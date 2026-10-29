@@ -216,6 +216,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Show network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMenuStyle, "KING menu background (off = map themes)", &g_Config.m_KgMenuStyle, &RightView, KING_LINE);
 
 	// ***** Preset ***** //
 	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);

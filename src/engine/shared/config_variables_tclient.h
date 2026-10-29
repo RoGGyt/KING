@@ -305,4 +305,6 @@ MACRO_CONFIG_INT(KgAutoMarginMax, kg_auto_margin_max, 40, 5, 150, CFGFLAG_CLIENT
 MACRO_CONFIG_INT(KgAutoMarginSafety, kg_auto_margin_safety, 2, 0, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Extra ms auto margin keeps on top of measured jitter")
 MACRO_CONFIG_INT(KgNetHud, kg_net_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show KING network HUD (ping, jitter, margin, late inputs)")
 MACRO_CONFIG_INT(KgUpdateCheck, kg_update_check, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Check GitHub for new KING releases on start")
+MACRO_CONFIG_INT(KgMenuStyle, kg_menu_style, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "KING menu background (dark with gold rays) instead of the menu map theme")
+MACRO_CONFIG_INT(KgThemeApplied, kg_theme_applied, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: KING interface colors were applied on first start")
 MACRO_CONFIG_INT(KgPresetApplied, kg_preset_applied, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: KoG preset was applied on first start")

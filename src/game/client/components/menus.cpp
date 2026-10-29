@@ -704,14 +704,14 @@ void CMenus::RenderLoadingDirect(const char *pCaption, const char *pContent, std
 
 	Ui()->MapScreen();
 
-	if(GameClient()->m_MenuBackground.IsLoading())
+	if(!g_Config.m_KgMenuStyle && GameClient()->m_MenuBackground.IsLoading())
 	{
 		// Avoid rendering while loading the menu background as this would otherwise
 		// cause the regular menu background to be rendered for a few frames while
 		// the menu background is not loaded yet.
 		return;
 	}
-	if(!GameClient()->m_MenuBackground.Render())
+	if(g_Config.m_KgMenuStyle || !GameClient()->m_MenuBackground.Render())
 	{
 		RenderBackground();
 	}
@@ -1023,7 +1023,7 @@ void CMenus::Render()
 	}
 	else
 	{
-		if(!GameClient()->m_MenuBackground.Render())
+		if(g_Config.m_KgMenuStyle || !GameClient()->m_MenuBackground.Render())
 		{
 			RenderBackground();
 		}
@@ -2453,8 +2453,91 @@ void CMenus::UpdateColors()
 	ms_ColorTabbarHoverIngame = ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f);
 }
 
+void CMenus::RenderKingBackground()
+{
+	const float ScreenHeight = 300.0f;
+	const float ScreenWidth = ScreenHeight * Graphics()->ScreenAspect();
+	Graphics()->MapScreenToSize(ScreenWidth, ScreenHeight);
+	const float Time = Client()->GlobalTime();
+
+	// dark purple-black gradient
+	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
+	const ColorRGBA Top(0.105f, 0.082f, 0.125f, 1.0f);
+	const ColorRGBA Bottom(0.035f, 0.031f, 0.047f, 1.0f);
+	Graphics()->SetColor4(Top, Top, Bottom, Bottom);
+	const IGraphics::CQuadItem BaseItem(0, 0, ScreenWidth, ScreenHeight);
+	Graphics()->QuadsDrawTL(&BaseItem, 1);
+	Graphics()->QuadsEnd();
+
+	// slowly rotating gold rays from behind the logo
+	const vec2 Center(ScreenWidth / 2.0f, 62.0f);
+	const float RayLen = ScreenWidth * 1.3f;
+	constexpr int NUM_RAYS = 18;
+	const float RayWidth = pi / NUM_RAYS * 0.45f;
+	Graphics()->QuadsBegin();
+	const ColorRGBA RayInner(1.0f, 0.74f, 0.2f, 0.08f);
+	const ColorRGBA RayOuter(1.0f, 0.6f, 0.1f, 0.0f);
+	Graphics()->SetColor4(RayInner, RayInner, RayOuter, RayOuter);
+	IGraphics::CFreeformItem aRays[NUM_RAYS];
+	for(int i = 0; i < NUM_RAYS; i++)
+	{
+		const float Angle = Time * 0.05f + i * (2.0f * pi / NUM_RAYS);
+		const vec2 A = Center + direction(Angle - RayWidth) * RayLen;
+		const vec2 B = Center + direction(Angle + RayWidth) * RayLen;
+		aRays[i] = IGraphics::CFreeformItem(Center, Center, A, B);
+	}
+	Graphics()->QuadsDrawFreeform(aRays, NUM_RAYS);
+	Graphics()->QuadsEnd();
+
+	// soft glow behind the crown
+	Graphics()->QuadsBegin();
+	for(int Ring = 6; Ring >= 1; Ring--)
+	{
+		Graphics()->SetColor(1.0f, 0.72f, 0.18f, 0.025f);
+		Graphics()->DrawCircle(Center.x, Center.y, Ring * 18.0f, 48);
+	}
+	Graphics()->QuadsEnd();
+
+	// rising gold sparks
+	Graphics()->QuadsBegin();
+	constexpr int NUM_SPARKS = 48;
+	IGraphics::CQuadItem aSparks[NUM_SPARKS];
+	for(int i = 0; i < NUM_SPARKS; i++)
+	{
+		// cheap deterministic pseudo random per spark
+		const float R1 = std::fmod(std::sin(i * 12.9898f) * 43758.5453f, 1.0f);
+		const float R2 = std::fmod(std::sin(i * 78.233f) * 12543.123f, 1.0f);
+		const float Speed = 6.0f + absolute(R2) * 10.0f;
+		const float Life = std::fmod(Time * Speed / ScreenHeight + absolute(R1), 1.0f);
+		const float X = absolute(R1) * ScreenWidth + std::sin(Time * 0.7f + i) * 6.0f;
+		const float Y = ScreenHeight * (1.05f - Life * 1.1f);
+		const float Size = 0.8f + absolute(R2) * 1.4f;
+		aSparks[i] = IGraphics::CQuadItem(X, Y, Size, Size);
+	}
+	Graphics()->SetColor(1.0f, 0.8f, 0.3f, 0.35f);
+	Graphics()->QuadsDrawTL(aSparks, NUM_SPARKS);
+	Graphics()->QuadsEnd();
+
+	// border fade
+	Graphics()->TextureSet(m_TextureBlob);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	const IGraphics::CQuadItem BlobQuadItem = IGraphics::CQuadItem(-100, -100, ScreenWidth + 200, ScreenHeight + 200);
+	Graphics()->QuadsDrawTL(&BlobQuadItem, 1);
+	Graphics()->QuadsEnd();
+
+	Ui()->MapScreen();
+}
+
 void CMenus::RenderBackground()
 {
+	if(g_Config.m_KgMenuStyle)
+	{
+		RenderKingBackground();
+		return;
+	}
+
 	const float ScreenHeight = 300.0f;
 	const float ScreenWidth = ScreenHeight * Graphics()->ScreenAspect();
 	Graphics()->MapScreenToSize(ScreenWidth, ScreenHeight);

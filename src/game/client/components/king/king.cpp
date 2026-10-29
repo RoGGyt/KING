@@ -62,6 +62,13 @@ void CKing::OnInit()
 		ApplyKogPreset();
 		g_Config.m_KgPresetApplied = 1;
 	}
+	if(!g_Config.m_KgThemeApplied)
+	{
+		// KING look: dark gold interface color (HSLA packed as A H S L)
+		g_Config.m_UiColor = (0xE4u << 24) | (0x1Eu << 16) | (0x8Cu << 8) | 0x46u;
+		g_Config.m_KgMenuStyle = 1;
+		g_Config.m_KgThemeApplied = 1;
+	}
 	ReadLastInstallResult();
 	if(g_Config.m_KgUpdateCheck)
 		CheckForUpdates();
