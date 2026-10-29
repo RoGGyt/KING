@@ -78,6 +78,7 @@ private:
 	void ReadLastInstallResult();
 
 	int m_PingCompAmount = 20;
+	int64_t m_PingCompChanged = 0;
 	std::shared_ptr<IHttpRequest> m_pUpdateTask = nullptr;
 	EUpdateState m_UpdateState = UPDATE_IDLE;
 	char m_aLatestVersion[32] = "";

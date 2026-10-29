@@ -40,12 +40,12 @@ jobs:
       run: |
         mkdir release
         cd release
-        cmake -E env CXXFLAGS=/DKING_REQUIRE_WINRT cmake -A x64 -DEXCEPTION_HANDLING=ON -DVULKAN=ON -DCMAKE_BUILD_TYPE=Release -DSERVER=OFF -DTOOLS=OFF -DDISCORD=OFF -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=. ..
+        cmake -E env CXXFLAGS=/DKING_REQUIRE_WINRT cmake -A x64 -DEXCEPTION_HANDLING=ON -DVULKAN=ON -DCMAKE_BUILD_TYPE=Release -DTOOLS=OFF -DDISCORD=OFF -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=. ..
 
     - name: Build
       run: |
         cd release
-        cmake --build . --config Release --target game-client
+        cmake --build . --config Release --target game-client game-server
 
     - name: Package
       run: |

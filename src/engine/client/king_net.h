@@ -17,7 +17,7 @@
 class CKingNetMonitor
 {
 public:
-	static constexpr int WINDOW = 150; // ~3 s of inputs at 50 Hz
+	static constexpr int WINDOW = 500; // ~10 s of inputs at 50 Hz
 	static constexpr int MIN_SAMPLES = 25;
 
 	void Reset(float StartMargin)
@@ -29,15 +29,19 @@ public:
 		m_LastRttMs = -1.0f;
 		m_TimeLeftMs = 0.0f;
 		m_SpreadMs = 0.0f;
-		m_MarginMs = StartMargin;
+		m_Margin = (int)std::ceil(StartMargin);
 		m_LateTotal = 0;
 		m_LastLate = 0;
-		m_LastUpdate = 0;
+		m_LastChange = 0;
 	}
 
+	// The margin is deliberately sticky: every change shifts the prediction
+	// timeline a little, and every late input costs a tick of your input (a
+	// visible correction). So: go up at once when needed, come down only after
+	// a long quiet period, one millisecond at a time.
 	void OnInputTiming(float RttMs, float TimeLeftMs, float SentMarginMs, int MinMargin, int MaxMargin, int Safety, int64_t Now)
 	{
-		const float Freq = (float)time_freq();
+		const int64_t Freq = time_freq();
 		MaxMargin = std::max(MaxMargin, MinMargin);
 
 		// RTT and RFC 3550 style inter-arrival jitter
@@ -55,44 +59,45 @@ public:
 		m_Index = (m_Index + 1) % WINDOW;
 		m_Count = std::min(m_Count + 1, WINDOW);
 
-		const float Dt = m_LastUpdate ? (Now - m_LastUpdate) / Freq : 0.0f;
-		m_LastUpdate = Now;
-
 		if(TimeLeftMs < 0.0f)
 		{
-			// Input arrived after the server tick started -> server reused the
-			// old input -> misprediction. React immediately.
+			// late input: the server had to reuse the previous input
 			m_LateTotal++;
 			m_LastLate = Now;
-			// Single spikes are cheap (one tick corrected), so nudge instead of jumping.
-			m_MarginMs = std::min((float)MaxMargin, m_MarginMs + 2.0f);
+			m_Margin = std::min(MaxMargin, m_Margin + 4);
+			m_LastChange = Now;
 			return;
 		}
 
 		if(m_Count < MIN_SAMPLES)
 			return;
 
+		// worst delay spike of the last ~10 s relative to the median
 		std::array<float, WINDOW> aSorted;
 		std::copy(m_aDev.begin(), m_aDev.begin() + m_Count, aSorted.begin());
 		const int Med = m_Count / 2;
-		const int P95 = std::min(m_Count - 1, (int)(m_Count * 0.95f));
 		std::nth_element(aSorted.begin(), aSorted.begin() + Med, aSorted.begin() + m_Count);
 		const float Median = aSorted[Med];
-		std::nth_element(aSorted.begin(), aSorted.begin() + P95, aSorted.begin() + m_Count);
-		m_SpreadMs = std::max(0.0f, aSorted[P95] - Median);
+		const float Worst = *std::max_element(aSorted.begin(), aSorted.begin() + m_Count);
+		m_SpreadMs = std::max(0.0f, Worst - Median);
 
-		const float Target = std::clamp(m_SpreadMs + Safety, (float)MinMargin, (float)MaxMargin);
-		const bool Hold = m_LastLate && (Now - m_LastLate) < (int64_t)(3 * Freq);
-		if(Target > m_MarginMs)
-			m_MarginMs += (Target - m_MarginMs) * 0.25f; // go up fast
-		else if(!Hold)
-			m_MarginMs = std::max(Target, m_MarginMs - 1.0f * Dt); // go down slowly: 1 ms per second
-		m_MarginMs = std::clamp(m_MarginMs, (float)MinMargin, (float)MaxMargin);
+		const int Target = std::clamp((int)std::ceil(m_SpreadMs) + Safety, MinMargin, MaxMargin);
+		if(Target > m_Margin)
+		{
+			m_Margin = Target;
+			m_LastChange = Now;
+		}
+		else if(Target < m_Margin && Now - m_LastChange > 20 * Freq && (!m_LastLate || Now - m_LastLate > 60 * Freq))
+		{
+			m_Margin--;
+			m_LastChange = Now;
+		}
+		m_Margin = std::clamp(m_Margin, MinMargin, MaxMargin);
 	}
 
 	int Margin(int MinMargin, int MaxMargin) const
 	{
-		return std::clamp((int)std::ceil(m_MarginMs), MinMargin, std::max(MinMargin, MaxMargin));
+		return std::clamp(m_Margin, MinMargin, std::max(MinMargin, MaxMargin));
 	}
 
 	bool Valid() const { return m_Count >= MIN_SAMPLES; }
@@ -112,10 +117,10 @@ private:
 	float m_LastRttMs = -1.0f;
 	float m_TimeLeftMs = 0.0f;
 	float m_SpreadMs = 0.0f;
-	float m_MarginMs = 10.0f;
+	int m_Margin = 10;
 	int m_LateTotal = 0;
 	int64_t m_LastLate = 0;
-	int64_t m_LastUpdate = 0;
+	int64_t m_LastChange = 0;
 };
 
 #endif

@@ -515,6 +515,7 @@ void CTranslate::Translate(CChat::CLine &Line, bool ShowProgress)
 	}
 
 	CTranslateJob Job;
+	Job.m_IsAuto = !ShowProgress;
 	Job.m_pLine = &Line;
 	Job.m_pTranslateResponse = std::make_shared<CTranslateResponse>();
 	Job.m_pLine->m_pTranslateResponse = Job.m_pTranslateResponse;
@@ -573,6 +574,15 @@ void CTranslate::OnRender()
 			if(str_comp_nocase(Job.m_pLine->m_aText, Job.m_pTranslateResponse->m_Text) == 0) // Check for no translation difference
 				Job.m_pTranslateResponse->m_Text[0] = '\0';
 		}
+		else if(Job.m_IsAuto)
+		{
+			// KING: never spam chat with errors from automatic translation. When the
+			// service rate limits us, stop auto translating for a while.
+			if(str_find(Job.m_pTranslateResponse->m_Text, "429"))
+				m_AutoPausedUntil = time_get() + 120 * time_freq();
+			Job.m_pTranslateResponse->m_Text[0] = '\0';
+			Job.m_pTranslateResponse->m_Error = false;
+		}
 		else
 		{
 			char aBuf[sizeof(Job.m_pTranslateResponse->m_Text)];
@@ -591,8 +601,10 @@ void CTranslate::AutoTranslate(CChat::CLine &Line)
 {
 	if(!g_Config.m_TcTranslateAuto)
 		return;
-	if(Line.m_ClientId == CChat::CLIENT_MSG)
+	if(m_AutoPausedUntil && time_get() < m_AutoPausedUntil)
 		return;
+	if(Line.m_ClientId == CChat::CLIENT_MSG || Line.m_ClientId == CChat::SERVER_MSG)
+		return; // KING: don't translate server/vote messages
 	for(const int Id : GameClient()->m_aLocalIds)
 	{
 		if(Id >= 0 && Id == Line.m_ClientId)

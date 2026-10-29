@@ -11,7 +11,7 @@
 #include <string>
 
 #define CLIENT_EXEC "DDNet"
-#define SERVER_EXEC "DDNet-Server"
+#define SERVER_EXEC "KING-Server"
 
 #if defined(CONF_FAMILY_WINDOWS)
 #define PLAT_EXT ".exe"

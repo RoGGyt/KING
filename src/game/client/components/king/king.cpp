@@ -7,6 +7,7 @@
 #include <base/log.h>
 #include <base/process.h>
 #include <base/str.h>
+#include <base/time.h>
 
 #include <engine/client.h>
 #include <engine/console.h>
@@ -76,6 +77,14 @@ void CKing::OnInit()
 		g_Config.m_UiColor = (0xE4u << 24) | (0x1Eu << 16) | (0x8Cu << 8) | 0x46u;
 		g_Config.m_KgMenuStyle = 1;
 		g_Config.m_KgThemeApplied = 1;
+	}
+	if(g_Config.m_KgDefaultsVersion < 2)
+	{
+		// 1.0.8: safer auto margin (no late inputs) and no automatic chat translation
+		g_Config.m_KgAutoMarginMin = std::max(g_Config.m_KgAutoMarginMin, 6);
+		g_Config.m_KgAutoMarginSafety = std::max(g_Config.m_KgAutoMarginSafety, 3);
+		g_Config.m_TcTranslateAuto = 0;
+		g_Config.m_KgDefaultsVersion = 2;
 	}
 	m_Media.Start();
 	ReadLastInstallResult();
@@ -401,9 +410,9 @@ void CKing::ApplyKogPreset()
 	g_Config.m_KgInputMode = INPUT_MODE_KING;
 	g_Config.m_KgFastInputAmount = 20;
 	g_Config.m_KgAutoMargin = 1;
-	g_Config.m_KgAutoMarginMin = 4;
+	g_Config.m_KgAutoMarginMin = 6;
 	g_Config.m_KgAutoMarginMax = 40;
-	g_Config.m_KgAutoMarginSafety = 2;
+	g_Config.m_KgAutoMarginSafety = 3;
 
 	// Antiping: predict others so hooks/collisions with other tees line up
 	g_Config.m_ClPredict = 1;
@@ -455,9 +464,14 @@ void CKing::ApplyInputMode()
 		const SKingNetStats Stats = Client()->KingNetStats();
 		if(Stats.m_Valid)
 		{
+			// change rarely: every change shifts your tee on screen
 			const int Wanted = std::clamp(round_to_int(Stats.m_RttMs * g_Config.m_KgPingComp / 100.0f), 1, 100);
-			if(absolute(Wanted - m_PingCompAmount) >= 2)
+			const int64_t Now = time_get();
+			if(absolute(Wanted - m_PingCompAmount) >= 4 && Now - m_PingCompChanged > 10 * time_freq())
+			{
 				m_PingCompAmount = Wanted;
+				m_PingCompChanged = Now;
+			}
 		}
 		g_Config.m_TcFastInput = 1;
 		g_Config.m_TcFastInputAmount = m_PingCompAmount;

@@ -70,10 +70,12 @@ class CTranslate : public CComponent
 		std::shared_ptr<CTranslateResponse> m_pTranslateResponse = nullptr;
 		// For outgoing translations (translating our own message before sending it)
 		bool m_IsOutgoing = false;
+		bool m_IsAuto = false; // KING: automatic translations fail silently
 		int m_OutgoingTeam = 0;
 		char m_aOutgoingOriginalText[256] = "";
 	};
 	std::vector<CTranslateJob> m_vJobs;
+	int64_t m_AutoPausedUntil = 0; // KING: back off after rate limiting (HTTP 429)
 
 	static void ConTranslate(IConsole::IResult *pResult, void *pUserData);
 	static void ConTranslateId(IConsole::IResult *pResult, void *pUserData);
