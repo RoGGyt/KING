@@ -2,7 +2,7 @@ name: KING Windows build
 
 on:
   push:
-    branches: [main, king]
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
