@@ -310,4 +310,5 @@ MACRO_CONFIG_INT(KgThemeApplied, kg_theme_applied, 0, 0, 1, CFGFLAG_CLIENT | CFG
 MACRO_CONFIG_INT(KgAspectRatio, kg_aspect_ratio, 0, 0, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game view aspect ratio, stretched to the screen (0 = native, 1 = 4:3, 2 = 5:4, 3 = 3:2, 4 = 16:10, 5 = 16:9, 6 = custom)")
 MACRO_CONFIG_INT(KgAspectCustom, kg_aspect_custom, 133, 100, 240, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom game view aspect ratio in hundredths (133 = 4:3)")
 MACRO_CONFIG_INT(KgMusicHud, kg_music_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the music player (what plays on your PC) at the top of the screen")
+MACRO_CONFIG_STR(KgSoundPack, kg_sound_pack, 64, "default", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sound pack from assets/sounds/<name> (default = built-in sounds)")
 MACRO_CONFIG_INT(KgPresetApplied, kg_preset_applied, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: KoG preset was applied on first start")

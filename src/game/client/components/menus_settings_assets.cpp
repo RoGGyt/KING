@@ -9,11 +9,16 @@
 #include <engine/storage.h>
 #include <engine/textrender.h>
 
+#include <generated/client_data.h>
+
 #include <game/client/gameclient.h>
 #include <game/client/ui_listbox.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <chrono>
+#include <string>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -34,7 +39,8 @@ enum
 	ASSETS_TAB_PARTICLES = 3,
 	ASSETS_TAB_HUD = 4,
 	ASSETS_TAB_EXTRAS = 5,
-	NUMBER_OF_ASSETS_TABS = 6,
+	ASSETS_TAB_SOUNDS = 6, // KING
+	NUMBER_OF_ASSETS_TABS = 7,
 };
 
 void CMenus::LoadEntities(SCustomEntities *pEntitiesItem, void *pUser)
@@ -364,7 +370,8 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		Localize("Emoticons"),
 		Localize("Particles"),
 		Localize("HUD"),
-		Localize("Extras")};
+		Localize("Extras"),
+		Localize("Sounds")};
 
 	for(int Tab = ASSETS_TAB_ENTITIES; Tab < NUMBER_OF_ASSETS_TABS; ++Tab)
 	{
@@ -375,6 +382,13 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		{
 			s_CurCustomTab = Tab;
 		}
+	}
+
+	if(s_CurCustomTab == ASSETS_TAB_SOUNDS)
+	{
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		RenderKingSoundPacks(MainView);
+		return;
 	}
 
 	auto LoadStartTime = time_get_nanoseconds();
@@ -740,4 +754,91 @@ void CMenus::ConchainAssetExtras(IConsole::IResult *pResult, void *pUserData, IC
 	}
 
 	pfnCallback(pResult, pCallbackUserData);
+}
+
+// ***** KING sound packs ***** //
+
+static int KingSoundPackScan(const char *pName, int IsDir, int DirType, void *pUser)
+{
+	auto *pList = static_cast<std::vector<std::string> *>(pUser);
+	if(!IsDir || pName[0] == '.' || str_comp(pName, "default") == 0)
+		return 0;
+	if(std::find(pList->begin(), pList->end(), pName) == pList->end())
+		pList->emplace_back(pName);
+	return 0;
+}
+
+void CMenus::RenderKingSoundPacks(CUIRect MainView)
+{
+	static std::vector<std::string> s_vPacks;
+	static bool s_Scanned = false;
+	if(!s_Scanned)
+	{
+		s_vPacks.clear();
+		Storage()->ListDirectory(IStorage::TYPE_ALL, "assets/sounds", KingSoundPackScan, &s_vPacks);
+		std::sort(s_vPacks.begin(), s_vPacks.end());
+		s_vPacks.insert(s_vPacks.begin(), "default");
+		s_Scanned = true;
+	}
+
+	CUIRect List, Bottom, Button, Hint;
+	MainView.HSplitBottom(ms_ButtonHeight, &List, &Bottom);
+	List.HSplitBottom(10.0f, &List, nullptr);
+	List.HSplitBottom(40.0f, &List, &Hint);
+
+	static CListBox s_ListBox;
+	int Selected = 0;
+	for(size_t i = 0; i < s_vPacks.size(); i++)
+		if(str_comp(s_vPacks[i].c_str(), g_Config.m_KgSoundPack) == 0)
+			Selected = (int)i;
+	s_ListBox.DoStart(24.0f, s_vPacks.size(), 1, 1, Selected, &List);
+	for(size_t i = 0; i < s_vPacks.size(); i++)
+	{
+		const CListboxItem Item = s_ListBox.DoNextItem(&s_vPacks[i], (int)i == Selected);
+		if(!Item.m_Visible)
+			continue;
+		CUIRect Label;
+		Item.m_Rect.VMargin(8.0f, &Label);
+		Ui()->DoLabel(&Label, s_vPacks[i].c_str(), 14.0f, TEXTALIGN_ML);
+	}
+	const int NewSelected = s_ListBox.DoEnd();
+	if(NewSelected != Selected && NewSelected >= 0 && NewSelected < (int)s_vPacks.size())
+	{
+		str_copy(g_Config.m_KgSoundPack, s_vPacks[NewSelected].c_str());
+		GameClient()->m_Sounds.ReloadSoundPack();
+		GameClient()->m_Sounds.Play(CSounds::CHN_GUI, SOUND_HOOK_ATTACH_GROUND, 1.0f);
+	}
+
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
+	CUIRect HintLine;
+	Hint.HSplitTop(20.0f, &HintLine, &Hint);
+	Ui()->DoLabel(&HintLine, "Put a folder with .wv files (same names as in data/audio) into assets/sounds/.", 12.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Hint, "Missing sounds stay default. Click a pack to switch, it applies at once.", 12.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	// buttons: open folder, rescan, test sound
+	CUIRect FolderButton, ReloadButton, TestButton;
+	Bottom.VSplitLeft(ms_ButtonHeight * 5.0f, &FolderButton, &Bottom);
+	Bottom.VSplitLeft(5.0f, nullptr, &Bottom);
+	Bottom.VSplitLeft(ms_ButtonHeight * 4.0f, &ReloadButton, &Bottom);
+	Bottom.VSplitLeft(5.0f, nullptr, &Bottom);
+	Bottom.VSplitLeft(ms_ButtonHeight * 4.0f, &TestButton, &Bottom);
+
+	static CButtonContainer s_FolderButton, s_ReloadButton, s_TestButton;
+	if(DoButton_Menu(&s_FolderButton, Localize("Assets directory"), 0, &FolderButton))
+	{
+		Storage()->CreateFolder("assets", IStorage::TYPE_SAVE);
+		Storage()->CreateFolder("assets/sounds", IStorage::TYPE_SAVE);
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "assets/sounds", aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+	if(DoButton_Menu(&s_ReloadButton, Localize("Reload"), 0, &ReloadButton))
+	{
+		s_Scanned = false;
+		GameClient()->m_Sounds.ReloadSoundPack();
+	}
+	if(DoButton_Menu(&s_TestButton, "Test sound", 0, &TestButton))
+		GameClient()->m_Sounds.Play(CSounds::CHN_GUI, SOUND_HOOK_ATTACH_GROUND, 1.0f);
+	(void)Button;
 }

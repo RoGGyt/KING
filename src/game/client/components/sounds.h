@@ -66,6 +66,9 @@ public:
 	void ClearQueue();
 	void Enqueue(int Channel, int SetId);
 	void Play(int Channel, int SetId, float Volume);
+	// KING sound packs
+	static int LoadPackSound(class CGameClient *pGameClient, const char *pFilename);
+	void ReloadSoundPack();
 	void PlayAt(int Channel, int SetId, float Volume, vec2 Position);
 	void PlayAndRecord(int Channel, int SetId, float Volume, vec2 Position);
 	void Stop(int SetId);

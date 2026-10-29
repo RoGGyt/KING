@@ -4,11 +4,13 @@
 #include "sounds.h"
 
 #include <base/mem.h>
+#include <base/str.h>
 #include <base/time.h>
 
 #include <engine/engine.h>
 #include <engine/shared/config.h>
 #include <engine/sound.h>
+#include <engine/storage.h>
 
 #include <generated/client_data.h>
 
@@ -16,6 +18,44 @@
 #include <game/client/components/menus.h>
 #include <game/client/gameclient.h>
 #include <game/localization.h>
+
+// KING: sound packs. A pack is a folder assets/sounds/<name>/ with .wv files named like
+// the ones in data/audio (e.g. wp_hammer_swing-01.wv). Missing files fall back to default.
+int CSounds::LoadPackSound(CGameClient *pGameClient, const char *pFilename)
+{
+	const char *pPack = g_Config.m_KgSoundPack;
+	if(pPack[0] != '\0' && str_comp(pPack, "default") != 0)
+	{
+		const char *pBase = str_startswith(pFilename, "audio/");
+		char aPath[IO_MAX_PATH_LENGTH];
+		str_format(aPath, sizeof(aPath), "assets/sounds/%s/%s", pPack, pBase ? pBase : pFilename);
+		if(pGameClient->Storage()->FileExists(aPath, IStorage::TYPE_ALL))
+		{
+			const int Id = pGameClient->Sound()->LoadWV(aPath);
+			if(Id != -1)
+				return Id;
+		}
+	}
+	return pGameClient->Sound()->LoadWV(pFilename);
+}
+
+void CSounds::ReloadSoundPack()
+{
+	if(m_WaitForSoundJob)
+		return;
+	Sound()->StopAll();
+	ClearQueue();
+	for(int s = 0; s < g_pData->m_NumSounds; s++)
+	{
+		for(int i = 0; i < g_pData->m_aSounds[s].m_NumSounds; i++)
+		{
+			int &Id = g_pData->m_aSounds[s].m_aSounds[i].m_Id;
+			if(Id != -1)
+				Sound()->UnloadSample(Id);
+			Id = LoadPackSound(GameClient(), g_pData->m_aSounds[s].m_aSounds[i].m_pFilename);
+		}
+	}
+}
 
 CSoundLoading::CSoundLoading(CGameClient *pGameClient, bool Render) :
 	m_pGameClient(pGameClient),
@@ -36,7 +76,7 @@ void CSoundLoading::Run()
 			if(State() == IJob::STATE_ABORTED)
 				return;
 
-			int Id = m_pGameClient->Sound()->LoadWV(g_pData->m_aSounds[s].m_aSounds[i].m_pFilename);
+			int Id = CSounds::LoadPackSound(m_pGameClient, g_pData->m_aSounds[s].m_aSounds[i].m_pFilename);
 			g_pData->m_aSounds[s].m_aSounds[i].m_Id = Id;
 			// try to render a frame
 			if(m_Render)

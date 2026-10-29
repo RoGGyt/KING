@@ -872,6 +872,7 @@ private:
 	void RenderSettingsKing(CUIRect MainView); // KING
 	void RenderSettingsKingPage(CUIRect MainView); // KING
 	void RenderSettingsKingDisplay(CUIRect MainView); // KING
+	void RenderKingSoundPacks(CUIRect MainView); // KING
 	void RenderKingBackground(); // KING
 	void RenderSettingsTClientSettings(CUIRect MainView);
 	void RenderSettingsTClientBindWheel(CUIRect MainView);
