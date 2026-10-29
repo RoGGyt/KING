@@ -216,7 +216,6 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Show network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMenuStyle, "KING menu background (off = map themes)", &g_Config.m_KgMenuStyle, &RightView, KING_LINE);
 
 	// ***** Preset ***** //
 	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
@@ -285,4 +284,49 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	ScrollRect.h = 0.0f;
 	s_ScrollRegion.AddRect(ScrollRect);
 	s_ScrollRegion.End();
+}
+
+void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
+{
+	CUIRect LeftView, RightView, Button;
+	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 3.0f);
+	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
+	RightView.Margin(KING_MARGIN_SMALL, &RightView);
+
+	Headline(Ui(), LeftView, "Aspect Ratio");
+	TextLine(Ui(), LeftView, "Game view ratio, stretched to fill your screen", 11.0f);
+	TextLine(Ui(), LeftView, "(like 4:3 stretched). Menus stay native.", 11.0f);
+	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+	{
+		int Value = g_Config.m_KgAspectRatio;
+		static std::vector<CButtonContainer> s_vRowA = {{}, {}, {}, {}};
+		static std::vector<CButtonContainer> s_vRowB = {{}, {}, {}};
+		bool Changed = DoLine_RadioMenu(LeftView, "", s_vRowA, {"Native", "4:3", "5:4", "3:2"}, {0, 1, 2, 3}, Value);
+		Changed |= DoLine_RadioMenu(LeftView, "", s_vRowB, {"16:10", "16:9", "Custom"}, {4, 5, 6}, Value);
+		if(Changed)
+			g_Config.m_KgAspectRatio = Value;
+	}
+	if(g_Config.m_KgAspectRatio == 6)
+	{
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		char aLabel[64];
+		str_format(aLabel, sizeof(aLabel), "Ratio %d.%02d", g_Config.m_KgAspectCustom / 100, g_Config.m_KgAspectCustom % 100);
+		Ui()->DoScrollbarOption(&g_Config.m_KgAspectCustom, &g_Config.m_KgAspectCustom, &Button, aLabel, 100, 240, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
+	}
+	{
+		char aNow[96];
+		const float Screen = Graphics()->ScreenAspect();
+		const float World = CKing::AspectRatioValue(g_Config.m_KgAspectRatio);
+		if(World > 0.0f)
+			str_format(aNow, sizeof(aNow), "Screen %.2f, game %.2f (stretch x%.2f)", Screen, World, Screen / World);
+		else
+			str_format(aNow, sizeof(aNow), "Screen %.2f, game uses the same", Screen);
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		TextLine(Ui(), LeftView, aNow, 11.0f);
+	}
+
+	Headline(Ui(), RightView, "Interface");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicHud, "Music player in game (top, next to the timer)", &g_Config.m_KgMusicHud, &RightView, KING_LINE);
 }

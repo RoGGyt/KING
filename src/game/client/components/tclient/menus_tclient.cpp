@@ -320,23 +320,10 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		s_Time = (float)rand() / (float)RAND_MAX;
 	}
 
-	static int s_CurCustomTab = TCLIENT_TAB_KING;
+	static int s_CurCustomTab = TCLIENT_TAB_SETTINGS;
 
-	CUIRect TabBar, Button;
-	int TabCount = NUMBER_OF_TCLIENT_TABS;
-	for(int Tab = 0; Tab < NUMBER_OF_TCLIENT_TABS; ++Tab)
-	{
-		if(Tab != TCLIENT_TAB_KING && IsFlagSet(g_Config.m_TcTClientSettingsTabs, Tab))
-		{
-			TabCount--;
-			if(s_CurCustomTab == Tab)
-				s_CurCustomTab++;
-		}
-	}
-
-	MainView.HSplitTop(LineSize, &TabBar, &MainView);
-	const float TabWidth = TabBar.w / TabCount;
-	static CButtonContainer s_aPageTabs[NUMBER_OF_TCLIENT_TABS] = {};
+	// TClient features only; KING settings and Info have their own settings page
+	static const int s_aTabOrder[] = {TCLIENT_TAB_SETTINGS, TCLIENT_TAB_BINDWHEEL, TCLIENT_TAB_WARLIST, TCLIENT_TAB_BINDCHAT, TCLIENT_TAB_STATUSBAR};
 	const char *apTabNames[] = {
 		TCLocalize("Settings"),
 		TCLocalize("Bind Wheel"),
@@ -346,21 +333,41 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		TCLocalize("Info"),
 		"KING"};
 
-	// KING tab goes first
-	static const int s_aTabOrder[NUMBER_OF_TCLIENT_TABS] = {TCLIENT_TAB_KING, TCLIENT_TAB_SETTINGS, TCLIENT_TAB_BINDWHEEL, TCLIENT_TAB_WARLIST, TCLIENT_TAB_BINDCHAT, TCLIENT_TAB_STATUSBAR, TCLIENT_TAB_INFO};
-	int LastVisible = TCLIENT_TAB_KING;
-	for(int Tab : s_aTabOrder)
-		if(Tab == TCLIENT_TAB_KING || !IsFlagSet(g_Config.m_TcTClientSettingsTabs, Tab))
-			LastVisible = Tab;
-
+	int TabCount = 0;
+	int FirstVisible = -1, LastVisible = -1;
 	for(int Tab : s_aTabOrder)
 	{
-		if(Tab != TCLIENT_TAB_KING && IsFlagSet(g_Config.m_TcTClientSettingsTabs, Tab))
+		if(IsFlagSet(g_Config.m_TcTClientSettingsTabs, Tab))
 			continue;
+		TabCount++;
+		if(FirstVisible < 0)
+			FirstVisible = Tab;
+		LastVisible = Tab;
+	}
+	if(TabCount == 0)
+	{
+		// everything hidden: show Settings anyway
+		TabCount = 1;
+		FirstVisible = LastVisible = TCLIENT_TAB_SETTINGS;
+		SetFlag(g_Config.m_TcTClientSettingsTabs, TCLIENT_TAB_SETTINGS, false);
+	}
+	if(IsFlagSet(g_Config.m_TcTClientSettingsTabs, s_CurCustomTab) || s_CurCustomTab == TCLIENT_TAB_INFO || s_CurCustomTab == TCLIENT_TAB_KING)
+		s_CurCustomTab = FirstVisible;
 
+	CUIRect TabBar, Button;
+	MainView.HSplitTop(LineSize, &TabBar, &MainView);
+	const float TabWidth = TabBar.w / TabCount;
+	static CButtonContainer s_aPageTabs[NUMBER_OF_TCLIENT_TABS] = {};
+	for(int Tab : s_aTabOrder)
+	{
+		if(IsFlagSet(g_Config.m_TcTClientSettingsTabs, Tab))
+			continue;
 		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
-		const int Corners = Tab == TCLIENT_TAB_KING ? (LastVisible == TCLIENT_TAB_KING ? IGraphics::CORNER_ALL : IGraphics::CORNER_L) : Tab == LastVisible ? IGraphics::CORNER_R :
-																		     IGraphics::CORNER_NONE;
+		int Corners = IGraphics::CORNER_NONE;
+		if(Tab == FirstVisible)
+			Corners |= IGraphics::CORNER_L;
+		if(Tab == LastVisible)
+			Corners |= IGraphics::CORNER_R;
 		if(DoButton_MenuTab(&s_aPageTabs[Tab], apTabNames[Tab], s_CurCustomTab == Tab, &Button, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
 			s_CurCustomTab = Tab;
 	}
@@ -377,10 +384,40 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		RenderSettingsTClientWarList(MainView);
 	if(s_CurCustomTab == TCLIENT_TAB_STATUSBAR)
 		RenderSettingsTClientStatusBar(MainView);
-	if(s_CurCustomTab == TCLIENT_TAB_INFO)
-		RenderSettingsTClientInfo(MainView);
-	if(s_CurCustomTab == TCLIENT_TAB_KING)
+}
+
+// KING settings page: General | Display | Info
+void CMenus::RenderSettingsKingPage(CUIRect MainView)
+{
+	enum
+	{
+		KING_TAB_GENERAL = 0,
+		KING_TAB_DISPLAY,
+		KING_TAB_INFO,
+		NUM_KING_TABS,
+	};
+	static int s_CurTab = KING_TAB_GENERAL;
+	static CButtonContainer s_aTabs[NUM_KING_TABS];
+	const char *apNames[NUM_KING_TABS] = {"General", "Display", "Info"};
+
+	CUIRect TabBar, Button;
+	MainView.HSplitTop(LineSize, &TabBar, &MainView);
+	const float TabWidth = TabBar.w / (float)NUM_KING_TABS;
+	for(int i = 0; i < NUM_KING_TABS; i++)
+	{
+		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
+		const int Corners = i == 0 ? IGraphics::CORNER_L : i == NUM_KING_TABS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE;
+		if(DoButton_MenuTab(&s_aTabs[i], apNames[i], s_CurTab == i, &Button, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
+			s_CurTab = i;
+	}
+	MainView.HSplitTop(Margin, nullptr, &MainView);
+
+	if(s_CurTab == KING_TAB_GENERAL)
 		RenderSettingsKing(MainView);
+	else if(s_CurTab == KING_TAB_DISPLAY)
+		RenderSettingsKingDisplay(MainView);
+	else
+		RenderSettingsTClientInfo(MainView);
 }
 
 void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
@@ -2231,7 +2268,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 		Ui()->DoLabel(&Label, "RoGGyt", LineSize, TEXTALIGN_ML);
 		if(Ui()->DoButton_FontIcon(&s_DevLinkButton, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
 			Client()->ViewLink("https://github.com/RoGGyt");
-		RenderDevSkin(TeeRect.Center(), 50.0f, "default", "default", true, 0, 0, 0, false, true, ColorRGBA(1.00f, 0.78f, 0.20f, 1.00f), ColorRGBA(0.35f, 0.22f, 0.05f, 1.00f));
+		RenderDevSkin(TeeRect.Center(), 50.0f, g_Config.m_ClPlayerSkin, "default", g_Config.m_ClPlayerUseCustomColor, g_Config.m_ClPlayerColorFeet, g_Config.m_ClPlayerColorBody, 0, false, true); // your own skin
 	}
 
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);

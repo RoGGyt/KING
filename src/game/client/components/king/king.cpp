@@ -461,9 +461,27 @@ void CKing::ApplyInputMode()
 	}
 }
 
+float CKing::AspectRatioValue(int Setting)
+{
+	switch(Setting)
+	{
+	case 1: return 4.0f / 3.0f;
+	case 2: return 5.0f / 4.0f;
+	case 3: return 3.0f / 2.0f;
+	case 4: return 16.0f / 10.0f;
+	case 5: return 16.0f / 9.0f;
+	case 6: return g_Config.m_KgAspectCustom / 100.0f;
+	}
+	return 0.0f; // native
+}
+
 void CKing::OnUpdate()
 {
 	ApplyInputMode();
+
+	// stretched aspect ratio only for the game world, menus stay native
+	const bool InGame = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
+	Graphics()->SetWorldAspect(InGame ? AspectRatioValue(g_Config.m_KgAspectRatio) : 0.0f);
 }
 
 void CKing::OnRender()

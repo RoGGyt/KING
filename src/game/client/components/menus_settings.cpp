@@ -51,7 +51,8 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Sound"),
 		Localize("DDNet"),
 		Localize("Assets"),
-		"KING", // KING (TClient settings live inside)
+		"KING", // KING
+		"TClient", // TClient
 		Localize("Profiles"), // TClient
 		Localize("Configs"), // TClient
 		Localize("Credits")};
@@ -117,6 +118,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
 		RenderSettingsAssets(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_KING) // KING
+	{
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_LANGUAGE);
+		RenderSettingsKingPage(MainView);
 	}
 	else if(g_Config.m_UiSettingsPage == SETTINGS_TCLIENT) // TClient
 	{

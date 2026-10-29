@@ -717,6 +717,7 @@ public:
 		SETTINGS_SOUND,
 		SETTINGS_DDNET,
 		SETTINGS_ASSETS,
+		SETTINGS_KING, // KING
 		SETTINGS_TCLIENT, // TClient
 		SETTINGS_PROFILES, // TClient
 		SETTINGS_CONFIGS, // TClient
@@ -869,6 +870,8 @@ private:
 	// TClient: found in menus_tclient.cpp
 	void RenderSettingsTClient(CUIRect MainView);
 	void RenderSettingsKing(CUIRect MainView); // KING
+	void RenderSettingsKingPage(CUIRect MainView); // KING
+	void RenderSettingsKingDisplay(CUIRect MainView); // KING
 	void RenderKingBackground(); // KING
 	void RenderSettingsTClientSettings(CUIRect MainView);
 	void RenderSettingsTClientBindWheel(CUIRect MainView);

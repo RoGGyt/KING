@@ -43,6 +43,7 @@ public:
 	void ApplyKogPreset();
 
 	static const char *InputModeName(int Mode);
+	static float AspectRatioValue(int Setting); // 0 = native
 	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH; }
 	int PingCompAmount() const { return m_PingCompAmount; }
 

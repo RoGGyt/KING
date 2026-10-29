@@ -2420,7 +2420,7 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 		{
 			CNetMsg_Cl_ShowDistance Msg;
 			float x, y;
-			Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), ShowDistanceZoom, &x, &y);
+			Graphics()->CalcScreenParams(Graphics()->WorldAspect(), ShowDistanceZoom, &x, &y);
 			Msg.m_X = x;
 			Msg.m_Y = y;
 			CMsgPacker Packer(&Msg);
@@ -2439,11 +2439,11 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 	}
 
 	// send show distance
-	if(ShowDistanceZoom != m_LastShowDistanceZoom || Graphics()->ScreenAspect() != m_LastScreenAspect)
+	if(ShowDistanceZoom != m_LastShowDistanceZoom || Graphics()->WorldAspect() != m_LastScreenAspect)
 	{
 		CNetMsg_Cl_ShowDistance Msg;
 		float x, y;
-		Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), ShowDistanceZoom, &x, &y);
+		Graphics()->CalcScreenParams(Graphics()->WorldAspect(), ShowDistanceZoom, &x, &y);
 		Msg.m_X = x;
 		Msg.m_Y = y;
 		Client()->ChecksumData()->m_Zoom = ShowDistanceZoom;
@@ -2472,7 +2472,7 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 
 	m_LastShowDistanceZoom = ShowDistanceZoom;
 	m_LastZoom = Zoom;
-	m_LastScreenAspect = Graphics()->ScreenAspect();
+	m_LastScreenAspect = Graphics()->WorldAspect();
 	m_LastDeadzone = Deadzone;
 	m_LastFollowFactor = FollowFactor;
 	m_LastDummyConnected = Client()->DummyConnected();

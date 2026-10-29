@@ -307,4 +307,7 @@ MACRO_CONFIG_INT(KgNetHud, kg_net_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "
 MACRO_CONFIG_INT(KgUpdateCheck, kg_update_check, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Check GitHub for new KING releases on start")
 MACRO_CONFIG_INT(KgMenuStyle, kg_menu_style, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "KING menu background (dark with gold rays) instead of the menu map theme")
 MACRO_CONFIG_INT(KgThemeApplied, kg_theme_applied, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: KING interface colors were applied on first start")
+MACRO_CONFIG_INT(KgAspectRatio, kg_aspect_ratio, 0, 0, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game view aspect ratio, stretched to the screen (0 = native, 1 = 4:3, 2 = 5:4, 3 = 3:2, 4 = 16:10, 5 = 16:9, 6 = custom)")
+MACRO_CONFIG_INT(KgAspectCustom, kg_aspect_custom, 133, 100, 240, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom game view aspect ratio in hundredths (133 = 4:3)")
+MACRO_CONFIG_INT(KgMusicHud, kg_music_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the music player (what plays on your PC) at the top of the screen")
 MACRO_CONFIG_INT(KgPresetApplied, kg_preset_applied, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: KoG preset was applied on first start")

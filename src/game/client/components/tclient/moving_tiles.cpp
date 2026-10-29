@@ -173,7 +173,7 @@ void CMovingTiles::OnRender()
 			Center.x, Center.y,
 			pGroup->m_ParallaxX, pGroup->m_ParallaxY, (float)ParallaxZoom,
 			pGroup->m_OffsetX, pGroup->m_OffsetY,
-			Graphics()->ScreenAspect(), Zoom);
+			Graphics()->WorldAspect(), Zoom);
 		Graphics()->MapScreen(ScreenRect);
 
 		return true;

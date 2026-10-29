@@ -240,6 +240,7 @@ class IGraphics : public IInterface
 {
 	MACRO_INTERFACE("graphics")
 protected:
+	float m_WorldAspectOverride = 0.0f; // KING
 	int m_ScreenWidth;
 	int m_ScreenHeight;
 	int m_ViewportX = 0;
@@ -278,6 +279,10 @@ public:
 	int ScreenHeight() const { return m_ScreenHeight; }
 	vec2 ScreenSize() const { return vec2(m_ScreenWidth, m_ScreenHeight); }
 	float ScreenAspect() const { return (float)ScreenWidth() / (float)ScreenHeight(); }
+	// KING: aspect ratio used for the game world. Differs from ScreenAspect() when a
+	// stretched ratio (like 4:3 on a 16:9 monitor) is selected.
+	float WorldAspect() const { return m_WorldAspectOverride > 0.0f ? m_WorldAspectOverride : ScreenAspect(); }
+	void SetWorldAspect(float Aspect) { m_WorldAspectOverride = Aspect; }
 	float ScreenHiDPIScale() const { return m_ScreenHiDPIScale; }
 	int WindowWidth() const { return m_ScreenWidth / m_ScreenHiDPIScale; }
 	int WindowHeight() const { return m_ScreenHeight / m_ScreenHiDPIScale; }
