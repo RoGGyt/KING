@@ -453,7 +453,23 @@ void CMenusStart::RenderKingPlayer(CUIRect Area)
 	vec2 Dir = Ui()->MousePos() - TeePos;
 	const float Len = length(Dir);
 	Dir = Len > 0.001f ? Dir / Len : vec2(1.0f, 0.0f);
-	RenderTools()->RenderTee(pIdle, &TeeInfo, EMOTE_NORMAL, Dir, TeePos);
+
+	// face: happy while hovered, surprised while pressed, blinks now and then
+	CUIRect TeeRect;
+	TeeRect.x = Center.x - Size * 0.5f;
+	TeeRect.y = Center.y - Size * 0.5f;
+	TeeRect.w = Size;
+	TeeRect.h = Size;
+	static CButtonContainer s_TeeButton;
+	const bool Hovered = Ui()->MouseHovered(&TeeRect);
+	int Emote = EMOTE_NORMAL;
+	if(Hovered && Ui()->CheckActiveItem(&s_TeeButton))
+		Emote = EMOTE_SURPRISE;
+	else if(Hovered)
+		Emote = EMOTE_HAPPY;
+	else if(std::fmod(Client()->GlobalTime(), 4.0f) < 0.12f)
+		Emote = EMOTE_BLINK;
+	RenderTools()->RenderTee(pIdle, &TeeInfo, Emote, Dir, TeePos);
 
 	// name above the tee
 	CUIRect NameRect;
@@ -466,12 +482,6 @@ void CMenusStart::RenderKingPlayer(CUIRect Area)
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	// clicking the tee opens the tee settings
-	static CButtonContainer s_TeeButton;
-	CUIRect TeeRect;
-	TeeRect.x = Center.x - Size * 0.5f;
-	TeeRect.y = Center.y - Size * 0.5f;
-	TeeRect.w = Size;
-	TeeRect.h = Size;
 	if(Ui()->DoButtonLogic(&s_TeeButton, 0, &TeeRect, BUTTONFLAG_LEFT))
 	{
 		g_Config.m_UiSettingsPage = CMenus::SETTINGS_TEE;
