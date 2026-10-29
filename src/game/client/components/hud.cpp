@@ -694,7 +694,12 @@ void CHud::RenderTextInfo()
 		else if(g_Config.m_TcShowFrozenText == 2)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumFrozen, NumInTeam);
 		if(g_Config.m_TcShowFrozenText > 0)
-			TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, 12.0f, 10.0f, aBuf);
+		{
+			// KING: below the music player pill instead of under it
+			const float FrozenTextY = GameClient()->m_King.PillRenderedThisFrame() ? GameClient()->m_King.PillBottom() + 1.0f : 12.0f;
+			TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, FrozenTextY, 10.0f, aBuf);
+			GameClient()->m_King.ReserveTopCenter(FrozenTextY + 11.0f);
+		}
 
 		// str_format(aBuf, sizeof(aBuf), "%d", GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_PrevPredicted.m_FreezeEnd);
 		// str_format(aBuf, sizeof(aBuf), "%d", g_Config.m_ClWhatsMyPing);
@@ -719,6 +724,8 @@ void CHud::RenderTextInfo()
 				MaxTees = (int)(9.5f * (m_Width / m_Height) * 13.0f / TeeSize);
 			int MaxRows = g_Config.m_TcFrozenMaxRows;
 			float StartPos = m_Width / 2.0f + 38.0f * (m_Width / m_Height) / 1.78f;
+			if(GameClient()->m_King.PillRenderedThisFrame()) // KING: start right of the music player pill
+				StartPos = std::max(StartPos, GameClient()->m_King.PillRight() + TeeSize / 2.0f + 3.0f);
 
 			int TotalRows = std::min(MaxRows, (NumInTeam + MaxTees - 1) / MaxTees);
 			Graphics()->TextureClear();

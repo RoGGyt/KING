@@ -13,6 +13,7 @@
 
 #include <game/client/component.h>
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <string>
@@ -133,6 +134,16 @@ public:
 	// Draws the pill centered on CenterX with its top at TopY. Unit scales everything
 	// (1 = HUD units of a 300 high screen). Returns the pill height.
 	float RenderMusicPill(float CenterX, float TopY, float Unit, const char *pTime, ColorRGBA TimeColor, bool Hud);
+	// HUD layout around the pill (HUD units, valid for the current frame only)
+	bool PillRenderedThisFrame() const { return m_PillRenderedThisFrame; }
+	float PillBottom() const { return m_PillBottom; }
+	float PillRight() const { return m_PillRight; }
+	// HUD text placed under the pill: lyrics go below it
+	void ReserveTopCenter(float Bottom)
+	{
+		if(m_PillRenderedThisFrame)
+			m_LyricsTop = std::max(m_LyricsTop, Bottom);
+	}
 	void ResetMusicSettings();
 
 private:
@@ -204,6 +215,8 @@ private:
 	float m_PillAlpha = 0.0f;
 	bool m_PillRenderedThisFrame = false;
 	float m_PillBottom = 0.0f;
+	float m_PillRight = 0.0f;
+	float m_LyricsTop = 0.0f;
 	float m_PillUnit = 1.0f;
 
 	// lyrics (lrclib.net, synced lyrics)

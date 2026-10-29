@@ -1235,6 +1235,8 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 	{
 		m_PillRenderedThisFrame = true;
 		m_PillBottom = TopY + H;
+		m_PillRight = X + W;
+		m_LyricsTop = m_PillBottom;
 		m_PillUnit = Unit;
 	}
 	return H;
@@ -1242,7 +1244,7 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 
 void CKing::RenderLyrics()
 {
-	if(!m_PillRenderedThisFrame)
+	if(!m_PillRenderedThisFrame || !g_Config.m_KgMusicLyrics)
 		return;
 	const SKingMediaInfo Info = m_Media.Get();
 	if(!Info.m_Valid)
@@ -1252,29 +1254,14 @@ void CKing::RenderLyrics()
 	const float Width = Height * Graphics()->ScreenAspect();
 	Graphics()->MapScreenToSize(Width, Height);
 
-	const int64_t Now = time_get();
 	const float Scale = m_PillUnit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
 	const float Dt = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
 
-	// right after a track change: its name, then the synced lyrics (if enabled)
+	// synced lyrics (opt-in); the song name is not shown, the cover is enough
 	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
-	if(Track != m_LastTrack)
-	{
-		m_LastTrack = Track;
-		m_TrackChangedTime = Now;
-	}
 	char aText[512] = "";
 	float Alpha = 0.0f;
-	const float SinceChange = (Now - m_TrackChangedTime) / (float)time_freq();
-	if(SinceChange < 4.0f && (Info.m_aTitle[0] || Info.m_aArtist[0]))
-	{
-		if(Info.m_aArtist[0] && Info.m_aTitle[0])
-			str_format(aText, sizeof(aText), "%s - %s", Info.m_aTitle, Info.m_aArtist);
-		else
-			str_copy(aText, Info.m_aTitle[0] ? Info.m_aTitle : Info.m_aArtist);
-		Alpha = std::min({1.0f, SinceChange / 0.2f, (4.0f - SinceChange) / 0.4f});
-	}
-	else if(g_Config.m_KgMusicLyrics && Info.m_HasTimeline && Track == m_LyricsTrack && !m_vLyrics.empty())
+	if(g_Config.m_KgMusicLyrics && Info.m_HasTimeline && Track == m_LyricsTrack && !m_vLyrics.empty())
 	{
 		const float Pos = Info.m_PositionSec + 0.25f; // show a line a moment early, like karaoke
 		int Line = -1;
@@ -1303,7 +1290,7 @@ void CKing::RenderLyrics()
 	const float FinalW = TextRender()->TextWidth(FontSize, aText);
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.92f * Alpha);
 	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.45f * Alpha);
-	TextRender()->Text(Width / 2.0f - FinalW / 2.0f, m_PillBottom + 2.0f * Scale, FontSize, aText, -1.0f);
+	TextRender()->Text(Width / 2.0f - FinalW / 2.0f, m_LyricsTop + 1.5f * Scale, FontSize, aText, -1.0f);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
 }
