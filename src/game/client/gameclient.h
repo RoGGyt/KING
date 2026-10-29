@@ -237,6 +237,8 @@ public:
 	vec2 m_KingSmoothStart = vec2(0.0f, 0.0f); // offset when the current blend started
 	float m_KingSmoothElapsedMs = 0.0f;
 	int m_KingPrevFinalRegular = -1;
+	int m_KingPrevLocalId = -1;
+	int m_KingPrevDummy = -1;
 	CTranslate m_Translate;
 	CPet m_Pet;
 	CPlayerIndicator m_PlayerIndicator;

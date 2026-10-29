@@ -47,10 +47,15 @@ struct SKingNetStats
 	float m_SpreadMs = 0.0f;
 	float m_TimeLeftMs = 0.0f;
 	int m_MarginMs = 10;
+	float m_MarginExactMs = 10.0f; // applied (ramped) margin
+	float m_MarginTargetMs = 10.0f; // where auto margin is heading
 	bool m_MarginAuto = false;
 	bool m_MarginLocked = false; // server lacks SyncWeaponInput, margin forced to 10
 	int m_LateInputs = 0;
+	float m_LastLateMs = 0.0f; // how late the last late input was
+	int64_t m_LastLateTime = 0; // time_get() of the last late input
 	bool m_RecentLate = false;
+	int m_PredictionResets = 0;
 };
 
 class IClient : public IInterface

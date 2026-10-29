@@ -151,11 +151,20 @@ void CHud::RenderGameTimer()
 		static float s_TextWidth000D = TextRender()->TextWidth(FontSize, "000d 00:00:00", -1, -1.0f);
 		float w = Time >= 3600 * 24 * 100 ? s_TextWidth000D : (Time >= 3600 * 24 * 10 ? s_TextWidth00D : (Time >= 3600 * 24 ? s_TextWidth0D : (Time >= 3600 ? s_TextWidthH : s_TextWidthM)));
 		// last 60 sec red, last 10 sec blink
+		ColorRGBA TimeColor(1.0f, 1.0f, 1.0f, 1.0f);
 		if(GameClient()->m_Snap.m_pGameInfoObj->m_TimeLimit && Time <= 60 && (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer <= 0))
 		{
 			float Alpha = Time <= 10 && (2 * time() / time_freq()) % 2 ? 0.5f : 1.0f;
-			TextRender()->TextColor(1.0f, 0.25f, 0.25f, Alpha);
+			TimeColor = ColorRGBA(1.0f, 0.25f, 0.25f, Alpha);
 		}
+		// KING music player: the timer sits between the cover and the visualizer
+		if(GameClient()->m_King.MusicPillVisible())
+		{
+			GameClient()->m_King.RenderMusicPill(Half, 1.0f, 1.0f, aBuf, TimeColor, true);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+			return;
+		}
+		TextRender()->TextColor(TimeColor);
 		TextRender()->Text(Half - w / 2, 2, FontSize, aBuf, -1.0f);
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}

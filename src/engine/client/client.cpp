@@ -362,6 +362,8 @@ bool CClient::ConnectionProblems() const
 	return m_aNetClient[g_Config.m_ClDummy].GotProblems(MaxLatencyTicks() * time_freq() / GameTickSpeed());
 }
 
+static bool KingAutoMarginActive(); // KING, defined next to PredictionMargin()
+
 void CClient::SendInput()
 {
 	int64_t Now = time_get();
@@ -390,7 +392,7 @@ void CClient::SendInput()
 
 			m_aInputs[i][m_aCurrentInput[i]].m_Tick = m_aPredTick[g_Config.m_ClDummy];
 			m_aInputs[i][m_aCurrentInput[i]].m_PredictedTime = m_PredictedTime.Get(Now);
-			m_aInputs[i][m_aCurrentInput[i]].m_PredictionMargin = PredictionMargin() * time_freq() / 1000;
+			m_aInputs[i][m_aCurrentInput[i]].m_PredictionMargin = KingMarginTime(); // KING: exact (ramped) margin
 			if(g_Config.m_TcSmoothPredictionMargin)
 				m_aInputs[i][m_aCurrentInput[i]].m_PredictionMargin = m_PredictedTime.GetMargin(Now);
 			m_aInputs[i][m_aCurrentInput[i]].m_Time = Now;
@@ -2161,7 +2163,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 					{
 						const float RttMs = (Now - m_aInputs[Conn][k].m_Time) * 1000.0f / (float)time_freq();
 						const float SentMarginMs = m_aInputs[Conn][k].m_PredictionMargin * 1000.0f / (float)time_freq();
-						m_KingNet.OnInputTiming(RttMs, (float)TimeLeft, SentMarginMs, g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety, Now);
+						m_KingNet.OnInputTiming(RttMs, (float)TimeLeft, SentMarginMs, Now);
 					}
 					Target = m_aInputs[Conn][k].m_PredictedTime + (Now - m_aInputs[Conn][k].m_Time);
 					if(g_Config.m_TcSmoothPredictionMargin)
@@ -2387,8 +2389,9 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 						{
 							m_PredictedTime.Init(GameTick * time_freq() / GameTickSpeed());
 							m_KingNet.Reset((float)g_Config.m_ClPredictionMargin); // KING
+							m_KingPredResets = 0;
 							m_PredictedTime.SetAdjustSpeed(CSmoothTime::ADJUSTDIRECTION_UP, 1000.0f);
-							m_PredictedTime.UpdateMargin(PredictionMargin() * time_freq() / 1000);
+							m_PredictedTime.UpdateMargin(KingMarginTime());
 						}
 						m_aGameTime[Conn].Init((GameTick - 1) * time_freq() / GameTickSpeed());
 						m_aapSnapshots[Conn][SNAP_PREV] = m_aSnapshotStorage[Conn].m_pFirst;
@@ -3027,6 +3030,7 @@ void CClient::Update()
 				if(absolute(NewPredTick - m_aapSnapshots[g_Config.m_ClDummy][SNAP_PREV]->m_Tick) > MaxLatencyTicks())
 				{
 					m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client", "prediction time reset!");
+					m_KingPredResets++; // KING lag log
 					m_PredictedTime.Init(CurTickStart + 2 * time_freq() / GameTickSpeed());
 				}
 
@@ -3208,7 +3212,12 @@ void CClient::Update()
 		m_ReconnectTime = 0;
 	}
 
-	m_PredictedTime.UpdateMargin(PredictionMargin() * time_freq() / 1000);
+	// KING: move the applied margin smoothly towards what the network needs
+	if(KingAutoMarginActive() && m_ServerCapabilities.m_SyncWeaponInput && m_KingNet.Valid())
+		m_KingNet.Advance(m_KingNet.TargetMs(g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety), time_get());
+	else
+		m_KingNet.SetCurrent(KingMarginMs());
+	m_PredictedTime.UpdateMargin(KingMarginTime());
 }
 
 void CClient::RegisterInterfaces()
@@ -5556,14 +5565,24 @@ static bool KingAutoMarginActive()
 	}
 }
 
-int CClient::PredictionMargin() const
+float CClient::KingMarginMs() const
 {
 	if(!m_ServerCapabilities.m_SyncWeaponInput)
-		return 10;
-	// KING: adaptive margin (forced on in KING input mode)
+		return 10.0f;
+	// KING: adaptive margin, ramped (see CKingNetMonitor::Advance)
 	if(KingAutoMarginActive() && m_KingNet.Valid())
-		return m_KingNet.Margin(g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax);
-	return g_Config.m_ClPredictionMargin;
+		return m_KingNet.CurrentMs();
+	return (float)g_Config.m_ClPredictionMargin;
+}
+
+int64_t CClient::KingMarginTime() const
+{
+	return (int64_t)(KingMarginMs() * (double)time_freq() / 1000.0);
+}
+
+int CClient::PredictionMargin() const
+{
+	return (int)std::ceil(KingMarginMs());
 }
 
 SKingNetStats CClient::KingNetStats() const
@@ -5575,10 +5594,15 @@ SKingNetStats CClient::KingNetStats() const
 	Stats.m_SpreadMs = m_KingNet.SpreadMs();
 	Stats.m_TimeLeftMs = m_KingNet.TimeLeftMs();
 	Stats.m_MarginMs = PredictionMargin();
+	Stats.m_MarginExactMs = KingMarginMs();
+	Stats.m_MarginTargetMs = m_KingNet.TargetMs(g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety);
 	Stats.m_MarginLocked = !m_ServerCapabilities.m_SyncWeaponInput;
 	Stats.m_MarginAuto = !Stats.m_MarginLocked && KingAutoMarginActive() && Stats.m_Valid;
 	Stats.m_LateInputs = m_KingNet.LateTotal();
+	Stats.m_LastLateMs = m_KingNet.LastLateMs();
+	Stats.m_LastLateTime = m_KingNet.LastLateTime();
 	Stats.m_RecentLate = m_KingNet.RecentLate(time_get());
+	Stats.m_PredictionResets = m_KingPredResets;
 	return Stats;
 }
 

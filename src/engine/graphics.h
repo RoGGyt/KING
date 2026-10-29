@@ -241,6 +241,7 @@ class IGraphics : public IInterface
 	MACRO_INTERFACE("graphics")
 protected:
 	float m_WorldAspectOverride = 0.0f; // KING
+	float m_ScreenAspectOverride = 0.0f; // KING
 	int m_ScreenWidth;
 	int m_ScreenHeight;
 	int m_ViewportX = 0;
@@ -278,9 +279,13 @@ public:
 	int ScreenWidth() const { return m_ScreenWidth; }
 	int ScreenHeight() const { return m_ScreenHeight; }
 	vec2 ScreenSize() const { return vec2(m_ScreenWidth, m_ScreenHeight); }
-	float ScreenAspect() const { return (float)ScreenWidth() / (float)ScreenHeight(); }
+	// KING: with a stretched aspect ratio in "full" mode everything (HUD, menus) is laid
+	// out for that ratio and stretched to the window, like a stretched resolution.
+	float ScreenAspect() const { return m_ScreenAspectOverride > 0.0f ? m_ScreenAspectOverride : NativeScreenAspect(); }
+	float NativeScreenAspect() const { return (float)ScreenWidth() / (float)ScreenHeight(); }
+	void SetScreenAspectOverride(float Aspect) { m_ScreenAspectOverride = Aspect; }
 	// KING: aspect ratio used for the game world. Differs from ScreenAspect() when a
-	// stretched ratio (like 4:3 on a 16:9 monitor) is selected.
+	// stretched ratio (like 4:3 on a 16:9 monitor) is selected for the world only.
 	float WorldAspect() const { return m_WorldAspectOverride > 0.0f ? m_WorldAspectOverride : ScreenAspect(); }
 	void SetWorldAspect(float Aspect) { m_WorldAspectOverride = Aspect; }
 	float ScreenHiDPIScale() const { return m_ScreenHiDPIScale; }

@@ -16,6 +16,7 @@
 #include <game/version.h>
 
 #include <algorithm>
+#include <iterator>
 #include <vector>
 
 namespace
@@ -83,7 +84,8 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	case CKing::INPUT_MODE_BEST:
 	{
 		TextLine(Ui(), LeftView, "Offset + latency comp + correction smoothing +");
-		TextLine(Ui(), LeftView, "blend curve. Auto picks them from your connection.");
+		TextLine(Ui(), LeftView, "blend curve. Auto: one tick ahead, smoothing");
+		TextLine(Ui(), LeftView, "follows your connection.");
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		static std::vector<CButtonContainer> s_vPreset = {{}, {}};
 		int Preset = g_Config.m_KgBestPreset;
@@ -126,13 +128,14 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		}
 		break;
 	case CKing::INPUT_MODE_KING:
-		TextLine(Ui(), LeftView, "Fast input + auto margin that follows your real");
-		TextLine(Ui(), LeftView, "jitter. Best for stable wired ping.");
+		TextLine(Ui(), LeftView, "One tick fast input + safe auto margin (never");
+		TextLine(Ui(), LeftView, "below stock 10 ms, changes smoothly).");
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, "Fast input", 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 		TextLine(Ui(), LeftView, "20 ms = one tick. Higher shows you further ahead", 11.0f);
 		TextLine(Ui(), LeftView, "but corrects more when you change direction.", 11.0f);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgKingSmooth, "Smooth small corrections (40 ms glide, no jumps)", &g_Config.m_KgKingSmooth, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_DELTA:
 		TextLine(Ui(), LeftView, "Fixed offset in hundredths of a tick, also between");
@@ -209,7 +212,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	if(!ForcedManual && (ForcedAuto || g_Config.m_KgAutoMargin))
 	{
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMin, &g_Config.m_KgAutoMarginMin, &Button, "Min", 1, 30, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMin, &g_Config.m_KgAutoMarginMin, &Button, "Min (stock 10)", 1, 30, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMax, &g_Config.m_KgAutoMarginMax, &Button, "Max", 5, 100, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
@@ -242,9 +245,14 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		if(Stats.m_MarginLocked)
 			str_format(aBuf, sizeof(aBuf), "Margin: %d ms (server forces 10 ms)", Stats.m_MarginMs);
 		else
-			str_format(aBuf, sizeof(aBuf), "Margin: %d ms (%s)", Stats.m_MarginMs, Stats.m_MarginAuto ? "auto" : "fixed");
+			str_format(aBuf, sizeof(aBuf), "Margin: %.1f ms (%s, heading to %.0f)", Stats.m_MarginExactMs, Stats.m_MarginAuto ? "auto" : "fixed", Stats.m_MarginAuto ? Stats.m_MarginTargetMs : Stats.m_MarginExactMs);
 		TextLine(Ui(), RightView, aBuf);
 		str_format(aBuf, sizeof(aBuf), "Late inputs this session: %d", Stats.m_LateInputs);
+		TextLine(Ui(), RightView, aBuf);
+		const CKing::SLagStats &Lag = GameClient()->m_King.LagStats();
+		str_format(aBuf, sizeof(aBuf), "Corrections: %d (biggest %.0f units)", Lag.m_Corrections, Lag.m_MaxCorrection);
+		TextLine(Ui(), RightView, aBuf);
+		str_format(aBuf, sizeof(aBuf), "Stutters: %d   Snapshot gaps: %d", Lag.m_Stutters, Lag.m_SnapGaps);
 		TextLine(Ui(), RightView, aBuf);
 	}
 	else
@@ -252,6 +260,8 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Show network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
+	TextLine(Ui(), RightView, "Every lag is written with its cause to", 11.0f);
+	TextLine(Ui(), RightView, "%APPDATA%\\DDNet\\king_lag.log", 11.0f);
 
 	// ***** Preset ***** //
 	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
@@ -322,84 +332,234 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	s_ScrollRegion.End();
 }
 
+namespace
+{
+// Section box like the TClient settings: the box is drawn from last frame's layout.
+struct SKingSections
+{
+	std::vector<CUIRect> m_vBoxes;
+	std::vector<CUIRect> m_vNext;
+	void Draw()
+	{
+		for(CUIRect Box : m_vBoxes)
+		{
+			const float Padding = KING_MARGIN;
+			Box.x -= Padding;
+			Box.y -= Padding;
+			Box.w += Padding * 2.0f;
+			Box.h += Padding * 2.0f;
+			Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_ALL, 10.0f);
+		}
+	}
+	void Begin(const CUIRect &Column) { m_vNext.push_back(Column); }
+	void End(const CUIRect &Column) { m_vNext.back().h = Column.y - m_vNext.back().y; }
+	void Swap()
+	{
+		m_vBoxes = m_vNext;
+		m_vNext.clear();
+	}
+};
+
+// "Label ............ [control]" row; returns the control rect
+CUIRect LabeledRow(CUi *pUi, CUIRect &Column, const char *pLabel, float LabelFraction = 0.32f)
+{
+	CUIRect Row, Label, Control;
+	Column.HSplitTop(KING_LINE, &Row, &Column);
+	Column.HSplitTop(KING_MARGIN_SMALL, nullptr, &Column);
+	Row.VSplitLeft(Row.w * LabelFraction, &Label, &Control);
+	pUi->DoLabel(&Label, pLabel, KING_TEXT + 1.0f, TEXTALIGN_ML);
+	return Control;
+}
+} // namespace
+
 void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 {
-	CUIRect LeftView, RightView, Button;
-	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 3.0f);
+	static SKingSections s_Sections;
+	s_Sections.Draw();
+
+	CUIRect LeftView, RightView, Button, Label;
+	MainView.Margin(KING_MARGIN, &MainView);
+	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 4.0f);
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
+	// ***** Aspect ratio ***** //
+	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, "Aspect Ratio");
-	TextLine(Ui(), LeftView, "Game view ratio, stretched to fill your screen", 11.0f);
-	TextLine(Ui(), LeftView, "(like 4:3 stretched). Menus stay native.", 11.0f);
-	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 	{
-		int Value = g_Config.m_KgAspectRatio;
-		static std::vector<CButtonContainer> s_vRowA = {{}, {}, {}, {}};
-		static std::vector<CButtonContainer> s_vRowB = {{}, {}, {}};
-		bool Changed = DoLine_RadioMenu(LeftView, "", s_vRowA, {"Native", "4:3", "5:4", "3:2"}, {0, 1, 2, 3}, Value);
-		Changed |= DoLine_RadioMenu(LeftView, "", s_vRowB, {"16:10", "16:9", "Custom"}, {4, 5, 6}, Value);
-		if(Changed)
-			g_Config.m_KgAspectRatio = Value;
-	}
-	if(g_Config.m_KgAspectRatio == 6)
-	{
-		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
-		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		char aLabel[64];
-		str_format(aLabel, sizeof(aLabel), "Ratio %d.%02d", g_Config.m_KgAspectCustom / 100, g_Config.m_KgAspectCustom % 100);
-		Ui()->DoScrollbarOption(&g_Config.m_KgAspectCustom, &g_Config.m_KgAspectCustom, &Button, aLabel, 100, 240, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
-	}
-	{
-		char aNow[96];
-		const float Screen = Graphics()->ScreenAspect();
-		const float World = CKing::AspectRatioValue(g_Config.m_KgAspectRatio);
-		if(World > 0.0f)
-			str_format(aNow, sizeof(aNow), "Screen %.2f, game %.2f (stretch x%.2f)", Screen, World, Screen / World);
+		static CUi::SDropDownState s_PresetState;
+		static const char *s_apPresets[] = {"Native", "4:3", "5:4", "3:2", "16:10", "16:9", "Custom"};
+		CUIRect Control = LabeledRow(Ui(), LeftView, "Preset");
+		const int Preset = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgAspectRatio, 0, 6), s_apPresets, std::size(s_apPresets), s_PresetState);
+		g_Config.m_KgAspectRatio = Preset;
+
+		static CUi::SDropDownState s_ApplyState;
+		static const char *s_apApply[] = {"Full", "World only"};
+		Control = LabeledRow(Ui(), LeftView, "Apply");
+		g_Config.m_KgAspectApply = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgAspectApply, 0, 1), s_apApply, std::size(s_apApply), s_ApplyState);
+
+		if(g_Config.m_KgAspectRatio == 6)
+		{
+			static CLineInputNumber s_Width, s_Height;
+			static bool s_Init = false;
+			if(!s_Init)
+			{
+				s_Width.SetInteger(g_Config.m_KgAspectCustomW);
+				s_Height.SetInteger(g_Config.m_KgAspectCustomH);
+				s_Init = true;
+			}
+			Control = LabeledRow(Ui(), LeftView, "Custom size");
+			CUIRect WidthBox, Colon, HeightBox;
+			Control.VSplitMid(&WidthBox, &HeightBox, 16.0f);
+			Colon = WidthBox;
+			Colon.x = WidthBox.x + WidthBox.w;
+			Colon.w = 16.0f;
+			Ui()->DoEditBox(&s_Width, &WidthBox, KING_TEXT);
+			Ui()->DoLabel(&Colon, ":", KING_TEXT + 1.0f, TEXTALIGN_MC);
+			Ui()->DoEditBox(&s_Height, &HeightBox, KING_TEXT);
+
+			CUIRect ApplyRow;
+			LeftView.HSplitTop(KING_LINE, &ApplyRow, &LeftView);
+			LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+			ApplyRow.VSplitLeft(ApplyRow.w * 0.32f, nullptr, &ApplyRow);
+			static CButtonContainer s_ApplyButton;
+			if(DoButton_Menu(&s_ApplyButton, "Apply", 0, &ApplyRow))
+			{
+				const int W = s_Width.GetInteger();
+				const int H = s_Height.GetInteger();
+				if(W > 0 && H > 0 && W <= 10000 && H <= 10000 && W / (float)H >= 0.5f && W / (float)H <= 4.0f)
+				{
+					g_Config.m_KgAspectCustomW = W;
+					g_Config.m_KgAspectCustomH = H;
+				}
+				s_Width.SetInteger(g_Config.m_KgAspectCustomW);
+				s_Height.SetInteger(g_Config.m_KgAspectCustomH);
+			}
+		}
+
+		char aNow[128];
+		const float Screen = Graphics()->NativeScreenAspect();
+		const float Game = CKing::AspectRatioValue(g_Config.m_KgAspectRatio);
+		if(Game > 0.0f)
+			str_format(aNow, sizeof(aNow), "Screen %.2f, game %.2f: stretched x%.2f%s", Screen, Game, Screen / Game, g_Config.m_KgAspectApply == CKing::ASPECT_APPLY_FULL ? " (world, HUD, menus)" : " (world only)");
 		else
-			str_format(aNow, sizeof(aNow), "Screen %.2f, game uses the same", Screen);
-		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+			str_format(aNow, sizeof(aNow), "Screen %.2f, the game uses the same", Screen);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
 		TextLine(Ui(), LeftView, aNow, 11.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	s_Sections.End(LeftView);
+
+	// ***** Interface ***** //
+	LeftView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &LeftView);
+	s_Sections.Begin(LeftView);
+	Headline(Ui(), LeftView, "Interface");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Network HUD in game", &g_Config.m_KgNetHud, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLagLog, "Lag log (king_lag.log: every lag and its cause)", &g_Config.m_KgLagLog, &LeftView, KING_LINE);
+	s_Sections.End(LeftView);
+
+	// ***** Music player ***** //
+	s_Sections.Begin(RightView);
+	{
+		CUIRect Header, Reset;
+		RightView.HSplitTop(KING_HEADLINE, &Header, &RightView);
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
+		Header.VSplitRight(KING_HEADLINE * 1.4f, &Header, &Reset);
+		Ui()->DoLabel(&Header, "Music Player", KING_HEADLINE, TEXTALIGN_ML);
+		static CButtonContainer s_ResetButton;
+		if(Ui()->DoButton_FontIcon(&s_ResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &Reset, BUTTONFLAG_LEFT))
+			GameClient()->m_King.ResetMusicSettings();
+	}
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicHud, "Enable music player", &g_Config.m_KgMusicHud, &RightView, KING_LINE);
+	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
+	{
+		static CUi::SDropDownState s_ColorState;
+		static const char *s_apColor[] = {"Cover", "KING", "White"};
+		CUIRect Control = LabeledRow(Ui(), RightView, "Color mode");
+		g_Config.m_KgMusicColorMode = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgMusicColorMode, 0, 2), s_apColor, std::size(s_apColor), s_ColorState);
+
+		static CUi::SDropDownState s_VisState;
+		static const char *s_apVis[] = {"Off", "Bottom", "Center"};
+		Control = LabeledRow(Ui(), RightView, "Visualizer mode");
+		g_Config.m_KgMusicVisualizer = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgMusicVisualizer, 0, 2), s_apVis, std::size(s_apVis), s_VisState);
+
+		RightView.HSplitTop(KING_LINE, &Button, &RightView);
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgMusicTextScale, &g_Config.m_KgMusicTextScale, &Button, "Text scale", 50, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		RightView.HSplitTop(KING_LINE, &Button, &RightView);
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgMusicColumns, &g_Config.m_KgMusicColumns, &Button, "Columns", 3, 24);
+
+		Control = LabeledRow(Ui(), RightView, "Rounding");
+		CUIRect Cube, Soft;
+		Control.VSplitMid(&Cube, &Soft, 0.0f);
+		static CButtonContainer s_Cube, s_Soft;
+		if(DoButton_Menu(&s_Cube, "Cube", g_Config.m_KgMusicRounding == 0, &Cube, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+			g_Config.m_KgMusicRounding = 0;
+		if(DoButton_Menu(&s_Soft, "Soft", g_Config.m_KgMusicRounding == 1, &Soft, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+			g_Config.m_KgMusicRounding = 1;
+
+		CUIRect LyricsRow, Badge;
+		RightView.HSplitTop(KING_LINE, &LyricsRow, &RightView);
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
+		LyricsRow.VSplitRight(52.0f, &LyricsRow, &Badge);
+		if(DoButton_CheckBox(&g_Config.m_KgMusicLyrics, "Show song lyrics", g_Config.m_KgMusicLyrics, &LyricsRow))
+			g_Config.m_KgMusicLyrics ^= 1;
+		Badge.Margin(2.0f, &Badge);
+		Badge.Draw(ColorRGBA(0.86f, 0.16f, 0.16f, 1.0f), IGraphics::CORNER_ALL, 4.0f);
+		Ui()->DoLabel(&Badge, "BETA", 11.0f, TEXTALIGN_MC);
 	}
 
-	Headline(Ui(), RightView, "Interface");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicHud, "Music player in game (top, next to the timer)", &g_Config.m_KgMusicHud, &RightView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicShowPaused, "Keep it visible while paused", &g_Config.m_KgMusicShowPaused, &RightView, KING_LINE);
-
-	// now playing + controls
-	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
-	Headline(Ui(), RightView, "Music");
+	// live preview + now playing + controls
+	RightView.HSplitTop(KING_MARGIN, nullptr, &RightView);
 	CKingMedia &Media = GameClient()->m_King.m_Media;
 	if(!Media.Supported())
-		TextLine(Ui(), RightView, "Not supported on this system.", 11.0f);
+		TextLine(Ui(), RightView, "Music player is not supported on this system.", 11.0f);
 	else
 	{
+		CUIRect Preview;
+		const float Unit = 2.0f;
+		const float PillH = 15.0f * Unit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
+		RightView.HSplitTop(PillH, &Preview, &RightView);
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		const SKingMediaInfo Info = Media.Get();
+		if(g_Config.m_KgMusicHud && Info.m_Valid && (Info.m_aTitle[0] || Info.m_aArtist[0]))
+			GameClient()->m_King.RenderMusicPill(Preview.x + Preview.w / 2.0f, Preview.y, Unit, "12:34", ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false);
+		else
+			Ui()->DoLabel(&Preview, g_Config.m_KgMusicHud ? "Play something (Spotify, browser, Yandex Music...) to see it here" : "Music player is off", 11.0f, TEXTALIGN_MC);
+
 		char aBuf[600];
 		if(Info.m_Valid && (Info.m_aTitle[0] || Info.m_aArtist[0]))
-			str_format(aBuf, sizeof(aBuf), "%s %s%s%s", Info.m_Playing ? "Playing:" : "Paused:", Info.m_aTitle, Info.m_aArtist[0] ? " - " : "", Info.m_aArtist);
+			str_format(aBuf, sizeof(aBuf), "%s%s%s", Info.m_aTitle, Info.m_aArtist[0] ? " - " : "", Info.m_aArtist);
 		else
-			str_copy(aBuf, "Nothing is playing (Spotify, browser, Yandex Music...)");
-		TextLine(Ui(), RightView, aBuf, 12.0f);
+			aBuf[0] = '\0';
 
 		CUIRect Row, Prev, Toggle, Next;
-		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		RightView.HSplitTop(KING_LINE * 1.25f, &Row, &RightView);
-		Row.VSplitLeft(Row.h * 2.0f, &Prev, &Row);
-		Row.VSplitLeft(KING_MARGIN_SMALL, nullptr, &Row);
-		Row.VSplitLeft(Row.h * 2.0f, &Toggle, &Row);
-		Row.VSplitLeft(KING_MARGIN_SMALL, nullptr, &Row);
-		Row.VSplitLeft(Row.h * 2.0f, &Next, &Row);
+		Row.VSplitRight(Row.h * 1.6f, &Row, &Next);
+		Row.VSplitRight(KING_MARGIN_SMALL, &Row, nullptr);
+		Row.VSplitRight(Row.h * 1.6f, &Row, &Toggle);
+		Row.VSplitRight(KING_MARGIN_SMALL, &Row, nullptr);
+		Row.VSplitRight(Row.h * 1.6f, &Row, &Prev);
+		Row.VSplitRight(KING_MARGIN, &Label, nullptr);
+		SLabelProperties Props;
+		Props.m_MaxWidth = Label.w;
+		Props.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&Label, aBuf, 12.0f, TEXTALIGN_ML, Props);
 		static CButtonContainer s_Prev, s_Toggle, s_Next;
-		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		if(DoButton_Menu(&s_Prev, FontIcon::BACKWARD_STEP, 0, &Prev))
+		if(Ui()->DoButton_FontIcon(&s_Prev, FontIcon::BACKWARD_STEP, 0, &Prev, BUTTONFLAG_LEFT))
 			Media.Command(CKingMedia::COMMAND_PREVIOUS);
-		if(DoButton_Menu(&s_Toggle, Info.m_Playing ? FontIcon::PAUSE : FontIcon::PLAY, 0, &Toggle))
+		if(Ui()->DoButton_FontIcon(&s_Toggle, Info.m_Playing ? FontIcon::PAUSE : FontIcon::PLAY, 0, &Toggle, BUTTONFLAG_LEFT))
 			Media.Command(CKingMedia::COMMAND_TOGGLE);
-		if(DoButton_Menu(&s_Next, FontIcon::FORWARD_STEP, 0, &Next))
+		if(Ui()->DoButton_FontIcon(&s_Next, FontIcon::FORWARD_STEP, 0, &Next, BUTTONFLAG_LEFT))
 			Media.Command(CKingMedia::COMMAND_NEXT);
-		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.5f);
+		if(g_Config.m_KgMusicVisualizer != CKing::MUSIC_VIS_OFF && Media.VisualizerCapturing())
+			TextLine(Ui(), RightView, Media.VisualizerExcludesGame() ? "Visualizer listens to your PC (game sounds excluded)" : "Visualizer listens to your PC output", 11.0f);
 		TextLine(Ui(), RightView, "Binds: kg_music_toggle, kg_music_next, kg_music_prev", 11.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
+	s_Sections.End(RightView);
+	s_Sections.Swap();
 }

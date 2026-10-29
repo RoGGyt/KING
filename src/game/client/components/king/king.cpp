@@ -1,8 +1,11 @@
-/* KING client: input modes, KoG preset, network HUD and update check. */
+/* KING client: input modes, KoG preset, network HUD, lag log, music player and update check. */
 #include "king.h"
 
-#include <base/math.h>
+#include <base/color.h>
 #include <base/fs.h>
+#include <base/math.h>
+#include <base/mem.h>
+#include <base/net.h>
 #include <base/io.h>
 #include <base/log.h>
 #include <base/process.h>
@@ -13,6 +16,7 @@
 #include <engine/console.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
+#include <engine/image.h>
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
@@ -22,6 +26,8 @@
 #include <game/version.h>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <tuple>
 
@@ -47,6 +53,7 @@ void CKing::OnConsoleInit()
 	Console()->Register("kg_music_toggle", "", CFGFLAG_CLIENT, ConMusicToggle, this, "Music player: play/pause what plays on your PC");
 	Console()->Register("kg_music_next", "", CFGFLAG_CLIENT, ConMusicNext, this, "Music player: next track");
 	Console()->Register("kg_music_prev", "", CFGFLAG_CLIENT, ConMusicPrev, this, "Music player: previous track");
+	Console()->Register("kg_lag_stats", "", CFGFLAG_CLIENT, ConLagStats, this, "Show what caused lag this session (late inputs, corrections, stutters)");
 }
 
 void CKing::ConMusicToggle(IConsole::IResult *pResult, void *pUserData) { static_cast<CKing *>(pUserData)->m_Media.Command(CKingMedia::COMMAND_TOGGLE); }
@@ -87,6 +94,21 @@ void CKing::OnInit()
 		g_Config.m_TcTranslateAuto = 0;
 		g_Config.m_KgDefaultsVersion = 2;
 	}
+	if(g_Config.m_KgDefaultsVersion < 3)
+	{
+		// 1.0.9: auto margin never below the stock 10 ms, light correction smoothing in
+		// KING mode, smooth margin changes, custom aspect ratio as width:height
+		g_Config.m_KgAutoMarginMin = std::max(g_Config.m_KgAutoMarginMin, 10);
+		g_Config.m_KgAutoMarginSafety = std::max(g_Config.m_KgAutoMarginSafety, 3);
+		g_Config.m_KgKingSmooth = 1;
+		g_Config.m_TcSmoothPredictionMargin = 0;
+		if(g_Config.m_KgAspectCustom != 133)
+		{
+			g_Config.m_KgAspectCustomW = g_Config.m_KgAspectCustom;
+			g_Config.m_KgAspectCustomH = 100;
+		}
+		g_Config.m_KgDefaultsVersion = 3;
+	}
 	m_Media.Start();
 	ReadLastInstallResult();
 	if(g_Config.m_KgUpdateCheck)
@@ -95,7 +117,18 @@ void CKing::OnInit()
 
 void CKing::OnShutdown()
 {
+	LagLogClose();
 	m_Media.Stop();
+	if(m_pLyricsTask)
+	{
+		m_pLyricsTask->Abort();
+		m_pLyricsTask = nullptr;
+	}
+	if(m_HasCoverTexture)
+	{
+		Graphics()->UnloadTexture(&m_CoverTexture);
+		m_HasCoverTexture = false;
+	}
 	if(m_pUpdateTask)
 	{
 		m_pUpdateTask->Abort();
@@ -407,11 +440,12 @@ void CKing::ReadLastInstallResult()
 
 void CKing::ApplyKogPreset()
 {
-	// Input: KING mode = classic one tick fast input + adaptive margin
+	// Input: KING mode = one tick fast input + safe auto margin + light correction smoothing
 	g_Config.m_KgInputMode = INPUT_MODE_KING;
 	g_Config.m_KgFastInputAmount = 20;
+	g_Config.m_KgKingSmooth = 1;
 	g_Config.m_KgAutoMargin = 1;
-	g_Config.m_KgAutoMarginMin = 6;
+	g_Config.m_KgAutoMarginMin = 10;
 	g_Config.m_KgAutoMarginMax = 40;
 	g_Config.m_KgAutoMarginSafety = 3;
 
@@ -422,7 +456,8 @@ void CKing::ApplyKogPreset()
 	g_Config.m_ClAntiPingPreInput = 1;
 	g_Config.m_ClAntiPingSmooth = 0;
 	g_Config.m_TcAntiPingImproved = 0;
-	g_Config.m_ClPredictionMargin = 10; // fallback when auto margin has no data yet
+	g_Config.m_TcSmoothPredictionMargin = 0;
+	g_Config.m_ClPredictionMargin = 10; // stock DDNet value, also the floor of auto margin
 
 	// Rendering latency: no vsync, uncapped update rate
 	g_Config.m_GfxVsync = 0;
@@ -431,10 +466,32 @@ void CKing::ApplyKogPreset()
 	g_Config.m_KgNetHud = 1;
 }
 
-static void KingSetFastInput(int AmountMs, bool Others)
+// ***** Input modes ***** //
+
+void CKing::SetFastInput(float WantedMs, bool Ramp, bool Others)
 {
-	g_Config.m_TcFastInput = AmountMs > 0;
-	g_Config.m_TcFastInputAmount = std::clamp(AmountMs, 1, 100);
+	const int64_t Now = time_get();
+	const int Mode = g_Config.m_KgInputMode;
+	WantedMs = std::clamp(WantedMs, 0.0f, 100.0f);
+	if(!Ramp || m_AppliedFastMs < 0.0f || m_LastAppliedMode != Mode)
+		m_AppliedFastMs = WantedMs;
+	else
+	{
+		// automatic changes shift your tee on screen: at most 5 ms per second, i.e.
+		// 1 ms (1/20 tick) at a time, which is too small to see
+		const float Dt = std::clamp((Now - m_LastFastUpdate) / (float)time_freq(), 0.0f, 0.1f);
+		const float Step = 5.0f * Dt;
+		if(WantedMs > m_AppliedFastMs)
+			m_AppliedFastMs = std::min(WantedMs, m_AppliedFastMs + Step);
+		else
+			m_AppliedFastMs = std::max(WantedMs, m_AppliedFastMs - Step);
+	}
+	m_LastFastUpdate = Now;
+	m_LastAppliedMode = Mode;
+
+	const int Amount = round_to_int(m_AppliedFastMs);
+	g_Config.m_TcFastInput = Amount > 0;
+	g_Config.m_TcFastInputAmount = std::clamp(Amount, 1, 100);
 	g_Config.m_TcFastInputOthers = Others;
 	g_Config.m_TcFastInputRepredictHook = 0;
 }
@@ -442,37 +499,26 @@ static void KingSetFastInput(int AmountMs, bool Others)
 void CKing::UpdateBestInput()
 {
 	const SKingNetStats Stats = Client()->KingNetStats();
-	int OffsetHundredths, LatencyComp, SmoothMs, Curve;
 	if(g_Config.m_KgBestPreset)
 	{
-		// auto: stable connection -> full tick and a short blend,
-		// shaky connection -> a bit less offset and a longer blend
+		// auto: always exactly one tick ahead (moving the offset would move your tee),
+		// only how long corrections are blended follows the connection
 		const float Jitter = Stats.m_Valid ? Stats.m_JitterMs : 0.0f;
-		OffsetHundredths = Jitter < 3.0f ? 100 : (Jitter < 8.0f ? 80 : 60);
-		LatencyComp = 0;
-		SmoothMs = Jitter < 3.0f ? 50 : (Jitter < 8.0f ? 80 : 110);
-		Curve = SMOOTH_CURVE_SMOOTH;
+		m_BestTarget = 20;
+		m_BestSmoothMs = Jitter < 3.0f ? 50 : (Jitter < 8.0f ? 70 : 100);
+		m_BestCurve = SMOOTH_CURVE_SMOOTH;
 	}
 	else
 	{
-		OffsetHundredths = g_Config.m_KgBestOffset;
-		LatencyComp = g_Config.m_KgBestLatencyComp;
-		SmoothMs = round_to_int(g_Config.m_KgBestSmoothing * 1.5f);
-		Curve = std::clamp(g_Config.m_KgBestInterpolation, 0, 2);
+		const float Rtt = Stats.m_Valid ? Stats.m_RttMs : 0.0f;
+		const int Wanted = std::clamp(round_to_int(g_Config.m_KgBestOffset * 0.2f + Rtt * g_Config.m_KgBestLatencyComp / 100.0f), 0, 100);
+		// hysteresis: ping noise must not make the offset flicker by 1 ms
+		if(g_Config.m_KgBestLatencyComp == 0 || absolute(Wanted - m_BestTarget) >= 2)
+			m_BestTarget = Wanted;
+		m_BestSmoothMs = round_to_int(g_Config.m_KgBestSmoothing * 1.5f);
+		m_BestCurve = std::clamp(g_Config.m_KgBestInterpolation, 0, 2);
 	}
-
-	const float Rtt = Stats.m_Valid ? Stats.m_RttMs : 0.0f;
-	const int Wanted = std::clamp(round_to_int(OffsetHundredths * 0.2f + Rtt * LatencyComp / 100.0f), 0, 100);
-
-	// every change of the offset moves your tee on screen, so only change it now and then
-	const int64_t Now = time_get();
-	if(m_BestFastMs < 0 || (absolute(Wanted - m_BestFastMs) >= 3 && Now - m_BestChanged > 5 * time_freq()) || (!g_Config.m_KgBestPreset && Wanted != m_BestFastMs && LatencyComp == 0))
-	{
-		m_BestFastMs = Wanted;
-		m_BestChanged = Now;
-	}
-	m_BestSmoothMs = SmoothMs;
-	m_BestCurve = Curve;
+	m_BestFastMs = m_BestTarget;
 }
 
 void CKing::ApplyInputMode()
@@ -484,48 +530,49 @@ void CKing::ApplyInputMode()
 		// rewrite: old tc_fast_input 1-5 = whole ticks ahead. A multiple of 20 ms
 		// makes the new code take the exact same whole-tick path (no sub-tick part).
 		// Prediction margin stays manual (cl_prediction_margin), exactly like TClient.
-		KingSetFastInput(std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20, false);
+		SetFastInput((float)(std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20), false, false);
 		break;
 	case INPUT_MODE_KING:
 	case INPUT_MODE_SMOOTH: // smoothing itself is applied when rendering our tee (gameclient.cpp)
-		KingSetFastInput(g_Config.m_KgFastInputAmount, false);
+		SetFastInput((float)g_Config.m_KgFastInputAmount, false, false);
 		break;
 	case INPUT_MODE_DELTA:
 		// 0.01 tick units -> ms (1 tick = 20 ms). 0 turns fast input off.
-		KingSetFastInput(round_to_int(g_Config.m_KgDeltaAmount * 0.2f), g_Config.m_KgDeltaOthers);
+		SetFastInput(g_Config.m_KgDeltaAmount * 0.2f, false, g_Config.m_KgDeltaOthers);
 		break;
 	case INPUT_MODE_PING_COMP:
 	{
-		// show our tee a share of the round trip ahead; change rarely, every change moves the tee
+		// show our tee a share of the round trip ahead; follows the ping slowly
 		const SKingNetStats Stats = Client()->KingNetStats();
 		if(Stats.m_Valid)
 		{
-			const int Wanted = std::clamp(round_to_int(Stats.m_RttMs * g_Config.m_KgPingComp / 100.0f), 1, 100);
-			const int64_t Now = time_get();
-			if(absolute(Wanted - m_PingCompAmount) >= 4 && Now - m_PingCompChanged > 10 * time_freq())
-			{
-				m_PingCompAmount = Wanted;
-				m_PingCompChanged = Now;
-			}
+			const int Wanted = std::clamp(round_to_int(Stats.m_RttMs * g_Config.m_KgPingComp / 100.0f), 0, 100);
+			if(absolute(Wanted - m_PingCompTarget) >= 2)
+				m_PingCompTarget = Wanted;
 		}
-		KingSetFastInput(m_PingCompAmount, false);
+		SetFastInput((float)m_PingCompTarget, true, false);
+		m_PingCompAmount = round_to_int(m_AppliedFastMs);
 		break;
 	}
 	case INPUT_MODE_BEST:
 		UpdateBestInput();
-		KingSetFastInput(m_BestFastMs, false);
+		SetFastInput((float)m_BestTarget, !g_Config.m_KgBestPreset && g_Config.m_KgBestLatencyComp > 0, false);
 		break;
 	default:
+		m_LastAppliedMode = g_Config.m_KgInputMode;
+		m_AppliedFastMs = -1.0f;
 		break;
 	}
 }
 
 float CKing::SmoothDurationMs() const
 {
-	if(g_Config.m_KgInputMode == INPUT_MODE_SMOOTH)
-		return (float)g_Config.m_KgSmoothMs;
-	if(g_Config.m_KgInputMode == INPUT_MODE_BEST)
-		return (float)m_BestSmoothMs;
+	switch(g_Config.m_KgInputMode)
+	{
+	case INPUT_MODE_KING: return g_Config.m_KgKingSmooth ? KING_SMOOTH_MS : 0.0f;
+	case INPUT_MODE_SMOOTH: return (float)g_Config.m_KgSmoothMs;
+	case INPUT_MODE_BEST: return (float)m_BestSmoothMs;
+	}
 	return 0.0f;
 }
 
@@ -554,7 +601,10 @@ float CKing::AspectRatioValue(int Setting)
 	case 3: return 3.0f / 2.0f;
 	case 4: return 16.0f / 10.0f;
 	case 5: return 16.0f / 9.0f;
-	case 6: return g_Config.m_KgAspectCustom / 100.0f;
+	case 6:
+		if(g_Config.m_KgAspectCustomW > 0 && g_Config.m_KgAspectCustomH > 0)
+			return std::clamp(g_Config.m_KgAspectCustomW / (float)g_Config.m_KgAspectCustomH, 0.5f, 4.0f);
+		return 0.0f;
 	}
 	return 0.0f; // native
 }
@@ -563,9 +613,25 @@ void CKing::OnUpdate()
 {
 	ApplyInputMode();
 
-	// stretched aspect ratio only for the game world, menus stay native
+	// stretched aspect ratio while in a game: "Full" = everything (world, HUD,
+	// in-game menus), "World" = only the game world
 	const bool InGame = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
-	Graphics()->SetWorldAspect(InGame ? AspectRatioValue(g_Config.m_KgAspectRatio) : 0.0f);
+	const float Ratio = InGame ? AspectRatioValue(g_Config.m_KgAspectRatio) : 0.0f;
+	if(g_Config.m_KgAspectApply == ASPECT_APPLY_FULL)
+	{
+		Graphics()->SetScreenAspectOverride(Ratio);
+		Graphics()->SetWorldAspect(0.0f);
+	}
+	else
+	{
+		Graphics()->SetScreenAspectOverride(0.0f);
+		Graphics()->SetWorldAspect(Ratio);
+	}
+
+	// visualizer: capture what plays only while the bars can be seen
+	const bool VisOn = g_Config.m_KgMusicHud && g_Config.m_KgMusicVisualizer != MUSIC_VIS_OFF && m_Media.Supported();
+	const bool Seen = InGame || GameClient()->m_Menus.IsActive();
+	m_Media.SetVisualizerWanted(VisOn && Seen && m_Media.Get().m_Playing);
 }
 
 void CKing::OnRender()
@@ -577,13 +643,22 @@ void CKing::OnRender()
 	}
 	if(m_pDownloadTask && m_pDownloadTask->Done())
 		FinishDownload();
+	if(m_pLyricsTask && m_pLyricsTask->Done())
+		FinishLyrics();
+	if(g_Config.m_KgMusicHud && g_Config.m_KgMusicLyrics)
+		UpdateLyrics(m_Media.Get());
 
 	if(Client()->State() != IClient::STATE_ONLINE)
+	{
+		m_PillRenderedThisFrame = false;
 		return;
+	}
+	UpdateLagMonitor();
 	if(g_Config.m_KgNetHud)
 		RenderNetHud();
 	if(g_Config.m_KgMusicHud && g_Config.m_ClShowhud)
-		RenderMusicHud();
+		RenderLyrics();
+	m_PillRenderedThisFrame = false;
 }
 
 void CKing::RenderNetHud()
@@ -601,6 +676,7 @@ void CKing::RenderNetHud()
 	char aLine1[128];
 	char aLine2[128];
 	char aLine3[128];
+	char aLine4[128];
 	if(Stats.m_Valid)
 		str_format(aLine1, sizeof(aLine1), "ping %d ms   jitter %.1f ms", round_to_int(Stats.m_RttMs), Stats.m_JitterMs);
 	else
@@ -608,36 +684,39 @@ void CKing::RenderNetHud()
 
 	if(Stats.m_MarginLocked)
 		str_format(aLine2, sizeof(aLine2), "margin %d ms (locked by server)", Stats.m_MarginMs);
+	else if(Stats.m_MarginAuto && absolute(Stats.m_MarginTargetMs - Stats.m_MarginExactMs) >= 0.5f)
+		str_format(aLine2, sizeof(aLine2), "margin %.0f -> %.0f ms auto", Stats.m_MarginExactMs, Stats.m_MarginTargetMs);
 	else
-		str_format(aLine2, sizeof(aLine2), "margin %d ms %s   late %d", Stats.m_MarginMs, Stats.m_MarginAuto ? "auto" : "fixed", Stats.m_LateInputs);
+		str_format(aLine2, sizeof(aLine2), "margin %d ms %s", Stats.m_MarginMs, Stats.m_MarginAuto ? "auto" : "fixed");
 
 	if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_CLASSIC)
 		str_format(aLine3, sizeof(aLine3), "%s input   %d tick%s (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgClassicTicks, g_Config.m_KgClassicTicks == 1 ? "" : "s", g_Config.m_TcFastInputAmount);
 	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_DELTA)
 		str_format(aLine3, sizeof(aLine3), "%s input   %d.%02d ticks (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100, g_Config.m_TcFastInputAmount);
-	else if(g_Config.m_KgInputMode == INPUT_MODE_BEST)
-		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms, smooth %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? g_Config.m_TcFastInputAmount : 0, m_BestSmoothMs);
-	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_SMOOTH)
-		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms, smooth %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount, g_Config.m_KgSmoothMs);
+	else if(SmoothDurationMs() > 0.0f)
+		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms, smooth %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? g_Config.m_TcFastInputAmount : 0, round_to_int(SmoothDurationMs()));
 	else if(g_Config.m_TcFastInput)
 		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount);
 	else
 		str_format(aLine3, sizeof(aLine3), "%s input   fast off", InputModeName(g_Config.m_KgInputMode));
 
-	char aLine4[96] = "";
+	// what went wrong this session (also written to king_lag.log)
+	str_format(aLine4, sizeof(aLine4), "late %d   corr %d   stutter %d   gaps %d", m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps);
+
+	char aLine5[96] = "";
 	{
 		const CControls &Controls = GameClient()->m_Controls;
 		if(g_Config.m_KgSnapTap)
-			str_append(aLine4, "SnapTap  ");
+			str_append(aLine5, "SnapTap  ");
 		if(Controls.King45Active())
-			str_append(aLine4, "45deg  ");
+			str_append(aLine5, "45deg  ");
 		if(Controls.KingSmallSensActive())
-			str_append(aLine4, "SmallSens");
+			str_append(aLine5, "SmallSens");
 	}
-	const bool HasLine4 = aLine4[0] != '\0';
-	const float TextW = std::max({TextRender()->TextWidth(FontSize, aLine4), TextRender()->TextWidth(FontSize, aLine1), TextRender()->TextWidth(FontSize, aLine2), TextRender()->TextWidth(FontSize, aLine3), TextRender()->TextWidth(FontSize, "KING")});
+	const bool HasLine5 = aLine5[0] != '\0';
+	const float TextW = std::max({TextRender()->TextWidth(FontSize, aLine5), TextRender()->TextWidth(FontSize, aLine1), TextRender()->TextWidth(FontSize, aLine2), TextRender()->TextWidth(FontSize, aLine3), TextRender()->TextWidth(FontSize, aLine4), TextRender()->TextWidth(FontSize, "KING")});
 	const float BoxW = TextW + Pad * 2.0f;
-	const float BoxH = LineHeight * (HasLine4 ? 5.0f : 4.0f) + Pad * 2.0f - 1.5f;
+	const float BoxH = LineHeight * (HasLine5 ? 6.0f : 5.0f) + Pad * 2.0f - 1.5f;
 
 	float y = 5.0f;
 	if(g_Config.m_ClShowfps)
@@ -664,90 +743,792 @@ void CKing::RenderNetHud()
 
 	TextRender()->TextColor(0.75f, 0.75f, 0.75f, 1.0f);
 	TextRender()->Text(x + Pad, Ty, FontSize, aLine3);
-	if(HasLine4)
+	Ty += LineHeight;
+
+	const int64_t Now = time_get();
+	const bool RecentTrouble = (m_LastStutterTime && Now - m_LastStutterTime < 2 * time_freq()) || (m_LastGapTime && Now - m_LastGapTime < 2 * time_freq()) || Stats.m_RecentLate;
+	if(RecentTrouble)
+		TextRender()->TextColor(1.0f, 0.45f, 0.35f, 1.0f);
+	else
+		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
+	TextRender()->Text(x + Pad, Ty, FontSize, aLine4);
+	if(HasLine5)
 	{
 		Ty += LineHeight;
 		TextRender()->TextColor(0.55f, 0.85f, 1.0f, 1.0f);
-		TextRender()->Text(x + Pad, Ty, FontSize, aLine4);
+		TextRender()->Text(x + Pad, Ty, FontSize, aLine5);
 	}
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
-static void KingFormatTime(char *pBuf, int Size, float Seconds)
+// ***** Lag monitor ***** //
+
+static constexpr const char *KING_LAG_LOG = "king_lag.log";
+static constexpr const char *KING_LAG_LOG_OLD = "king_lag.old.log";
+
+void CKing::OnStateChange(int NewState, int OldState)
 {
-	const int Total = std::max(0, (int)Seconds);
-	str_format(pBuf, Size, "%d:%02d", Total / 60, Total % 60);
+	if(NewState == IClient::STATE_ONLINE && OldState != IClient::STATE_ONLINE)
+	{
+		m_LagStats = SLagStats();
+		m_OnlineSince = time_get();
+		m_LastSnapshotTime = 0;
+		m_LastStutterTime = 0;
+		m_LastGapTime = 0;
+		m_LastCorrectionLog = 0;
+		m_CorrectionLogBudget = 10.0f;
+		m_CorrectionsNotLogged = 0;
+		m_LastLogFlush = time_get();
+		m_SeenLateInputs = 0;
+		m_SeenPredResets = 0;
+		m_LastSummary = time_get();
+		m_MinFrameFps = 0.0f;
+		LagLogOpen();
+	}
+	else if(NewState != IClient::STATE_ONLINE && OldState == IClient::STATE_ONLINE)
+	{
+		LagLog("left the server: late %d, corrections %d (big %d, max %.0f units), stutters %d, snapshot gaps %d, prediction resets %d",
+			m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_BigCorrections, m_LagStats.m_MaxCorrection, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps, m_LagStats.m_PredResets);
+		LagLogClose();
+		m_OnlineSince = 0;
+	}
 }
 
-void CKing::RenderMusicHud()
+void CKing::LagLogOpen()
+{
+	LagLogClose();
+	if(!g_Config.m_KgLagLog)
+		return;
+	// keep it small: start a new file when it grows past 1 MB
+	IOHANDLE Existing = Storage()->OpenFile(KING_LAG_LOG, IOFLAG_READ, IStorage::TYPE_SAVE);
+	if(Existing)
+	{
+		const int64_t Length = io_length(Existing);
+		io_close(Existing);
+		if(Length > 1024 * 1024)
+		{
+			Storage()->RemoveFile(KING_LAG_LOG_OLD, IStorage::TYPE_SAVE);
+			Storage()->RenameFile(KING_LAG_LOG, KING_LAG_LOG_OLD, IStorage::TYPE_SAVE);
+		}
+	}
+	m_LagLogFile = Storage()->OpenFile(KING_LAG_LOG, IOFLAG_APPEND, IStorage::TYPE_SAVE);
+	if(!m_LagLogFile)
+		return;
+
+	char aAddr[NETADDR_MAXSTRSIZE];
+	net_addr_str(&Client()->ServerAddress(), aAddr, sizeof(aAddr), true);
+	char aDate[64];
+	str_timestamp_format(aDate, sizeof(aDate), TimestampFormat::SPACE);
+	char aLine[512];
+	str_format(aLine, sizeof(aLine), "\n==== %s | KING %s | server %s | map %s\n", aDate, KING_VERSION, aAddr, GameClient()->Map()->IsLoaded() ? GameClient()->Map()->BaseName() : "?");
+	io_write(m_LagLogFile, aLine, str_length(aLine));
+	LagLog("settings: mode %s, fast input %s %d ms, smoothing %d ms, margin %s (min %d max %d safety %d, manual %d), antiping %d players %d, fps cap %d, vsync %d, refresh %d",
+		InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? "on" : "off", g_Config.m_TcFastInputAmount, round_to_int(SmoothDurationMs()),
+		ModeUsesAutoMargin(g_Config.m_KgInputMode) || (g_Config.m_KgAutoMargin && g_Config.m_KgInputMode != INPUT_MODE_CLASSIC) ? "auto" : "manual",
+		g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety, g_Config.m_ClPredictionMargin,
+		g_Config.m_ClAntiPing, g_Config.m_ClAntiPingPlayers, g_Config.m_GfxRefreshRate, g_Config.m_GfxVsync, g_Config.m_ClRefreshRate);
+}
+
+void CKing::LagLogClose()
+{
+	if(m_LagLogFile)
+	{
+		io_close(m_LagLogFile);
+		m_LagLogFile = nullptr;
+	}
+}
+
+void CKing::LagLog(const char *pFormat, ...)
+{
+	if(!m_LagLogFile)
+		return;
+	char aMsg[768];
+	va_list Args;
+	va_start(Args, pFormat);
+	str_format_v(aMsg, sizeof(aMsg), pFormat, Args);
+	va_end(Args);
+	char aTime[32];
+	str_timestamp_format(aTime, sizeof(aTime), TimestampFormat::TIME);
+	char aLine[832];
+	str_format(aLine, sizeof(aLine), "%s  %s\n", aTime, aMsg);
+	io_write(m_LagLogFile, aLine, str_length(aLine)); // buffered, flushed every few seconds
+}
+
+void CKing::OnNewSnapshot()
+{
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return;
+	const int64_t Now = time_get();
+	const bool Settled = m_OnlineSince && Now - m_OnlineSince > 3 * time_freq();
+	if(Settled && m_LastSnapshotTime)
+	{
+		const float GapMs = (Now - m_LastSnapshotTime) * 1000.0f / (float)time_freq();
+		if(GapMs > 150.0f)
+		{
+			m_LagStats.m_SnapGaps++;
+			m_LastGapTime = Now;
+			const SKingNetStats Stats = Client()->KingNetStats();
+			LagLog("snapshot gap: %.0f ms without server data (ping %.0f ms)", GapMs, Stats.m_RttMs);
+		}
+	}
+	m_LastSnapshotTime = Now;
+}
+
+void CKing::OnLocalCorrection(float Distance, int Tick)
+{
+	if(Client()->State() != IClient::STATE_ONLINE || Distance < 4.0f)
+		return;
+	m_LagStats.m_Corrections++;
+	if(Distance >= 24.0f)
+		m_LagStats.m_BigCorrections++;
+	m_LagStats.m_MaxCorrection = std::max(m_LagStats.m_MaxCorrection, Distance);
+	if(!m_LagLogFile)
+		return;
+
+	const int64_t Now = time_get();
+	const int64_t Freq = time_freq();
+	if(Distance < 8.0f && m_LastCorrectionLog && Now - m_LastCorrectionLog < Freq / 5)
+		return;
+	// at most ~10 lines per second, busy KoG maps can correct you a lot
+	m_CorrectionLogBudget = std::min(10.0f, m_CorrectionLogBudget + (Now - m_LastCorrectionLog) / (float)Freq * 10.0f);
+	m_LastCorrectionLog = Now;
+	if(m_CorrectionLogBudget < 1.0f)
+	{
+		m_CorrectionsNotLogged++;
+		return;
+	}
+	m_CorrectionLogBudget -= 1.0f;
+
+	// what could have caused it: anything that happened within one round trip
+	const SKingNetStats Stats = Client()->KingNetStats();
+	const int64_t Window = (int64_t)((Stats.m_RttMs + 250.0f) / 1000.0f * Freq);
+	char aCause[256] = "";
+	if(Stats.m_LastLateTime && Now - Stats.m_LastLateTime < Window)
+		str_format(aCause + str_length(aCause), sizeof(aCause) - str_length(aCause), "late input (%.0f ms late), ", Stats.m_LastLateMs);
+	if(m_LastStutterTime && Now - m_LastStutterTime < Window)
+		str_append(aCause, "stutter, ");
+	if(m_LastGapTime && Now - m_LastGapTime < Window)
+		str_append(aCause, "snapshot gap, ");
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	if(LocalId >= 0 && GameClient()->m_aClients[LocalId].m_Predicted.HookedPlayer() >= 0)
+		str_append(aCause, "hooking a player, ");
+	if(LocalId >= 0)
+	{
+		const vec2 LocalPos = GameClient()->m_LocalCharacterPos;
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(i == LocalId || !GameClient()->m_Snap.m_aCharacters[i].m_Active)
+				continue;
+			const vec2 Pos(GameClient()->m_Snap.m_aCharacters[i].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[i].m_Cur.m_Y);
+			if(distance(Pos, LocalPos) < 160.0f)
+			{
+				str_append(aCause, "player nearby, ");
+				break;
+			}
+		}
+	}
+	if(aCause[0])
+		aCause[str_length(aCause) - 2] = '\0'; // drop the last ", "
+	else
+		str_copy(aCause, "no local cause (server side)");
+	LagLog("correction: %.1f units at tick %d | %s | margin %.1f ms, ping %.0f ms%s", Distance, Tick, aCause, Stats.m_MarginExactMs, Stats.m_RttMs, m_CorrectionsNotLogged ? " (more were not logged)" : "");
+	m_CorrectionsNotLogged = 0;
+}
+
+void CKing::UpdateLagMonitor()
+{
+	const int64_t Now = time_get();
+	const int64_t Freq = time_freq();
+	const bool Settled = m_OnlineSince && Now - m_OnlineSince > 3 * Freq;
+	const SKingNetStats Stats = Client()->KingNetStats();
+
+	const float FrameMs = Client()->RenderFrameTime() * 1000.0f;
+	if(FrameMs > 0.0f)
+	{
+		const float Fps = 1000.0f / FrameMs;
+		m_MinFrameFps = m_MinFrameFps <= 0.0f ? Fps : std::min(m_MinFrameFps, Fps);
+	}
+	// a hitch longer than the prediction margin can make inputs late, even if you don't see it
+	const float AverageMs = Client()->FrameTimeAverage() * 1000.0f;
+	if(Settled && FrameMs > std::max(25.0f, AverageMs * 2.5f) && FrameMs < 1000.0f) // > 1 s: minimized / alt-tab
+	{
+		m_LagStats.m_Stutters++;
+		m_LastStutterTime = Now;
+		LagLog("stutter: a frame took %.0f ms (usually %.1f ms), inputs may have been sent late", FrameMs, AverageMs);
+	}
+
+	if(Stats.m_LateInputs < m_SeenLateInputs)
+		m_SeenLateInputs = Stats.m_LateInputs; // counters were reset on (re)connect
+	if(Stats.m_LateInputs > m_SeenLateInputs)
+	{
+		const int New = Stats.m_LateInputs - m_SeenLateInputs;
+		m_SeenLateInputs = Stats.m_LateInputs;
+		if(Settled)
+		{
+			m_LagStats.m_LateInputs += New;
+			LagLog("late input%s: %d (last %.0f ms late) | margin %.1f ms, auto target %.0f ms, ping %.0f ms, jitter %.1f ms",
+				New > 1 ? "s" : "", New, Stats.m_LastLateMs, Stats.m_MarginExactMs, Stats.m_MarginTargetMs, Stats.m_RttMs, Stats.m_JitterMs);
+		}
+	}
+
+	if(Stats.m_PredictionResets < m_SeenPredResets)
+		m_SeenPredResets = Stats.m_PredictionResets;
+	if(Stats.m_PredictionResets > m_SeenPredResets)
+	{
+		m_LagStats.m_PredResets += Stats.m_PredictionResets - m_SeenPredResets;
+		m_SeenPredResets = Stats.m_PredictionResets;
+		if(Settled)
+			LagLog("prediction time reset (connection hiccup, the client resynced its clock)");
+	}
+
+	if(m_LagLogFile && Now - m_LastLogFlush > 5 * Freq)
+	{
+		io_flush(m_LagLogFile);
+		m_LastLogFlush = Now;
+	}
+
+	if(Now - m_LastSummary > 60 * Freq)
+	{
+		m_LastSummary = Now;
+		LagLog("minute: ping %.0f ms, jitter %.1f ms, margin %.1f ms (target %.0f) | late %d, corrections %d (max %.0f units), stutters %d, gaps %d | lowest fps %.0f",
+			Stats.m_RttMs, Stats.m_JitterMs, Stats.m_MarginExactMs, Stats.m_MarginTargetMs, m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_MaxCorrection, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps, m_MinFrameFps);
+		m_MinFrameFps = 0.0f;
+	}
+}
+
+void CKing::ConLagStats(IConsole::IResult *pResult, void *pUserData)
+{
+	CKing *pSelf = static_cast<CKing *>(pUserData);
+	const SLagStats &Lag = pSelf->m_LagStats;
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "late inputs %d, corrections %d (big %d, max %.0f units), stutters %d, snapshot gaps %d, prediction resets %d",
+		Lag.m_LateInputs, Lag.m_Corrections, Lag.m_BigCorrections, Lag.m_MaxCorrection, Lag.m_Stutters, Lag.m_SnapGaps, Lag.m_PredResets);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "king", aBuf);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "king", "details: king_lag.log in your KING settings folder (%APPDATA%\\DDNet)");
+}
+
+// ***** Music player ***** //
+
+static const ColorRGBA s_KingGold(0.91f, 0.70f, 0.29f, 1.0f);
+
+void CKing::ResetMusicSettings()
+{
+	g_Config.m_KgMusicHud = 1;
+	g_Config.m_KgMusicColorMode = MUSIC_COLOR_COVER;
+	g_Config.m_KgMusicVisualizer = MUSIC_VIS_CENTER;
+	g_Config.m_KgMusicTextScale = 100;
+	g_Config.m_KgMusicColumns = 5;
+	g_Config.m_KgMusicRounding = 1;
+	g_Config.m_KgMusicLyrics = 0;
+	g_Config.m_KgMusicShowPaused = 1;
+}
+
+bool CKing::MusicPillVisible()
+{
+	if(!g_Config.m_KgMusicHud || !m_Media.Supported())
+		return false;
+	const SKingMediaInfo Info = m_Media.Get();
+	return Info.m_Valid && (Info.m_Playing || g_Config.m_KgMusicShowPaused) && (Info.m_aTitle[0] || Info.m_aArtist[0]);
+}
+
+ColorRGBA CKing::MusicAccent(const SKingMediaInfo &Info) const
+{
+	switch(g_Config.m_KgMusicColorMode)
+	{
+	case MUSIC_COLOR_KING: return s_KingGold;
+	case MUSIC_COLOR_WHITE: return ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+	default:
+	{
+		if(!Info.m_HasCover)
+			return s_KingGold;
+		// cover color, made bright enough to read on the dark pill
+		ColorHSLA Hsl = color_cast<ColorHSLA>(ColorRGBA(Info.m_aCoverColor[0], Info.m_aCoverColor[1], Info.m_aCoverColor[2], 1.0f));
+		Hsl.s = std::min(Hsl.s * 1.1f, 0.85f);
+		Hsl.l = std::clamp(Hsl.l, 0.62f, 0.8f);
+		return color_cast<ColorRGBA>(Hsl);
+	}
+	}
+}
+
+void CKing::UpdateCoverTexture()
 {
 	const SKingMediaInfo Info = m_Media.Get();
-	if(!Info.m_Valid || (!Info.m_Playing && !g_Config.m_KgMusicShowPaused) || (Info.m_aTitle[0] == '\0' && Info.m_aArtist[0] == '\0'))
+	if(Info.m_CoverSerial == m_CoverSerial)
+		return;
+	std::vector<uint8_t> vPixels;
+	int Serial = 0;
+	const bool Have = m_Media.GetCover(vPixels, Serial);
+	m_CoverSerial = Serial;
+	if(m_HasCoverTexture)
+	{
+		Graphics()->UnloadTexture(&m_CoverTexture);
+		m_HasCoverTexture = false;
+	}
+	const size_t Bytes = (size_t)CKingMedia::COVER_SIZE * CKingMedia::COVER_SIZE * 4;
+	if(!Have || vPixels.size() < Bytes)
+		return;
+	CImageInfo Image;
+	Image.m_Width = CKingMedia::COVER_SIZE;
+	Image.m_Height = CKingMedia::COVER_SIZE;
+	Image.m_Format = CImageInfo::FORMAT_RGBA;
+	Image.Allocate();
+	mem_copy(Image.m_pData, vPixels.data(), Bytes);
+	m_CoverTexture = Graphics()->LoadTextureRaw(Image, 0, "king_cover");
+	m_HasCoverTexture = m_CoverTexture.IsValid();
+}
+
+// Textured quad with rounded corners (the cover art).
+static void KingDrawRoundedImage(IGraphics *pGraphics, float X, float Y, float W, float H, float Rounding, ColorRGBA Color)
+{
+	Rounding = std::clamp(Rounding, 0.0f, std::min(W, H) * 0.5f);
+	const auto Quad = [&](vec2 A, vec2 B, vec2 C, vec2 D) {
+		const auto Uv = [&](vec2 P) { return vec2((P.x - X) / W, (P.y - Y) / H); };
+		const vec2 Ua = Uv(A), Ub = Uv(B), Uc = Uv(C), Ud = Uv(D);
+		pGraphics->QuadsSetSubsetFree(Ua.x, Ua.y, Ub.x, Ub.y, Uc.x, Uc.y, Ud.x, Ud.y);
+		const IGraphics::CFreeformItem Item(A, B, C, D);
+		pGraphics->QuadsDrawFreeform(&Item, 1);
+	};
+
+	pGraphics->QuadsBegin();
+	pGraphics->SetColor(Color);
+	const float R = Rounding;
+	if(R < 0.05f)
+		Quad(vec2(X, Y), vec2(X + W, Y), vec2(X, Y + H), vec2(X + W, Y + H));
+	else
+	{
+		Quad(vec2(X + R, Y), vec2(X + W - R, Y), vec2(X + R, Y + H), vec2(X + W - R, Y + H));
+		Quad(vec2(X, Y + R), vec2(X + R, Y + R), vec2(X, Y + H - R), vec2(X + R, Y + H - R));
+		Quad(vec2(X + W - R, Y + R), vec2(X + W, Y + R), vec2(X + W - R, Y + H - R), vec2(X + W, Y + H - R));
+		const vec2 aCenter[4] = {vec2(X + R, Y + R), vec2(X + W - R, Y + R), vec2(X + W - R, Y + H - R), vec2(X + R, Y + H - R)};
+		const float aStart[4] = {pi, pi * 1.5f, 0.0f, pi * 0.5f};
+		constexpr int SEGMENTS = 6;
+		for(int c = 0; c < 4; c++)
+		{
+			for(int s = 0; s < SEGMENTS; s++)
+			{
+				const float A0 = aStart[c] + (pi * 0.5f) * s / SEGMENTS;
+				const float A1 = aStart[c] + (pi * 0.5f) * (s + 1) / SEGMENTS;
+				const vec2 P0 = aCenter[c] + vec2(std::cos(A0), std::sin(A0)) * R;
+				const vec2 P1 = aCenter[c] + vec2(std::cos(A1), std::sin(A1)) * R;
+				Quad(aCenter[c], P0, aCenter[c], P1);
+			}
+		}
+	}
+	pGraphics->QuadsEnd();
+}
+
+float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *pTime, ColorRGBA TimeColor, bool Hud)
+{
+	const SKingMediaInfo Info = m_Media.Get();
+	UpdateCoverTexture();
+
+	const float Scale = Unit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
+	const bool Soft = g_Config.m_KgMusicRounding != 0;
+	const float FontSize = 10.0f * Scale;
+	const float H = 15.0f * Scale;
+	const float Pad = 1.7f * Scale;
+	const float Gap = 3.0f * Scale;
+	const float CoverSize = H - 2.0f * Pad;
+	const int Vis = g_Config.m_KgMusicVisualizer;
+	const int Columns = std::clamp(g_Config.m_KgMusicColumns, 3, 24);
+	const float BarW = 1.7f * Scale;
+	const float BarGap = 1.1f * Scale;
+	const float VisW = Vis != MUSIC_VIS_OFF ? Columns * BarW + (Columns - 1) * BarGap : 0.0f;
+
+	// width from a digit template, so the pill does not wobble every second
+	char aTemplate[64];
+	str_copy(aTemplate, pTime);
+	for(char *p = aTemplate; *p; p++)
+		if(*p >= '0' && *p <= '9')
+			*p = '0';
+	const float TimeW = TextRender()->TextWidth(FontSize, aTemplate);
+	const float LeftW = Pad + CoverSize + Gap;
+	const float RightW = Vis != MUSIC_VIS_OFF ? Gap + VisW + Pad + 0.6f * Scale : Pad;
+	const float Side = std::max(LeftW, RightW);
+	const float W = TimeW + 2.0f * Side;
+	const float X = CenterX - W / 2.0f;
+	const ColorRGBA Accent = MusicAccent(Info);
+	const float PausedAlpha = Info.m_Playing ? 1.0f : 0.55f;
+
+	// pill
+	Graphics()->DrawRect(X, TopY, W, H, ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f), IGraphics::CORNER_ALL, Soft ? H * 0.32f : 1.2f * Scale);
+
+	// cover
+	const float CoverX = X + Pad;
+	const float CoverY = TopY + Pad;
+	const float CoverRounding = Soft ? CoverSize * 0.22f : 0.6f * Scale;
+	if(m_HasCoverTexture)
+	{
+		Graphics()->TextureSet(m_CoverTexture);
+		KingDrawRoundedImage(Graphics(), CoverX, CoverY, CoverSize, CoverSize, CoverRounding, ColorRGBA(1.0f, 1.0f, 1.0f, PausedAlpha));
+		Graphics()->TextureClear();
+	}
+	else
+	{
+		Graphics()->DrawRect(CoverX, CoverY, CoverSize, CoverSize, ColorRGBA(Accent.r * 0.35f, Accent.g * 0.35f, Accent.b * 0.35f, 0.9f), IGraphics::CORNER_ALL, CoverRounding);
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->TextColor(Accent.WithAlpha(0.9f * PausedAlpha));
+		const float IconSize = CoverSize * 0.55f;
+		const float IconW = TextRender()->TextWidth(IconSize, FontIcon::MUSIC);
+		TextRender()->Text(CoverX + (CoverSize - IconW) / 2.0f, CoverY + (CoverSize - IconSize) / 2.0f - 0.2f * IconSize, IconSize, FontIcon::MUSIC);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+	}
+	if(!Info.m_Playing)
+	{
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
+		const float IconSize = CoverSize * 0.45f;
+		const float IconW = TextRender()->TextWidth(IconSize, FontIcon::PAUSE);
+		TextRender()->Text(CoverX + (CoverSize - IconW) / 2.0f, CoverY + (CoverSize - IconSize) / 2.0f - 0.2f * IconSize, IconSize, FontIcon::PAUSE);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+	}
+
+	// timer in the middle
+	const STextBoundingBox Box = TextRender()->TextBoundingBox(FontSize, pTime);
+	TextRender()->TextColor(TimeColor);
+	TextRender()->Text(CenterX - Box.m_W / 2.0f, TopY + (H - Box.m_H) / 2.0f, FontSize, pTime, -1.0f);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	// visualizer on the right
+	if(Vis != MUSIC_VIS_OFF)
+	{
+		std::array<float, CKingMedia::NUM_BANDS> aBands{};
+		const bool Real = m_Media.VisualizerCapturing();
+		if(Real)
+			m_Media.GetBands(aBands);
+		const float Dt = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
+		const double Time = time_get() / (double)time_freq();
+		const float VisX = X + W - Pad - 0.6f * Scale - VisW;
+		const float MinH = BarW;
+		const float MaxH = H - 2.0f * Pad - 0.4f * Scale;
+		for(int i = 0; i < Columns; i++)
+		{
+			float Target = 0.0f;
+			if(Info.m_Playing)
+			{
+				if(Real)
+				{
+					const int B0 = i * CKingMedia::NUM_BANDS / Columns;
+					const int B1 = std::max(B0 + 1, (i + 1) * CKingMedia::NUM_BANDS / Columns);
+					for(int b = B0; b < B1 && b < CKingMedia::NUM_BANDS; b++)
+						Target = std::max(Target, aBands[b]);
+				}
+				else
+				{
+					// no access to the audio output: a calm decorative motion
+					Target = 0.35f + 0.25f * std::sin(Time * (3.1 + i * 0.7) + i * 1.3) + 0.15f * std::sin(Time * (5.3 + i * 0.4));
+				}
+			}
+			float &Level = m_aBarLevels[i];
+			Level += (Target - Level) * std::min(1.0f, Dt * 30.0f);
+			Level = std::clamp(Level, 0.0f, 1.0f);
+
+			const float BarH = MinH + (MaxH - MinH) * Level;
+			const float BarX = VisX + i * (BarW + BarGap);
+			const float BarY = Vis == MUSIC_VIS_CENTER ? TopY + (H - BarH) / 2.0f : TopY + H - Pad - 0.2f * Scale - BarH;
+			Graphics()->DrawRect(BarX, BarY, BarW, BarH, Accent.WithAlpha((0.55f + 0.45f * Level) * PausedAlpha), IGraphics::CORNER_ALL, Soft ? BarW * 0.5f : 0.0f);
+		}
+	}
+
+	if(Hud)
+	{
+		m_PillRenderedThisFrame = true;
+		m_PillBottom = TopY + H;
+		m_PillUnit = Unit;
+	}
+	return H;
+}
+
+void CKing::RenderLyrics()
+{
+	if(!m_PillRenderedThisFrame)
+		return;
+	const SKingMediaInfo Info = m_Media.Get();
+	if(!Info.m_Valid)
 		return;
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
 	Graphics()->MapScreenToSize(Width, Height);
 
-	// left of the race timer at the top
-	const float BoxW = 132.0f;
-	const float BoxH = 14.0f;
-	const float BoxX = Width / 2.0f - 30.0f - BoxW;
-	const float BoxY = 2.0f;
-	const ColorRGBA Accent(0.91f, 0.70f, 0.29f, 1.0f);
-	Graphics()->DrawRect(BoxX, BoxY, BoxW, BoxH, ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 3.0f);
+	const int64_t Now = time_get();
+	const float Scale = m_PillUnit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
+	const float Dt = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
 
-	// play state icon
-	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-	TextRender()->TextColor(Accent);
-	TextRender()->Text(BoxX + 4.0f, BoxY + 3.0f, 5.5f, Info.m_Playing ? FontIcon::PLAY : FontIcon::PAUSE);
-	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-
-	// time on the right
-	char aTime[32];
-	KingFormatTime(aTime, sizeof(aTime), Info.m_PositionSec);
-	const float TimeFont = 4.5f;
-	const float TimeW = TextRender()->TextWidth(TimeFont, aTime);
-	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
-	TextRender()->Text(BoxX + BoxW - 4.0f - TimeW, BoxY + 3.6f, TimeFont, aTime);
-
-	// "Title - Artist", cut to fit
-	char aText[512];
-	if(Info.m_aArtist[0] && Info.m_aTitle[0])
-		str_format(aText, sizeof(aText), "%s - %s", Info.m_aTitle, Info.m_aArtist);
-	else
-		str_copy(aText, Info.m_aTitle[0] ? Info.m_aTitle : Info.m_aArtist);
-	const float TextFont = 5.2f;
-	const float MaxTextW = BoxW - 14.0f - TimeW - 6.0f;
-	if(TextRender()->TextWidth(TextFont, aText) > MaxTextW)
+	// right after a track change: its name, then the synced lyrics (if enabled)
+	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
+	if(Track != m_LastTrack)
 	{
-		int Len = str_length(aText);
-		while(Len > 1)
+		m_LastTrack = Track;
+		m_TrackChangedTime = Now;
+	}
+	char aText[512] = "";
+	float Alpha = 0.0f;
+	const float SinceChange = (Now - m_TrackChangedTime) / (float)time_freq();
+	if(SinceChange < 4.0f && (Info.m_aTitle[0] || Info.m_aArtist[0]))
+	{
+		if(Info.m_aArtist[0] && Info.m_aTitle[0])
+			str_format(aText, sizeof(aText), "%s - %s", Info.m_aTitle, Info.m_aArtist);
+		else
+			str_copy(aText, Info.m_aTitle[0] ? Info.m_aTitle : Info.m_aArtist);
+		Alpha = std::min({1.0f, SinceChange / 0.2f, (4.0f - SinceChange) / 0.4f});
+	}
+	else if(g_Config.m_KgMusicLyrics && Info.m_HasTimeline && Track == m_LyricsTrack && !m_vLyrics.empty())
+	{
+		const float Pos = Info.m_PositionSec + 0.25f; // show a line a moment early, like karaoke
+		int Line = -1;
+		for(int i = 0; i < (int)m_vLyrics.size() && m_vLyrics[i].m_Time <= Pos; i++)
+			Line = i;
+		if(Line != m_CurrentLyric)
 		{
-			Len = str_utf8_rewind(aText, Len);
-			char aCut[512];
-			str_truncate(aCut, sizeof(aCut), aText, Len);
-			str_append(aCut, "...");
-			if(TextRender()->TextWidth(TextFont, aCut) <= MaxTextW)
-			{
-				str_copy(aText, aCut);
-				break;
-			}
+			m_CurrentLyric = Line;
+			m_LyricAlpha = 0.0f;
+		}
+		if(Line >= 0 && !m_vLyrics[Line].m_Text.empty())
+		{
+			str_copy(aText, m_vLyrics[Line].m_Text.c_str());
+			m_LyricAlpha = std::min(1.0f, m_LyricAlpha + Dt / 0.15f);
+			Alpha = m_LyricAlpha * (Info.m_Playing ? 1.0f : 0.6f);
 		}
 	}
-	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.92f);
-	TextRender()->Text(BoxX + 12.0f, BoxY + 3.2f, TextFont, aText);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	if(!aText[0] || Alpha <= 0.0f)
+		return;
 
-	// progress line along the bottom
-	if(Info.m_DurationSec > 0.0f)
+	float FontSize = 6.5f * Scale;
+	const float MaxW = Width * 0.6f;
+	const float TextW = TextRender()->TextWidth(FontSize, aText);
+	if(TextW > MaxW)
+		FontSize = std::max(FontSize * 0.7f, FontSize * MaxW / TextW);
+	const float FinalW = TextRender()->TextWidth(FontSize, aText);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.92f * Alpha);
+	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.45f * Alpha);
+	TextRender()->Text(Width / 2.0f - FinalW / 2.0f, m_PillBottom + 2.0f * Scale, FontSize, aText, -1.0f);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+}
+
+// ***** Lyrics (lrclib.net) ***** //
+
+// "Song (Official Video) [HD]" -> "Song"
+static void KingCleanTitle(char *pBuf, int Size, const char *pTitle)
+{
+	std::string Out;
+	int Depth = 0;
+	for(const char *p = pTitle; *p; p++)
 	{
-		const float Progress = std::clamp(Info.m_PositionSec / Info.m_DurationSec, 0.0f, 1.0f);
-		const float LineX = BoxX + 4.0f;
-		const float LineW = BoxW - 8.0f;
-		const float LineY = BoxY + BoxH - 2.6f;
-		Graphics()->DrawRect(LineX, LineY, LineW, 1.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.15f), IGraphics::CORNER_ALL, 0.5f);
-		Graphics()->DrawRect(LineX, LineY, LineW * Progress, 1.0f, Accent, IGraphics::CORNER_ALL, 0.5f);
+		if(*p == '(' || *p == '[')
+			Depth++;
+		else if((*p == ')' || *p == ']') && Depth > 0)
+			Depth--;
+		else if(Depth == 0)
+			Out += *p;
 	}
+	str_copy(pBuf, Out.c_str(), Size);
+	str_utf8_trim_right(pBuf);
+	// leading spaces
+	const char *pStart = str_utf8_skip_whitespaces(pBuf);
+	if(pStart != pBuf)
+		mem_move(pBuf, pStart, str_length(pStart) + 1);
+}
+
+// "Artist - Topic" / "ArtistVEVO" (YouTube channel names) -> "Artist"
+static void KingCleanArtist(char *pBuf, int Size, const char *pArtist)
+{
+	str_copy(pBuf, pArtist, Size);
+	if(str_endswith(pBuf, " - Topic"))
+		pBuf[str_length(pBuf) - 8] = '\0';
+	if(str_endswith(pBuf, "VEVO"))
+		pBuf[str_length(pBuf) - 4] = '\0';
+	str_utf8_trim_right(pBuf);
+}
+
+void CKing::UpdateLyrics(const SKingMediaInfo &Info)
+{
+	if(!Info.m_Valid || !Info.m_aTitle[0])
+		return;
+	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
+	if(Track == m_LyricsTrack || Track == m_LyricsWanted)
+		return;
+
+	if(m_pLyricsTask)
+	{
+		m_pLyricsTask->Abort();
+		m_pLyricsTask = nullptr;
+	}
+	m_vLyrics.clear();
+	m_CurrentLyric = -1;
+	m_LyricsTrack.clear();
+	m_LyricsWanted = Track;
+	m_LyricsAttempt = 0;
+
+	char aTitle[256], aArtist[256];
+	KingCleanTitle(aTitle, sizeof(aTitle), Info.m_aTitle);
+	KingCleanArtist(aArtist, sizeof(aArtist), Info.m_aArtist);
+	if(!aTitle[0])
+		str_copy(aTitle, Info.m_aTitle);
+
+	char aEscTitle[768], aEscArtist[768], aUrl[2048];
+	EscapeUrl(aEscTitle, aTitle);
+	EscapeUrl(aEscArtist, aArtist);
+	if(aArtist[0])
+		str_format(aUrl, sizeof(aUrl), "https://lrclib.net/api/search?track_name=%s&artist_name=%s", aEscTitle, aEscArtist);
+	else
+		str_format(aUrl, sizeof(aUrl), "https://lrclib.net/api/search?q=%s", aEscTitle);
+
+	m_pLyricsTask = HttpGet(aUrl);
+	m_pLyricsTask->HeaderString("User-Agent", "KING/" KING_VERSION " (https://github.com/" KING_UPDATE_REPO ")");
+	m_pLyricsTask->Timeout(CTimeout{10000, 0, 500, 10});
+	m_pLyricsTask->FailOnErrorStatus(false);
+	m_pLyricsTask->MaxResponseSize(4 * 1024 * 1024);
+	m_pLyricsTask->LogProgress(HTTPLOG::FAILURE);
+	Http()->Run(m_pLyricsTask);
+}
+
+static bool KingParseLrcTime(const char *&p, float &Out)
+{
+	// [mm:ss.xx] or [mm:ss] or [mm:ss.xxx]
+	if(*p != '[')
+		return false;
+	const char *q = p + 1;
+	int Min = 0, Digits = 0;
+	while(*q >= '0' && *q <= '9')
+	{
+		Min = Min * 10 + (*q - '0');
+		q++;
+		Digits++;
+	}
+	if(!Digits || *q != ':')
+		return false;
+	q++;
+	int Sec = 0;
+	Digits = 0;
+	while(*q >= '0' && *q <= '9')
+	{
+		Sec = Sec * 10 + (*q - '0');
+		q++;
+		Digits++;
+	}
+	if(!Digits)
+		return false;
+	float Frac = 0.0f;
+	if(*q == '.' || *q == ':')
+	{
+		q++;
+		float Div = 10.0f;
+		while(*q >= '0' && *q <= '9')
+		{
+			Frac += (*q - '0') / Div;
+			Div *= 10.0f;
+			q++;
+		}
+	}
+	if(*q != ']')
+		return false;
+	Out = Min * 60.0f + Sec + Frac;
+	p = q + 1;
+	return true;
+}
+
+void CKing::FinishLyrics()
+{
+	std::shared_ptr<IHttpRequest> pTask = m_pLyricsTask;
+	m_pLyricsTask = nullptr;
+	const SKingMediaInfo Info = m_Media.Get();
+	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
+	if(Track != m_LyricsWanted)
+		return; // the song changed meanwhile; UpdateLyrics() starts over
+
+	const char *pSynced = nullptr;
+	json_value *pJson = nullptr;
+	if(pTask->State() == EHttpState::DONE && pTask->StatusCode() == 200)
+		pJson = pTask->ResultJson();
+	if(pJson && pJson->type == json_array)
+	{
+		// the result whose length is closest to what plays (if the player tells us)
+		float BestDiff = 1e9f;
+		for(int i = 0; i < json_array_length(pJson); i++)
+		{
+			const json_value &Entry = *json_array_get(pJson, i);
+			const json_value &Synced = Entry["syncedLyrics"];
+			if(Synced.type != json_string || !Synced.u.string.length)
+				continue;
+			const json_value &Duration = Entry["duration"];
+			float Diff = 0.0f;
+			if(Info.m_DurationSec > 0.0f && (Duration.type == json_double || Duration.type == json_integer))
+				Diff = absolute((Duration.type == json_double ? (float)Duration.u.dbl : (float)Duration.u.integer) - Info.m_DurationSec);
+			if(Diff < BestDiff)
+			{
+				BestDiff = Diff;
+				pSynced = Synced.u.string.ptr;
+			}
+		}
+		if(BestDiff > 10.0f)
+			pSynced = nullptr; // a different version of the song, timings would be off
+	}
+
+	if(pSynced)
+	{
+		const char *p = pSynced;
+		while(*p)
+		{
+			const char *pEnd = p;
+			while(*pEnd && *pEnd != '\n')
+				pEnd++;
+			std::string Line(p, pEnd - p);
+			if(!Line.empty() && Line.back() == '\r')
+				Line.pop_back();
+
+			const char *pLine = Line.c_str();
+			std::vector<float> vTimes;
+			float Time;
+			while(KingParseLrcTime(pLine, Time))
+				vTimes.push_back(Time);
+			while(*pLine == ' ')
+				pLine++;
+			for(float T : vTimes)
+				m_vLyrics.push_back({T, std::string(pLine)});
+			p = *pEnd ? pEnd + 1 : pEnd;
+		}
+		std::stable_sort(m_vLyrics.begin(), m_vLyrics.end(), [](const SLyricLine &a, const SLyricLine &b) { return a.m_Time < b.m_Time; });
+	}
+	if(pJson)
+		json_value_free(pJson);
+
+	if(!m_vLyrics.empty() || m_LyricsAttempt >= 1)
+	{
+		m_LyricsTrack = m_LyricsWanted; // done (with or without lyrics)
+		m_CurrentLyric = -1;
+		return;
+	}
+
+	// second try: YouTube style "Artist - Title" in the title
+	m_LyricsAttempt++;
+	char aTitle[256];
+	KingCleanTitle(aTitle, sizeof(aTitle), Info.m_aTitle);
+	const char *pDash = str_find(aTitle, " - ");
+	char aEsc[1024], aUrl[2048];
+	if(pDash)
+	{
+		char aArtist[256];
+		str_truncate(aArtist, sizeof(aArtist), aTitle, pDash - aTitle);
+		char aEscArtist[768];
+		EscapeUrl(aEscArtist, aArtist);
+		EscapeUrl(aEsc, pDash + 3);
+		str_format(aUrl, sizeof(aUrl), "https://lrclib.net/api/search?track_name=%s&artist_name=%s", aEsc, aEscArtist);
+	}
+	else
+	{
+		char aQuery[600];
+		str_format(aQuery, sizeof(aQuery), "%s %s", aTitle, Info.m_aArtist);
+		EscapeUrl(aEsc, aQuery);
+		str_format(aUrl, sizeof(aUrl), "https://lrclib.net/api/search?q=%s", aEsc);
+	}
+	m_pLyricsTask = HttpGet(aUrl);
+	m_pLyricsTask->HeaderString("User-Agent", "KING/" KING_VERSION " (https://github.com/" KING_UPDATE_REPO ")");
+	m_pLyricsTask->Timeout(CTimeout{10000, 0, 500, 10});
+	m_pLyricsTask->FailOnErrorStatus(false);
+	m_pLyricsTask->MaxResponseSize(4 * 1024 * 1024);
+	m_pLyricsTask->LogProgress(HTTPLOG::FAILURE);
+	Http()->Run(m_pLyricsTask);
 }

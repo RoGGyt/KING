@@ -2781,13 +2781,14 @@ void CGameClient::OnPredict()
 	int LocalTee = g_Config.m_ClDummy ^ m_IsDummySwapping;
 	int DummyTee = LocalTee ^ 1;
 
-	// KING Smooth: remember last prediction of a tick whose input was already final,
-	// so a change after this repredict can only come from the server (a correction)
+	// KING: remember the last prediction of a tick whose input was already final, so a
+	// change after this repredict can only come from the server (a correction). Used by
+	// the lag monitor always and by correction smoothing when a mode enables it.
 	const int KingLocalId = m_Snap.m_LocalClientId;
 	const int KingCheckTick = m_KingPrevFinalRegular;
 	bool KingHaveOld = false;
 	vec2 KingOldPos = vec2(0.0f, 0.0f);
-	if(m_King.SmoothDurationMs() > 0.0f && KingLocalId >= 0 &&
+	if(KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy &&
 		KingCheckTick > Client()->GameTick(g_Config.m_ClDummy) && KingCheckTick <= FinalTickRegular && KingCheckTick >= FinalTickRegular - 2 &&
 		m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
 	{
@@ -2995,14 +2996,18 @@ void CGameClient::OnPredict()
 		}
 	}
 
-	// KING Smooth: turn the correction into a render offset that fades out
+	// KING: detect server corrections of our tee; smooth them if the input mode wants it
 	if(KingHaveOld && m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
 	{
 		const vec2 Err = KingOldPos - m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
 		const float ErrLen = length(Err);
-		if(ErrLen > 64.0f)
+		if(ErrLen > 0.5f)
+			m_King.OnLocalCorrection(ErrLen, KingCheckTick);
+
+		const float SmoothMs = m_King.SmoothDurationMs();
+		if(SmoothMs <= 0.0f || ErrLen > CKing::SMOOTH_SNAP_DISTANCE)
 		{
-			// teleport or huge correction: snap
+			// smoothing off, or a teleport / huge correction: show the truth at once
 			m_KingSmoothOffset = vec2(0.0f, 0.0f);
 			m_KingSmoothStart = vec2(0.0f, 0.0f);
 		}
@@ -3011,13 +3016,15 @@ void CGameClient::OnPredict()
 			// start a new blend from where the tee is drawn right now
 			m_KingSmoothStart = m_KingSmoothOffset + Err;
 			const float StartLen = length(m_KingSmoothStart);
-			if(StartLen > 64.0f)
-				m_KingSmoothStart = m_KingSmoothStart * (64.0f / StartLen);
+			if(StartLen > CKing::SMOOTH_SNAP_DISTANCE)
+				m_KingSmoothStart = m_KingSmoothStart * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
 			m_KingSmoothOffset = m_KingSmoothStart;
 			m_KingSmoothElapsedMs = 0.0f;
 		}
 	}
 	m_KingPrevFinalRegular = FinalTickRegular;
+	m_KingPrevLocalId = KingLocalId;
+	m_KingPrevDummy = g_Config.m_ClDummy;
 
 	// detect mispredictions of other players and make corrections smoother when possible
 	if(g_Config.m_ClAntiPingSmooth &&

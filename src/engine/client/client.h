@@ -199,6 +199,9 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	// graphs
 	CGraph m_aInputtimeMarginGraphs[NUM_DUMMIES];
 	CKingNetMonitor m_KingNet; // KING
+	int m_KingPredResets = 0; // KING lag log
+	float KingMarginMs() const;
+	int64_t KingMarginTime() const;
 	CGraph m_aGametimeMarginGraphs[NUM_DUMMIES];
 	CGraph m_FpsGraph;
 
