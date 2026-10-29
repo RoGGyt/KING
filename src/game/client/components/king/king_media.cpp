@@ -22,6 +22,10 @@
 #pragma message("KING: system media player support DISABLED (no C++/WinRT headers)")
 #endif
 
+#if defined(KING_REQUIRE_WINRT) && !defined(KING_MEDIA_WINRT)
+#error "KING: C++/WinRT headers not found, the music player would be disabled"
+#endif
+
 static double KingSteadySeconds()
 {
 	using namespace std::chrono;
