@@ -76,6 +76,7 @@ jobs:
         if (-not (Get-Content $log | Select-String '^ok')) { throw 'updater reported failure' }
         if ((Get-Item (Join-Path $dest 'KING.exe')).Length -lt 100000) { throw 'KING.exe was not replaced' }
         if (-not (Test-Path (Join-Path $dest 'data'))) { throw 'data folder missing after update' }
+        if (-not (Test-Path (Join-Path $dest 'KING-Server.exe'))) { throw 'KING-Server.exe missing from the package (local server would not start)' }
         if (-not (Test-Path (Join-Path $dest 'keep-me.txt'))) { throw 'existing files were removed' }
         if (Test-Path $zip) { throw 'zip was not cleaned up' }
         Write-Host 'updater script OK'
