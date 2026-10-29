@@ -111,6 +111,9 @@ public:
 	};
 	const SLagStats &LagStats() const { return m_LagStats; }
 
+	// "Find Hours" in the player menu: total playtime (ddstats.tw) and points (ddnet.org), printed to chat
+	void LookupPlayer(const char *pName);
+
 	// Updates (GitHub releases of KING_UPDATE_REPO)
 	void CheckForUpdates();
 	EUpdateState UpdateState() const { return m_UpdateState; }
@@ -234,6 +237,12 @@ private:
 	float m_LyricAlpha = 0.0f;
 	int64_t m_TrackChangedTime = 0;
 	std::string m_LastTrack;
+
+	// player lookup
+	void FinishLookup();
+	std::shared_ptr<IHttpRequest> m_pLookupStats = nullptr; // ddstats.tw
+	std::shared_ptr<IHttpRequest> m_pLookupDDNet = nullptr; // ddnet.org
+	char m_aLookupName[64] = "";
 
 	static void ConKogPreset(IConsole::IResult *pResult, void *pUserData);
 	static void ConCheckUpdate(IConsole::IResult *pResult, void *pUserData);

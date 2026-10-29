@@ -55,10 +55,26 @@ class CScoreboard : public CComponent
 
 		CButtonContainer m_SpectateButton;
 
+		// KING: more actions
+		CButtonContainer m_TeamAction;
+		CButtonContainer m_WarAction;
+		CButtonContainer m_ProfileButton;
+		CButtonContainer m_WhisperButton;
+		CButtonContainer m_CopySkinButton;
+		CButtonContainer m_VoteKickButton;
+		CButtonContainer m_FindHoursButton;
+		CButtonContainer m_ClipNameButton;
+		CButtonContainer m_SwapButton;
+		CButtonContainer m_InviteButton;
+
 		int m_ClientId;
 		bool m_IsLocal;
 		bool m_IsSpectating;
+		bool m_CanInvite = false; // we are in a team, they are not in it
 
+		static float Width() { return 125.0f; }
+		static float Height(bool IsLocal, bool IsSpectating, bool CanInvite);
+		static bool CanInvite(const CGameClient *pGameClient, int ClientId);
 		static CUi::EPopupMenuFunctionResult Render(void *pContext, CUIRect View, bool Active);
 	} m_ScoreboardPopupContext;
 

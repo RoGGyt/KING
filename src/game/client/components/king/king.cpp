@@ -124,6 +124,14 @@ void CKing::OnShutdown()
 		m_pLyricsTask->Abort();
 		m_pLyricsTask = nullptr;
 	}
+	for(auto *ppTask : {&m_pLookupStats, &m_pLookupDDNet})
+	{
+		if(*ppTask)
+		{
+			(*ppTask)->Abort();
+			*ppTask = nullptr;
+		}
+	}
 	if(m_HasCoverTexture)
 	{
 		Graphics()->UnloadTexture(&m_CoverTexture);
@@ -645,6 +653,8 @@ void CKing::OnRender()
 		FinishDownload();
 	if(m_pLyricsTask && m_pLyricsTask->Done())
 		FinishLyrics();
+	if((m_pLookupStats || m_pLookupDDNet) && (!m_pLookupStats || m_pLookupStats->Done()) && (!m_pLookupDDNet || m_pLookupDDNet->Done()))
+		FinishLookup();
 	if(g_Config.m_KgMusicHud && g_Config.m_KgMusicLyrics)
 		UpdateLyrics(m_Media.Get());
 
@@ -1518,4 +1528,125 @@ void CKing::FinishLyrics()
 	m_pLyricsTask->MaxResponseSize(4 * 1024 * 1024);
 	m_pLyricsTask->LogProgress(HTTPLOG::FAILURE);
 	Http()->Run(m_pLyricsTask);
+}
+
+// ***** Player lookup ("Find Hours") ***** //
+
+void CKing::LookupPlayer(const char *pName)
+{
+	if(!pName[0])
+		return;
+	for(auto *ppTask : {&m_pLookupStats, &m_pLookupDDNet})
+	{
+		if(*ppTask)
+		{
+			(*ppTask)->Abort();
+			*ppTask = nullptr;
+		}
+	}
+	str_copy(m_aLookupName, pName);
+
+	char aEscaped[256], aUrl[512];
+	EscapeUrl(aEscaped, pName);
+	const auto Start = [&](const char *pUrl) {
+		std::shared_ptr<IHttpRequest> pTask = HttpGet(pUrl);
+		pTask->HeaderString("User-Agent", "KING/" KING_VERSION " (https://github.com/" KING_UPDATE_REPO ")");
+		pTask->HeaderString("Accept", "application/json");
+		pTask->Timeout(CTimeout{10000, 0, 500, 10});
+		pTask->FailOnErrorStatus(false);
+		pTask->MaxResponseSize(8 * 1024 * 1024);
+		pTask->LogProgress(HTTPLOG::FAILURE);
+		Http()->Run(pTask);
+		return pTask;
+	};
+	str_format(aUrl, sizeof(aUrl), "https://ddstats.tw/player/json?player=%s", aEscaped);
+	m_pLookupStats = Start(aUrl);
+	str_format(aUrl, sizeof(aUrl), "https://ddnet.org/players/?json2=%s", aEscaped);
+	m_pLookupDDNet = Start(aUrl);
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "Looking up %s...", pName);
+	GameClient()->m_Chat.Echo(aBuf);
+}
+
+static json_value *KingJsonResult(const std::shared_ptr<IHttpRequest> &pTask)
+{
+	if(!pTask || pTask->State() != EHttpState::DONE || pTask->StatusCode() != 200)
+		return nullptr;
+	json_value *pJson = pTask->ResultJson(); // nullptr for an html challenge page etc.
+	if(pJson && pJson->type != json_object)
+	{
+		json_value_free(pJson);
+		return nullptr;
+	}
+	return pJson;
+}
+
+static bool KingJsonNumber(const json_value &Value, double &Out)
+{
+	if(Value.type == json_integer)
+		Out = (double)Value.u.integer;
+	else if(Value.type == json_double)
+		Out = Value.u.dbl;
+	else
+		return false;
+	return true;
+}
+
+void CKing::FinishLookup()
+{
+	json_value *pStats = KingJsonResult(m_pLookupStats);
+	json_value *pDDNet = KingJsonResult(m_pLookupDDNet);
+	m_pLookupStats = nullptr;
+	m_pLookupDDNet = nullptr;
+
+	// total playtime: ddstats.tw follows every server, ddnet.org only knows the last year
+	char aHours[128] = "";
+	double Value;
+	if(pStats && KingJsonNumber((*pStats)["general_activity"]["total_seconds_played"], Value) && Value > 0.0)
+	{
+		const json_value &Since = (*pStats)["general_activity"]["start_of_playtime"];
+		if(Since.type == json_string && str_length(Since.u.string.ptr) >= 4)
+		{
+			char aYear[8];
+			str_truncate(aYear, sizeof(aYear), Since.u.string.ptr, 4);
+			str_format(aHours, sizeof(aHours), "%d hours played (since %s)", round_to_int(Value / 3600.0), aYear);
+		}
+		else
+			str_format(aHours, sizeof(aHours), "%d hours played", round_to_int(Value / 3600.0));
+	}
+	else if(pDDNet && KingJsonNumber((*pDDNet)["hours_played_past_365_days"], Value))
+		str_format(aHours, sizeof(aHours), "%d hours played in the last year (total unknown)", round_to_int(Value));
+
+	// points: ddnet.org is the official source
+	char aPoints[128] = "";
+	const json_value *pPoints = pDDNet ? &(*pDDNet)["points"] : nullptr;
+	double Points, Total, Rank;
+	if(pPoints && pPoints->type == json_object && KingJsonNumber((*pPoints)["points"], Points))
+	{
+		const bool HaveTotal = KingJsonNumber((*pPoints)["total"], Total);
+		const bool HaveRank = KingJsonNumber((*pPoints)["rank"], Rank);
+		if(HaveRank && HaveTotal)
+			str_format(aPoints, sizeof(aPoints), "%d / %d points (rank #%d)", round_to_int(Points), round_to_int(Total), round_to_int(Rank));
+		else
+			str_format(aPoints, sizeof(aPoints), "%d points", round_to_int(Points));
+	}
+	else if(pStats && KingJsonNumber((*pStats)["profile"]["points"], Points))
+		str_format(aPoints, sizeof(aPoints), "%d points", round_to_int(Points));
+
+	char aBuf[512];
+	if(aHours[0] && aPoints[0])
+		str_format(aBuf, sizeof(aBuf), "%s: %s, %s", m_aLookupName, aHours, aPoints);
+	else if(aHours[0] || aPoints[0])
+		str_format(aBuf, sizeof(aBuf), "%s: %s", m_aLookupName, aHours[0] ? aHours : aPoints);
+	else if(pStats || pDDNet)
+		str_format(aBuf, sizeof(aBuf), "%s: no stats found (new player or a different name)", m_aLookupName);
+	else
+		str_format(aBuf, sizeof(aBuf), "%s: stats sites did not answer, try again later", m_aLookupName);
+	GameClient()->m_Chat.Echo(aBuf);
+
+	if(pStats)
+		json_value_free(pStats);
+	if(pDDNet)
+		json_value_free(pDDNet);
 }
