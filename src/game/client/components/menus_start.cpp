@@ -412,7 +412,7 @@ bool CMenusStart::DoKingMenuItem(CButtonContainer *pButtonContainer, const char 
 
 void CMenusStart::RenderKingPlayer(CUIRect Area)
 {
-	const float Size = std::min(Area.h * 0.28f, Area.w * 0.3f);
+	const float Size = std::min(Area.h * 0.36f, Area.w * 0.38f);
 	const vec2 Center(Area.x + Area.w / 2.0f, Area.y + Area.h * 0.55f);
 
 	CTeeRenderInfo TeeInfo;
