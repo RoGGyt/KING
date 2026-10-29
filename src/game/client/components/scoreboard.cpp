@@ -934,6 +934,14 @@ void CScoreboard::OnRender()
 		return;
 	}
 
+	// KING: the scoreboard has its own size (kg_scoreboard_scale), independent of the menus
+	struct SScaleGuard
+	{
+		CUi *m_pUi;
+		~SScaleGuard() { m_pUi->SetScreenScaleOverride(0.0f); }
+	} ScaleGuard{Ui()};
+	Ui()->SetScreenScaleOverride(std::clamp(g_Config.m_KgScoreboardScale, 50, 150) / 100.0f);
+
 	if(!GameClient()->m_Menus.IsActive() && !GameClient()->m_Chat.IsActive())
 	{
 		Ui()->StartCheck();

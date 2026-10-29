@@ -462,9 +462,17 @@ float CUi::ButtonColorMul(const void *pId)
 	return ButtonColorMulDefault();
 }
 
+float CUi::ScreenScale() const
+{
+	if(m_ScreenScaleOverride > 0.0f)
+		return m_ScreenScaleOverride;
+	return std::clamp(g_Config.m_KgUiScale, 50, 150) / 100.0f;
+}
+
 const CUIRect *CUi::Screen()
 {
-	m_Screen.h = 600.0f;
+	// KING: a smaller virtual screen makes every menu element bigger (GUI scale)
+	m_Screen.h = 600.0f / ScreenScale();
 	m_Screen.w = Graphics()->ScreenAspect() * m_Screen.h;
 	return &m_Screen;
 }

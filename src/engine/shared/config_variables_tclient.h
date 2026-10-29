@@ -319,6 +319,8 @@ MACRO_CONFIG_INT(KgAspectCustom, kg_aspect_custom, 133, 100, 240, CFGFLAG_CLIENT
 MACRO_CONFIG_INT(KgAspectCustomW, kg_aspect_custom_w, 4, 1, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom aspect ratio: width part (e.g. 4 for 4:3, 1440 for 1440x1080)")
 MACRO_CONFIG_INT(KgAspectCustomH, kg_aspect_custom_h, 3, 1, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom aspect ratio: height part (e.g. 3 for 4:3, 1080 for 1440x1080)")
 MACRO_CONFIG_INT(KgAspectApply, kg_aspect_apply, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "What the aspect ratio stretches in game (0 = full: world, HUD and menus, 1 = only the game world)")
+MACRO_CONFIG_INT(KgUiScale, kg_ui_scale, 100, 50, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of all menus in percent, like the GUI scale in Minecraft (100 = default)")
+MACRO_CONFIG_INT(KgScoreboardScale, kg_scoreboard_scale, 100, 50, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of the scoreboard (TAB) in percent")
 MACRO_CONFIG_INT(KgMusicHud, kg_music_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player: cover, timer and visualizer at the top of the screen (what plays on your PC)")
 MACRO_CONFIG_INT(KgMusicColorMode, kg_music_color_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player colors (0 = from the cover, 1 = KING gold, 2 = white)")
 MACRO_CONFIG_INT(KgMusicVisualizer, kg_music_visualizer, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer (0 = off, 1 = bars from the bottom, 2 = bars from the center)")

@@ -453,6 +453,7 @@ private:
 	std::function<void()> m_OnBackButtonPressedFunction;
 
 	CUIRect m_Screen;
+	float m_ScreenScaleOverride = 0.0f; // KING
 
 	std::vector<CUIRect> m_vClips;
 	void UpdateClipping();
@@ -610,6 +611,10 @@ public:
 
 	const CUIRect *Screen();
 	void MapScreen();
+	// KING: menus are drawn at kg_ui_scale; a component can use its own scale for a
+	// while (the scoreboard uses kg_scoreboard_scale), 0 = back to the menu scale
+	float ScreenScale() const;
+	void SetScreenScaleOverride(float Scale) { m_ScreenScaleOverride = Scale; }
 	float PixelSize();
 
 	void ClipEnable(const CUIRect *pRect);

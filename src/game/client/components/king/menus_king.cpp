@@ -339,10 +339,14 @@ struct SKingSections
 {
 	std::vector<CUIRect> m_vBoxes;
 	std::vector<CUIRect> m_vNext;
-	void Draw()
+	float m_PrevScrollY = 0.0f;
+	void Draw(float ScrollY)
 	{
+		const float Shift = ScrollY - m_PrevScrollY; // the page scrolled since last frame
+		m_PrevScrollY = ScrollY;
 		for(CUIRect Box : m_vBoxes)
 		{
+			Box.y += Shift;
 			const float Padding = KING_MARGIN;
 			Box.x -= Padding;
 			Box.y -= Padding;
@@ -374,8 +378,16 @@ CUIRect LabeledRow(CUi *pUi, CUIRect &Column, const char *pLabel, float LabelFra
 
 void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 {
+	// scrolls, so bigger menu sizes still fit
+	static CScrollRegion s_ScrollRegion;
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 60.0f;
+	ScrollParams.m_ScrollbarMargin = 5.0f;
+	s_ScrollRegion.Begin(&MainView, &ScrollParams);
+	MainView.VSplitRight(10.0f, &MainView, nullptr); // room for the scrollbar
+
 	static SKingSections s_Sections;
-	s_Sections.Draw();
+	s_Sections.Draw(MainView.y);
 
 	CUIRect LeftView, RightView, Button, Label;
 	MainView.Margin(KING_MARGIN, &MainView);
@@ -383,7 +395,29 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
+	// ***** Interface size (like Minecraft's GUI scale) ***** //
+	s_Sections.Begin(LeftView);
+	Headline(Ui(), LeftView, "Interface Size");
+	{
+		static std::vector<CButtonContainer> s_vMenuScale = {{}, {}, {}, {}, {}, {}};
+		int Value = g_Config.m_KgUiScale;
+		if(DoLine_RadioMenu(LeftView, "Menus", s_vMenuScale, {"80%", "90%", "100%", "110%", "120%", "130%"}, {80, 90, 100, 110, 120, 130}, Value))
+			g_Config.m_KgUiScale = Value;
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgScoreboardScale, &g_Config.m_KgScoreboardScale, &Button, "Scoreboard (TAB)", 50, 150, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClChatFontSize, &g_Config.m_ClChatFontSize, &Button, "Chat", 10, 100);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
+		TextLine(Ui(), LeftView, "Console: kg_ui_scale, kg_scoreboard_scale (50-150)", 11.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	s_Sections.End(LeftView);
+
 	// ***** Aspect ratio ***** //
+	LeftView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &LeftView);
 	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, "Aspect Ratio");
 	{
@@ -570,4 +604,13 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	}
 	s_Sections.End(RightView);
 	s_Sections.Swap();
+
+	// scroll height = taller column
+	CUIRect ScrollRect;
+	ScrollRect.x = MainView.x;
+	ScrollRect.y = std::max(LeftView.y, RightView.y) + KING_MARGIN * 2.0f;
+	ScrollRect.w = MainView.w;
+	ScrollRect.h = 0.0f;
+	s_ScrollRegion.AddRect(ScrollRect);
+	s_ScrollRegion.End();
 }
