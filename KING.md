@@ -12,6 +12,7 @@ KING is a DDNet client for KoG (King of Gores), based on [TClient](https://githu
 * **Network HUD** (`kg_net_hud`): ping, jitter, current margin, late inputs, input mode.
 * **KoG preset** (`kg_kog_preset`, also a button in Settings → KING → KING): KING input, antiping on, vsync off, uncapped update rate. It is applied once on first start.
 
+* **One-click update** (Windows): the Update button in the main menu or the KING tab downloads the release zip. It shows progress, then closes KING. A small PowerShell script waits for the client to exit, unpacks the zip over the install folder with robocopy (config in `%APPDATA%\DDNet` is not touched) and starts KING again. If something fails, the reason is shown in the KING tab on the next start. CI tests this script on every build.
 * **Update check** (`kg_update_check`, `kg_check_update`): on start, KING requests `https://api.github.com/repos/RoGGyt/KING/releases/latest` and compares the release tag with `KING_VERSION`. When a newer version exists, the main menu shows "KING x.y.z is out!" with a Download button that opens the `-win64.zip` link directly. The status and a "Check now" button are in Settings → KING → KING. Drafts and pre-releases are ignored.
 
 ## Releasing an update

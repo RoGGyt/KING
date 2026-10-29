@@ -2,6 +2,10 @@
 #include "king.h"
 
 #include <base/math.h>
+#include <base/fs.h>
+#include <base/io.h>
+#include <base/log.h>
+#include <base/process.h>
 #include <base/str.h>
 
 #include <engine/client.h>
@@ -9,6 +13,7 @@
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
+#include <engine/storage.h>
 #include <engine/textrender.h>
 
 #include <game/client/gameclient.h>
@@ -54,6 +59,7 @@ void CKing::OnInit()
 		ApplyKogPreset();
 		g_Config.m_KgPresetApplied = 1;
 	}
+	ReadLastInstallResult();
 	if(g_Config.m_KgUpdateCheck)
 		CheckForUpdates();
 }
@@ -64,6 +70,11 @@ void CKing::OnShutdown()
 	{
 		m_pUpdateTask->Abort();
 		m_pUpdateTask = nullptr;
+	}
+	if(m_pDownloadTask)
+	{
+		m_pDownloadTask->Abort();
+		m_pDownloadTask = nullptr;
 	}
 }
 
@@ -150,6 +161,7 @@ void CKing::FinishUpdateCheck()
 	{
 		str_copy(m_aLatestVersion, Tag);
 		m_aUpdateUrl[0] = '\0';
+		m_aAssetUrl[0] = '\0';
 #if defined(CONF_FAMILY_WINDOWS)
 		// Prefer the direct download of the Windows zip
 		const json_value &Assets = Json["assets"];
@@ -163,6 +175,7 @@ void CKing::FinishUpdateCheck()
 				if(Name.type == json_string && Download.type == json_string && str_endswith(Name, "-win64.zip") && str_startswith(Download, "https://"))
 				{
 					str_copy(m_aUpdateUrl, Download);
+					str_copy(m_aAssetUrl, Download);
 					break;
 				}
 			}
@@ -194,6 +207,172 @@ void CKing::OpenUpdatePage()
 		str_format(aUrl, sizeof(aUrl), "https://github.com/%s/releases/latest", KING_UPDATE_REPO);
 		Client()->ViewLink(aUrl);
 	}
+}
+
+// ***** One-click install ***** //
+
+static constexpr const char *KING_UPDATE_DIR = "king_update";
+static constexpr const char *KING_UPDATE_ZIP = "king_update/KING-update.zip";
+static constexpr const char *KING_UPDATE_SCRIPT = "king_update/update.ps1";
+static constexpr const char *KING_UPDATE_LOG = "king_update/update.log";
+static constexpr const char *KING_EXE_NAME = "KING.exe";
+
+// Runs after KING has quit: waits for the process to exit, unpacks the release
+// zip over the install folder (robocopy retries locked files), starts KING again.
+// Config, binds and skins live in %APPDATA%\DDNet and are not touched.
+static const char gs_aUpdateScript[] = R"PS(param([int]$ProcId, [string]$Zip, [string]$Dest, [string]$Exe, [string]$Log)
+$ErrorActionPreference = 'Stop'
+$ok = $false
+try {
+    Wait-Process -Id $ProcId -Timeout 60 -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+    $tmp = Join-Path (Split-Path -Parent $Zip) 'extract'
+    if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+    Expand-Archive -LiteralPath $Zip -DestinationPath $tmp -Force
+    $src = $tmp
+    $items = @(Get-ChildItem -LiteralPath $tmp)
+    if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $src = $items[0].FullName }
+    if (-not (Test-Path -LiteralPath (Join-Path $src 'KING.exe'))) { throw 'KING.exe not found in update zip' }
+    & robocopy.exe $src $Dest /E /R:30 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "copy failed (robocopy $LASTEXITCODE), is the folder write protected?" }
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $Zip -Force -ErrorAction SilentlyContinue
+    $ok = $true
+    Set-Content -LiteralPath $Log -Value ('ok ' + (Get-Date -Format s)) -Encoding ASCII
+} catch {
+    Set-Content -LiteralPath $Log -Value ('fail ' + $_.Exception.Message) -Encoding ASCII
+}
+Start-Process -FilePath $Exe -WorkingDirectory $Dest
+)PS";
+
+bool CKing::CanInstallUpdate() const
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	return UpdateAvailable() && m_aAssetUrl[0] != '\0';
+#else
+	return false;
+#endif
+}
+
+float CKing::DownloadProgress() const
+{
+	if(!m_pDownloadTask)
+		return 0.0f;
+	const double Size = m_pDownloadTask->Size();
+	if(Size <= 0.0)
+		return 0.0f;
+	return std::clamp((float)(m_pDownloadTask->Current() / Size), 0.0f, 1.0f);
+}
+
+void CKing::InstallUpdate()
+{
+	if(!CanInstallUpdate())
+	{
+		OpenUpdatePage();
+		return;
+	}
+	if(m_pDownloadTask)
+		return;
+	m_aInstallError[0] = '\0';
+	Storage()->CreateFolder(KING_UPDATE_DIR, IStorage::TYPE_SAVE);
+	Storage()->RemoveFile(KING_UPDATE_ZIP, IStorage::TYPE_SAVE);
+
+	m_pDownloadTask = HttpGet(m_aAssetUrl);
+	m_pDownloadTask->HeaderString("User-Agent", "KING/" KING_VERSION);
+	m_pDownloadTask->HeaderString("Accept", "application/octet-stream");
+	// no total timeout for a ~60 MB file, but give up if it stalls for 30 s
+	m_pDownloadTask->Timeout(CTimeout{10000, 0, 1024, 30});
+	m_pDownloadTask->IpResolve(IPRESOLVE::V4);
+	m_pDownloadTask->WriteToFile(Storage(), KING_UPDATE_ZIP, IStorage::TYPE_SAVE);
+	Http()->Run(m_pDownloadTask);
+	log_info("king", "downloading update %s", m_aLatestVersion);
+}
+
+void CKing::FinishDownload()
+{
+	const bool Ok = m_pDownloadTask->State() == EHttpState::DONE && m_pDownloadTask->StatusCode() == 200;
+	const int Status = m_pDownloadTask->StatusCode();
+	m_pDownloadTask = nullptr;
+	if(!Ok)
+	{
+		str_format(m_aInstallError, sizeof(m_aInstallError), "Download failed (HTTP %d). Try again or use the releases page.", Status);
+		Storage()->RemoveFile(KING_UPDATE_ZIP, IStorage::TYPE_SAVE);
+		return;
+	}
+	if(!LaunchInstaller())
+		return;
+	Client()->Quit();
+}
+
+bool CKing::LaunchInstaller()
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	IOHANDLE File = Storage()->OpenFile(KING_UPDATE_SCRIPT, IOFLAG_WRITE, IStorage::TYPE_SAVE);
+	if(!File)
+	{
+		str_copy(m_aInstallError, "Could not write the update script.");
+		return false;
+	}
+	io_write(File, gs_aUpdateScript, sizeof(gs_aUpdateScript) - 1);
+	io_close(File);
+
+	char aScript[IO_MAX_PATH_LENGTH];
+	char aZip[IO_MAX_PATH_LENGTH];
+	char aLog[IO_MAX_PATH_LENGTH];
+	char aExe[IO_MAX_PATH_LENGTH];
+	char aDest[IO_MAX_PATH_LENGTH];
+	Storage()->GetCompletePath(IStorage::TYPE_SAVE, KING_UPDATE_SCRIPT, aScript, sizeof(aScript));
+	Storage()->GetCompletePath(IStorage::TYPE_SAVE, KING_UPDATE_ZIP, aZip, sizeof(aZip));
+	Storage()->GetCompletePath(IStorage::TYPE_SAVE, KING_UPDATE_LOG, aLog, sizeof(aLog));
+	Storage()->GetBinaryPathAbsolute(KING_EXE_NAME, aExe, sizeof(aExe));
+	str_copy(aDest, aExe);
+	if(fs_parent_dir(aDest) != 0)
+	{
+		str_copy(m_aInstallError, "Could not find the KING install folder.");
+		return false;
+	}
+
+	char aPid[16];
+	str_format(aPid, sizeof(aPid), "%d", process_id());
+	const char *apArgs[] = {
+		"-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
+		"-File", aScript,
+		"-ProcId", aPid,
+		"-Zip", aZip,
+		"-Dest", aDest,
+		"-Exe", aExe,
+		"-Log", aLog};
+	PROCESS Process = process_execute("powershell.exe", EShellExecuteWindowState::BACKGROUND, apArgs, std::size(apArgs));
+	if(Process == INVALID_PROCESS)
+	{
+		str_copy(m_aInstallError, "Could not start PowerShell for the update.");
+		return false;
+	}
+	log_info("king", "update downloaded, installing into %s", aDest);
+	return true;
+#else
+	str_copy(m_aInstallError, "Automatic install is only supported on Windows.");
+	return false;
+#endif
+}
+
+void CKing::ReadLastInstallResult()
+{
+	char *pLog = Storage()->ReadFileStr(KING_UPDATE_LOG, IStorage::TYPE_SAVE);
+	if(!pLog)
+		return;
+	const char *pText = pLog;
+	if(str_startswith(pText, "\xEF\xBB\xBF"))
+		pText += 3;
+	if(const char *pReason = str_startswith(pText, "fail "))
+	{
+		char aReason[200];
+		str_copy(aReason, pReason);
+		str_utf8_trim_right(aReason);
+		str_format(m_aInstallError, sizeof(m_aInstallError), "Last update failed: %s", aReason);
+	}
+	free(pLog);
+	Storage()->RemoveFile(KING_UPDATE_LOG, IStorage::TYPE_SAVE);
 }
 
 void CKing::ApplyKogPreset()
@@ -259,6 +438,8 @@ void CKing::OnRender()
 		FinishUpdateCheck();
 		m_pUpdateTask = nullptr;
 	}
+	if(m_pDownloadTask && m_pDownloadTask->Done())
+		FinishDownload();
 
 	if(Client()->State() != IClient::STATE_ONLINE)
 		return;

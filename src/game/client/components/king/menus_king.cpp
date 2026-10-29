@@ -187,7 +187,26 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		if(DoButton_Menu(&s_CheckButton, King.UpdateState() == CKing::UPDATE_CHECKING ? "Checking..." : "Check now", 0, &CheckButton))
 			King.CheckForUpdates();
 		static CButtonContainer s_DownloadButton;
-		if(DoButton_Menu(&s_DownloadButton, King.UpdateAvailable() ? "Download update" : "Releases page", 0, &DownloadButton))
-			King.OpenUpdatePage();
+		if(King.Installing())
+			Ui()->RenderProgressBar(DownloadButton, King.DownloadProgress());
+		else if(DoButton_Menu(&s_DownloadButton, King.CanInstallUpdate() ? "Update now" : (King.UpdateAvailable() ? "Download update" : "Releases page"), 0, &DownloadButton))
+		{
+			if(King.UpdateAvailable())
+				King.InstallUpdate();
+			else
+				King.OpenUpdatePage();
+		}
+
+		if(King.Installing())
+		{
+			str_format(aBuf, sizeof(aBuf), "Downloading %s... %d%% (KING restarts by itself)", King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
+			TextLine(Ui(), RightView, aBuf, 11.0f);
+		}
+		else if(King.InstallError()[0])
+		{
+			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+			TextLine(Ui(), RightView, King.InstallError(), 11.0f);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
 	}
 }

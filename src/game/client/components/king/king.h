@@ -49,15 +49,29 @@ public:
 	const char *UpdateUrl() const { return m_aUpdateUrl; }
 	void OpenUpdatePage();
 
+	// One-click install: download the release zip, quit, a helper script replaces
+	// the files and starts KING again. Windows only, needs a -win64.zip asset.
+	bool CanInstallUpdate() const;
+	void InstallUpdate();
+	bool Installing() const { return m_pDownloadTask != nullptr; }
+	float DownloadProgress() const;
+	const char *InstallError() const { return m_aInstallError; }
+
 private:
 	void ApplyInputMode();
 	void RenderNetHud();
 	void FinishUpdateCheck();
+	void FinishDownload();
+	bool LaunchInstaller();
+	void ReadLastInstallResult();
 
 	std::shared_ptr<IHttpRequest> m_pUpdateTask = nullptr;
 	EUpdateState m_UpdateState = UPDATE_IDLE;
 	char m_aLatestVersion[32] = "";
 	char m_aUpdateUrl[512] = "";
+	char m_aAssetUrl[512] = ""; // direct -win64.zip download
+	std::shared_ptr<IHttpRequest> m_pDownloadTask = nullptr;
+	char m_aInstallError[256] = "";
 
 	static void ConKogPreset(IConsole::IResult *pResult, void *pUserData);
 	static void ConCheckUpdate(IConsole::IResult *pResult, void *pUserData);

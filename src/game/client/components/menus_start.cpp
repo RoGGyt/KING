@@ -276,12 +276,20 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		KingUpdate.VSplitRight(100.0f, &KingUpdate, &KingButton);
 		KingUpdate.VSplitRight(10.0f, &KingUpdate, nullptr);
 
-		static CButtonContainer s_KingDownloadButton;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_KingDownloadButton, "Download", 0, &KingButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-			GameClient()->m_King.OpenUpdatePage();
+		CKing &King = GameClient()->m_King;
+		static CButtonContainer s_KingUpdateButton;
+		if(King.Installing())
+			Ui()->RenderProgressBar(KingButton, King.DownloadProgress());
+		else if(GameClient()->m_Menus.DoButton_Menu(&s_KingUpdateButton, King.CanInstallUpdate() ? "Update" : "Download", 0, &KingButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+			King.InstallUpdate();
 
-		char aKingBuf[96];
-		str_format(aKingBuf, sizeof(aKingBuf), "KING %s is out! (you have " KING_VERSION ")", GameClient()->m_King.LatestVersion());
+		char aKingBuf[160];
+		if(King.Installing())
+			str_format(aKingBuf, sizeof(aKingBuf), "Downloading KING %s... %d%%", King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
+		else if(King.InstallError()[0])
+			str_copy(aKingBuf, King.InstallError());
+		else
+			str_format(aKingBuf, sizeof(aKingBuf), "KING %s is out! (you have " KING_VERSION ")", King.LatestVersion());
 		SLabelProperties KingLabelProps;
 		KingLabelProps.SetColor(ColorRGBA(1.0f, 0.82f, 0.2f, 1.0f));
 		Ui()->DoLabel(&KingUpdate, aKingBuf, 14.0f, TEXTALIGN_ML, KingLabelProps);

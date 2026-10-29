@@ -64,10 +64,16 @@ else()
   message(FATAL_ERROR "Couldn't parse TClient version from src/game/version.h")
 endif()
 
-if(TCLIENT_VERSION_PATCH STREQUAL "0")
-  project(KING VERSION ${TCLIENT_VERSION_MAJOR}.${TCLIENT_VERSION_MINOR})
+file(STRINGS src/game/version.h KING_VERSION_LINE
+  LIMIT_COUNT 1
+  REGEX "^#define KING_VERSION "
+)
+if(KING_VERSION_LINE MATCHES "([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+  project(KING VERSION ${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3})
+elseif(KING_VERSION_LINE MATCHES "([0-9]+)\\.([0-9]+)")
+  project(KING VERSION ${CMAKE_MATCH_1}.${CMAKE_MATCH_2})
 else()
-  project(KING VERSION ${TCLIENT_VERSION_MAJOR}.${TCLIENT_VERSION_MINOR}.${TCLIENT_VERSION_PATCH})
+  message(FATAL_ERROR "Couldn't parse KING version from src/game/version.h")
 endif()
 
 file(APPEND "${DATA_VERSION_FILE}" "TClient ${TCLIENT_VERSION_MAJOR}.${TCLIENT_VERSION_MINOR}.${TCLIENT_VERSION_PATCH}\n")
