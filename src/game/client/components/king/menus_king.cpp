@@ -388,12 +388,16 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	Headline(Ui(), LeftView, "Aspect Ratio");
 	{
 		static CUi::SDropDownState s_PresetState;
+		static CScrollRegion s_PresetScrollRegion;
+		s_PresetState.m_SelectionPopupContext.m_pScrollRegion = &s_PresetScrollRegion; // the popup needs one, or it crashes
 		static const char *s_apPresets[] = {"Native", "4:3", "5:4", "3:2", "16:10", "16:9", "Custom"};
 		CUIRect Control = LabeledRow(Ui(), LeftView, "Preset");
 		const int Preset = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgAspectRatio, 0, 6), s_apPresets, std::size(s_apPresets), s_PresetState);
 		g_Config.m_KgAspectRatio = Preset;
 
 		static CUi::SDropDownState s_ApplyState;
+		static CScrollRegion s_ApplyScrollRegion;
+		s_ApplyState.m_SelectionPopupContext.m_pScrollRegion = &s_ApplyScrollRegion; // the popup needs one, or it crashes
 		static const char *s_apApply[] = {"Full", "World only"};
 		Control = LabeledRow(Ui(), LeftView, "Apply");
 		g_Config.m_KgAspectApply = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgAspectApply, 0, 1), s_apApply, std::size(s_apApply), s_ApplyState);
@@ -474,11 +478,15 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 	{
 		static CUi::SDropDownState s_ColorState;
+		static CScrollRegion s_ColorScrollRegion;
+		s_ColorState.m_SelectionPopupContext.m_pScrollRegion = &s_ColorScrollRegion; // the popup needs one, or it crashes
 		static const char *s_apColor[] = {"Cover", "KING", "White"};
 		CUIRect Control = LabeledRow(Ui(), RightView, "Color mode");
 		g_Config.m_KgMusicColorMode = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgMusicColorMode, 0, 2), s_apColor, std::size(s_apColor), s_ColorState);
 
 		static CUi::SDropDownState s_VisState;
+		static CScrollRegion s_VisScrollRegion;
+		s_VisState.m_SelectionPopupContext.m_pScrollRegion = &s_VisScrollRegion; // the popup needs one, or it crashes
 		static const char *s_apVis[] = {"Off", "Bottom", "Center"};
 		Control = LabeledRow(Ui(), RightView, "Visualizer mode");
 		g_Config.m_KgMusicVisualizer = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgMusicVisualizer, 0, 2), s_apVis, std::size(s_apVis), s_VisState);
