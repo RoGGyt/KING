@@ -1,5 +1,6 @@
 /* KING client: input modes, KoG preset, network HUD, lag log, music player and update check. */
 #include "king.h"
+#include "king_system.h"
 
 #include <base/color.h>
 #include <base/fs.h>
@@ -118,6 +119,8 @@ void CKing::OnInit()
 void CKing::OnShutdown()
 {
 	LagLogClose();
+	if(m_AppliedLowerDiscord == 1)
+		KingSetDiscordLowPriority(false); // give Discord its normal priority back
 	m_Media.Stop();
 	if(m_pLyricsTask)
 	{
@@ -620,6 +623,8 @@ float CKing::AspectRatioValue(int Setting)
 void CKing::OnUpdate()
 {
 	ApplyInputMode();
+	ApplyPriorities(false);
+	AutoSaveConfig();
 
 	// stretched aspect ratio while in a game: "Full" = everything (world, HUD,
 	// in-game menus), "World" = only the game world
@@ -795,6 +800,7 @@ void CKing::OnStateChange(int NewState, int OldState)
 		m_LastSummary = time_get();
 		m_MinFrameFps = 0.0f;
 		LagLogOpen();
+		ApplyPriorities(true); // Discord may have been restarted meanwhile
 	}
 	else if(NewState != IClient::STATE_ONLINE && OldState == IClient::STATE_ONLINE)
 	{
@@ -1649,4 +1655,120 @@ void CKing::FinishLookup()
 		json_value_free(pStats);
 	if(pDDNet)
 		json_value_free(pDDNet);
+}
+
+// ***** Settings autosave ***** //
+
+uint64_t CKing::ConfigHash() const
+{
+	// FNV-1a over all settings, without the values KING itself changes every frame
+	CConfig &Config = g_Config;
+	const int aSaved[4] = {Config.m_TcFastInput, Config.m_TcFastInputAmount, Config.m_TcFastInputOthers, Config.m_TcFastInputRepredictHook};
+	Config.m_TcFastInput = Config.m_TcFastInputAmount = Config.m_TcFastInputOthers = Config.m_TcFastInputRepredictHook = 0;
+	uint64_t Hash = 14695981039346656037ull;
+	const unsigned char *pBytes = reinterpret_cast<const unsigned char *>(&Config);
+	for(size_t i = 0; i < sizeof(CConfig); i++)
+	{
+		Hash ^= pBytes[i];
+		Hash *= 1099511628211ull;
+	}
+	Config.m_TcFastInput = aSaved[0];
+	Config.m_TcFastInputAmount = aSaved[1];
+	Config.m_TcFastInputOthers = aSaved[2];
+	Config.m_TcFastInputRepredictHook = aSaved[3];
+	return Hash;
+}
+
+void CKing::AutoSaveConfig()
+{
+	// The client normally writes settings only when it closes cleanly; a crash or a
+	// killed process lost everything changed in that session. Save shortly after a
+	// change instead, but never while you play (writing the file can take a moment).
+	const int64_t Now = time_get();
+	const int64_t Freq = time_freq();
+	if(Now - m_LastConfigCheck < Freq)
+		return;
+	m_LastConfigCheck = Now;
+
+	const uint64_t Hash = ConfigHash();
+	if(!m_ConfigHashValid)
+	{
+		m_ConfigHash = Hash;
+		m_ConfigHashValid = true;
+		return;
+	}
+	if(Hash != m_ConfigHash)
+	{
+		m_ConfigHash = Hash;
+		m_ConfigDirty = true;
+		m_ConfigDirtySince = Now;
+	}
+	const bool Playing = Client()->State() == IClient::STATE_ONLINE && !GameClient()->m_Menus.IsActive();
+	if(m_ConfigDirty && !Playing && Now - m_ConfigDirtySince > 2 * Freq && Now - m_LastConfigSave > 10 * Freq)
+	{
+		m_ConfigDirty = false;
+		m_LastConfigSave = Now;
+		if(!ConfigManager()->Save())
+			log_error("king", "saving settings failed");
+	}
+}
+
+// ***** Process priorities ***** //
+
+void CKing::ApplyPriorities(bool Force)
+{
+	if(Force || g_Config.m_KgHighPriority != m_AppliedHighPriority)
+	{
+		// only touch the priority once the option was used, so a default install changes nothing
+		if(g_Config.m_KgHighPriority || m_AppliedHighPriority == 1)
+			KingSetHighPriority(g_Config.m_KgHighPriority != 0);
+		m_AppliedHighPriority = g_Config.m_KgHighPriority;
+	}
+	if(Force || g_Config.m_KgLowerDiscord != m_AppliedLowerDiscord)
+	{
+		if(g_Config.m_KgLowerDiscord || m_AppliedLowerDiscord == 1)
+			KingSetDiscordLowPriority(g_Config.m_KgLowerDiscord != 0);
+		m_AppliedLowerDiscord = g_Config.m_KgLowerDiscord;
+	}
+}
+
+// ***** Optimizer: FPS fog ***** //
+
+void CKing::RenderFpsFog()
+{
+	if(!g_Config.m_KgOptimizer || !g_Config.m_KgOptFpsFog)
+		return;
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+
+	// the map renderer culls tiles beyond the fog distance (whole tiles around the camera);
+	// fog covers everything outside a box that always lies inside the rendered tiles
+	const vec2 Center = GameClient()->m_Camera.m_Center;
+	const CScreenRect World = Graphics()->MapScreenToWorld(Center.x, Center.y, 100.0f, 100.0f, 100.0f, 0.0f, 0.0f, Graphics()->WorldAspect(), GameClient()->m_Camera.m_Zoom);
+	const float Radius = g_Config.m_KgOptFpsFogRadius * 32.0f;
+	const float Band = std::min(6.0f * 32.0f, Radius * 0.5f); // soft edge
+	const float L = Center.x - Radius, R = Center.x + Radius, T = Center.y - Radius, B = Center.y + Radius;
+	const float X0 = World.m_TopLeft.x, Y0 = World.m_TopLeft.y, X1 = World.m_BottomRight.x, Y1 = World.m_BottomRight.y;
+	if(L + Band <= X0 && R - Band >= X1 && T + Band <= Y0 && B - Band >= Y1)
+		return; // the fog starts outside the screen on every side: nothing to draw
+
+	Graphics()->MapScreen(World);
+	Graphics()->TextureClear();
+	const ColorRGBA Fog(0.035f, 0.035f, 0.045f, 1.0f);
+	const ColorRGBA Clear = Fog.WithAlpha(0.0f);
+	const int None = IGraphics::CORNER_NONE;
+	// solid outside
+	if(T > Y0)
+		Graphics()->DrawRect(X0, Y0, X1 - X0, T - Y0, Fog, None, 0.0f);
+	if(B < Y1)
+		Graphics()->DrawRect(X0, B, X1 - X0, Y1 - B, Fog, None, 0.0f);
+	if(L > X0)
+		Graphics()->DrawRect(X0, T, L - X0, B - T, Fog, None, 0.0f);
+	if(R < X1)
+		Graphics()->DrawRect(R, T, X1 - R, B - T, Fog, None, 0.0f);
+	// soft edges inside the box
+	Graphics()->DrawRect4(L, T, R - L, Band, Fog, Fog, Clear, Clear, None, 0.0f);
+	Graphics()->DrawRect4(L, B - Band, R - L, Band, Clear, Clear, Fog, Fog, None, 0.0f);
+	Graphics()->DrawRect4(L, T, Band, B - T, Fog, Clear, Fog, Clear, None, 0.0f);
+	Graphics()->DrawRect4(R - Band, T, Band, B - T, Clear, Fog, Clear, Fog, None, 0.0f);
 }

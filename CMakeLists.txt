@@ -2824,6 +2824,8 @@ if(CLIENT)
     components/king/king.h
     components/king/king_media.cpp
     components/king/king_media.h
+    components/king/king_system.cpp
+    components/king/king_system.h
     components/king/menus_king.cpp
     components/local_server.cpp
     components/local_server.h

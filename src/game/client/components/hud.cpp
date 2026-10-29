@@ -2008,6 +2008,8 @@ void CHud::OnRender()
 	if(!GameClient()->m_Snap.m_pGameInfoObj)
 		return;
 
+	GameClient()->m_King.RenderFpsFog(); // KING optimizer: over the world, under the HUD
+
 	m_Width = 300.0f * Graphics()->ScreenAspect();
 	m_Height = 300.0f;
 	Graphics()->MapScreenToSize(m_Width, m_Height);

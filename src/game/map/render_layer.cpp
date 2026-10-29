@@ -315,6 +315,18 @@ void CRenderLayerTile::RenderTileLayer(const ColorRGBA &Color, const CRenderLaye
 	int ScreenRectY1 = std::ceil(ScreenRect.m_BottomRight.y / 32);
 	int ScreenRectX1 = std::ceil(ScreenRect.m_BottomRight.x / 32);
 
+	// KING optimizer, FPS fog: nothing farther than the fog distance from the camera
+	if(g_Config.m_KgOptimizer && g_Config.m_KgOptFpsFog && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN)
+	{
+		const int CenterX = (int)std::floor((ScreenRect.m_TopLeft.x + ScreenRect.m_BottomRight.x) / 2.0f / 32.0f);
+		const int CenterY = (int)std::floor((ScreenRect.m_TopLeft.y + ScreenRect.m_BottomRight.y) / 2.0f / 32.0f);
+		const int Radius = g_Config.m_KgOptFpsFogRadius;
+		ScreenRectX0 = std::max(ScreenRectX0, CenterX - Radius);
+		ScreenRectX1 = std::min(ScreenRectX1, CenterX + Radius + 1);
+		ScreenRectY0 = std::max(ScreenRectY0, CenterY - Radius);
+		ScreenRectY1 = std::min(ScreenRectY1, CenterY + Radius + 1);
+	}
+
 	if(IsVisibleInClipRegion(m_LayerClip))
 	{
 		size_t X0 = std::max(ScreenRectX0, 0);
@@ -576,6 +588,12 @@ void CRenderLayerTile::Render(const CRenderLayerParams &Params)
 	}
 }
 
+// KING optimizer can force high detail layers off
+static bool KingHighDetail()
+{
+	return g_Config.m_GfxHighDetail && !(g_Config.m_KgOptimizer && g_Config.m_KgOptNoHighDetail);
+}
+
 bool CRenderLayerTile::DoRender(const CRenderLayerParams &Params)
 {
 	// skip rendering if we render background force, but deactivated tile layer and want to render a tilelayer
@@ -587,7 +605,7 @@ bool CRenderLayerTile::DoRender(const CRenderLayerParams &Params)
 		return false;
 
 	// skip rendering if detail layers if not wanted
-	if(m_Flags & LAYERFLAG_DETAIL && !g_Config.m_GfxHighDetail && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN) // detail but no details
+	if(m_Flags & LAYERFLAG_DETAIL && !KingHighDetail() && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN) // detail but no details
 		return false;
 	return true;
 }
@@ -1450,7 +1468,11 @@ bool CRenderLayerQuads::DoRender(const CRenderLayerParams &Params)
 		return false;
 
 	// skip rendering if detail layers if not wanted
-	if(m_Flags & LAYERFLAG_DETAIL && !g_Config.m_GfxHighDetail && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN) // detail but no details
+	if(m_Flags & LAYERFLAG_DETAIL && !KingHighDetail() && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN) // detail but no details
+		return false;
+
+	// KING optimizer: no map quads at all (not in the editor)
+	if(g_Config.m_KgOptimizer && g_Config.m_KgOptNoQuads && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN)
 		return false;
 
 	// this option only deactivates quads in the background

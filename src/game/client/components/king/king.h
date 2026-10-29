@@ -111,6 +111,9 @@ public:
 	};
 	const SLagStats &LagStats() const { return m_LagStats; }
 
+	// Optimizer FPS fog: darkens everything beyond the culled area (called before the HUD)
+	void RenderFpsFog();
+
 	// "Find Hours" in the player menu: total playtime (ddstats.tw) and points (ddnet.org), printed to chat
 	void LookupPlayer(const char *pName);
 
@@ -237,6 +240,21 @@ private:
 	float m_LyricAlpha = 0.0f;
 	int64_t m_TrackChangedTime = 0;
 	std::string m_LastTrack;
+
+	// settings are saved right after they change (not only on a clean exit)
+	void AutoSaveConfig();
+	uint64_t ConfigHash() const;
+	int64_t m_LastConfigCheck = 0;
+	int64_t m_ConfigDirtySince = 0;
+	int64_t m_LastConfigSave = 0;
+	uint64_t m_ConfigHash = 0;
+	bool m_ConfigHashValid = false;
+	bool m_ConfigDirty = false;
+
+	// process priorities (Windows)
+	void ApplyPriorities(bool Force);
+	int m_AppliedHighPriority = -1;
+	int m_AppliedLowerDiscord = -1;
 
 	// player lookup
 	void FinishLookup();

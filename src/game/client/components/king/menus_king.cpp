@@ -614,3 +614,58 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	s_ScrollRegion.AddRect(ScrollRect);
 	s_ScrollRegion.End();
 }
+
+void CMenus::RenderSettingsKingPerformance(CUIRect MainView)
+{
+	static SKingSections s_Sections;
+	s_Sections.Draw(MainView.y);
+
+	CUIRect LeftView, RightView, Button;
+	MainView.Margin(KING_MARGIN, &MainView);
+	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 4.0f);
+	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
+	RightView.Margin(KING_MARGIN_SMALL, &RightView);
+
+	// ***** Optimizer ***** //
+	s_Sections.Begin(LeftView);
+	Headline(Ui(), LeftView, "Optimizer");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptimizer, "Enable optimizer", &g_Config.m_KgOptimizer, &LeftView, KING_LINE);
+	{
+		// the options only work while the optimizer is on
+		CUIRect Options = LeftView;
+		Options.VSplitLeft(16.0f, nullptr, &Options);
+		const float StartY = Options.y;
+		if(!g_Config.m_KgOptimizer)
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.45f);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoParticles, "Disable all particles render", &g_Config.m_KgOptNoParticles, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoQuads, "Disable map quads render", &g_Config.m_KgOptNoQuads, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoHighDetail, "Disable high detail", &g_Config.m_KgOptNoHighDetail, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptFpsFog, "FPS fog (cull outside limit)", &g_Config.m_KgOptFpsFog, &Options, KING_LINE);
+		if(g_Config.m_KgOptFpsFog)
+		{
+			Options.HSplitTop(KING_LINE, &Button, &Options);
+			Options.HSplitTop(KING_MARGIN_SMALL, nullptr, &Options);
+			Ui()->DoScrollbarOption(&g_Config.m_KgOptFpsFogRadius, &g_Config.m_KgOptFpsFogRadius, &Button, "Fog distance", 10, 150, &CUi::ms_LinearScrollbarScale, 0u, " tiles");
+		}
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		LeftView.HSplitTop(Options.y - StartY, nullptr, &LeftView);
+	}
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
+	TextLine(Ui(), LeftView, "Only what you see changes: physics, hitboxes and", 11.0f);
+	TextLine(Ui(), LeftView, "inputs stay exactly the same.", 11.0f);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	s_Sections.End(LeftView);
+
+	// ***** Performance ***** //
+	s_Sections.Begin(RightView);
+	Headline(Ui(), RightView, "Performance");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgHighPriority, "High KING Process Priority", &g_Config.m_KgHighPriority, &RightView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLowerDiscord, "Lower Discord's Process Priority", &g_Config.m_KgLowerDiscord, &RightView, KING_LINE);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
+	TextLine(Ui(), RightView, "Windows gives KING more CPU time than background", 11.0f);
+	TextLine(Ui(), RightView, "apps; Discord gets less while KING runs and its", 11.0f);
+	TextLine(Ui(), RightView, "normal priority back when KING closes.", 11.0f);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	s_Sections.End(RightView);
+	s_Sections.Swap();
+}

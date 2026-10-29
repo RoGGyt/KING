@@ -393,12 +393,13 @@ void CMenus::RenderSettingsKingPage(CUIRect MainView)
 	{
 		KING_TAB_GENERAL = 0,
 		KING_TAB_DISPLAY,
+		KING_TAB_PERFORMANCE,
 		KING_TAB_INFO,
 		NUM_KING_TABS,
 	};
 	static int s_CurTab = KING_TAB_GENERAL;
 	static CButtonContainer s_aTabs[NUM_KING_TABS];
-	const char *apNames[NUM_KING_TABS] = {"General", "Display", "Info"};
+	const char *apNames[NUM_KING_TABS] = {"General", "Display", "Performance", "Info"};
 
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(LineSize, &TabBar, &MainView);
@@ -416,6 +417,8 @@ void CMenus::RenderSettingsKingPage(CUIRect MainView)
 		RenderSettingsKing(MainView);
 	else if(s_CurTab == KING_TAB_DISPLAY)
 		RenderSettingsKingDisplay(MainView);
+	else if(s_CurTab == KING_TAB_PERFORMANCE)
+		RenderSettingsKingPerformance(MainView);
 	else
 		RenderSettingsTClientInfo(MainView);
 }

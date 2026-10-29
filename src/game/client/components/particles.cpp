@@ -46,6 +46,8 @@ void CParticles::Add(int Group, CParticle *pPart, float TimePassed)
 	{
 		return;
 	}
+	if(g_Config.m_KgOptimizer && g_Config.m_KgOptNoParticles) // KING optimizer
+		return;
 
 	if(m_FirstFree == -1)
 		return;
@@ -191,6 +193,8 @@ bool CParticles::ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize) co
 
 void CParticles::RenderGroup(int Group)
 {
+	if(g_Config.m_KgOptimizer && g_Config.m_KgOptNoParticles) // KING optimizer
+		return;
 	IGraphics::CTextureHandle *aParticles = GameClient()->m_ParticlesSkin.m_aSpriteParticles;
 	int FirstParticleOffset = SPRITE_PART_SLICE;
 	int ParticleQuadContainerIndex = m_ParticleQuadContainerIndex;
