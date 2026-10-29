@@ -288,6 +288,7 @@ MACRO_CONFIG_INT(TcShowhudDummyAngle, tc_showhud_dummy_angle, 0, 0, 1, CFGFLAG_C
 
 // KING
 MACRO_CONFIG_INT(KgInputMode, kg_input_mode, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "KING input mode (0 = custom TClient settings, 1 = Classic TClient fast input (exactly 1 tick), 2 = KING: classic input + auto prediction margin)")
+MACRO_CONFIG_INT(KgClassicTicks, kg_classic_ticks, 1, 1, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Classic TClient mode: how many whole ticks (20 ms each) fast input predicts ahead, like old tc_fast_input 1-5")
 MACRO_CONFIG_INT(KgFastInputAmount, kg_fast_input_amount, 20, 1, 40, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input amount in ms used by KING mode (20 = exactly one tick, same as classic TClient)")
 MACRO_CONFIG_INT(KgAutoMargin, kg_auto_margin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Adapt prediction margin to measured network jitter (always on in KING mode)")
 MACRO_CONFIG_INT(KgAutoMarginMin, kg_auto_margin_min, 4, 1, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Lowest prediction margin auto margin may use (ms)")

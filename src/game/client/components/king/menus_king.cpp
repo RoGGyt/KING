@@ -67,9 +67,17 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	switch(g_Config.m_KgInputMode)
 	{
 	case CKing::INPUT_MODE_CLASSIC:
-		TextLine(Ui(), LeftView, "Old TClient fast input: your tee is shown exactly");
-		TextLine(Ui(), LeftView, "one tick (20 ms) ahead with your newest input.");
-		TextLine(Ui(), LeftView, "Prediction margin stays manual (below).");
+		TextLine(Ui(), LeftView, "Old TClient fast input (tc_fast_input 1-5): your tee");
+		TextLine(Ui(), LeftView, "is shown whole ticks ahead with your newest input.");
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgClassicTicks, &g_Config.m_KgClassicTicks, &Button, "Ticks", 1, 5, &CUi::ms_LinearScrollbarScale, 0u, "");
+		{
+			char aTicks[96];
+			str_format(aTicks, sizeof(aTicks), "= %d ms ahead. 1 tick feels most honest, more = earlier", g_Config.m_KgClassicTicks * 20);
+			TextLine(Ui(), LeftView, aTicks, 11.0f);
+			TextLine(Ui(), LeftView, "but bigger corrections when you change direction.", 11.0f);
+		}
 		break;
 	case CKing::INPUT_MODE_KING:
 		TextLine(Ui(), LeftView, "Classic one-tick fast input + auto margin that");

@@ -228,10 +228,10 @@ void CKing::ApplyInputMode()
 	{
 	case INPUT_MODE_CLASSIC:
 		// TClient fast input as it worked before the Feb 2026 "adjustable fast input"
-		// rewrite: our own tee is predicted exactly one whole tick ahead with the
-		// newest local input, other tees are not shifted.
+		// rewrite: old tc_fast_input 1-5 = whole ticks ahead. A multiple of 20 ms
+		// makes the new code take the exact same whole-tick path (no sub-tick part).
 		g_Config.m_TcFastInput = 1;
-		g_Config.m_TcFastInputAmount = 20;
+		g_Config.m_TcFastInputAmount = std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20;
 		g_Config.m_TcFastInputOthers = 0;
 		g_Config.m_TcFastInputRepredictHook = 0;
 		break;
@@ -291,7 +291,9 @@ void CKing::RenderNetHud()
 	else
 		str_format(aLine2, sizeof(aLine2), "margin %d ms %s   late %d", Stats.m_MarginMs, Stats.m_MarginAuto ? "auto" : "fixed", Stats.m_LateInputs);
 
-	if(g_Config.m_TcFastInput)
+	if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_CLASSIC)
+		str_format(aLine3, sizeof(aLine3), "%s input   %d tick%s (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgClassicTicks, g_Config.m_KgClassicTicks == 1 ? "" : "s", g_Config.m_TcFastInputAmount);
+	else if(g_Config.m_TcFastInput)
 		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount);
 	else
 		str_format(aLine3, sizeof(aLine3), "%s input   fast off", InputModeName(g_Config.m_KgInputMode));

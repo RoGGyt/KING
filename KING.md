@@ -6,7 +6,7 @@ KING is a DDNet client for KoG (King of Gores), based on [TClient](https://githu
 
 * **Input modes** (`kg_input_mode`):
   * `0` Custom: the TClient input settings are used as they are.
-  * `1` Classic TClient: the old TClient fast input from before the Feb 2026 rewrite. Your tee is shown exactly one tick (20 ms) ahead with your newest input.
+  * `1` Classic TClient: the old TClient fast input from before the Feb 2026 rewrite. `kg_classic_ticks` (1–5) works like the old `tc_fast_input`: your tee is shown that many whole ticks (20 ms each) ahead with your newest input.
   * `2` KING (default): classic input plus auto prediction margin. Fast input amount: `kg_fast_input_amount` (20 by default).
 * **Auto prediction margin** (`kg_auto_margin`, `kg_auto_margin_min/max/safety`). For every input, the server reports how early the input arrived. KING sets the margin to the measured spread plus a safety value. The margin goes up quickly when inputs start arriving late and comes back down slowly (1 ms/s). On a stable wired connection this settles around 4–7 ms instead of the fixed 10 ms. Servers without the `SyncWeaponInput` capability force 10 ms, and the HUD shows this as "locked by server".
 * **Network HUD** (`kg_net_hud`): ping, jitter, current margin, late inputs, input mode.
