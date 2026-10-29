@@ -17,6 +17,9 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.Control.h>
 #pragma comment(lib, "windowsapp")
+#pragma message("KING: system media player support ENABLED (C++/WinRT)")
+#elif defined(_MSC_VER)
+#pragma message("KING: system media player support DISABLED (no C++/WinRT headers)")
 #endif
 
 static double KingSteadySeconds()
