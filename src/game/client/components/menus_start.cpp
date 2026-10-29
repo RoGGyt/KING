@@ -29,15 +29,15 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1, 1, 1, 1);
-	// KING logo is 1280x565 (aspect ~2.27)
-	const float LogoH = 135.0f;
-	const float LogoW = LogoH * (1280.0f / 565.0f);
-	IGraphics::CQuadItem QuadItem(MainView.w / 2 - LogoW / 2, 40, LogoW, LogoH);
+	// KING wordmark is 1043x385
+	const float LogoH = 100.0f;
+	const float LogoW = LogoH * (1043.0f / 385.0f);
+	IGraphics::CQuadItem QuadItem(MainView.w / 2 - LogoW / 2, 70, LogoW, LogoH);
 	Graphics()->QuadsDrawTL(&QuadItem, 1);
 	Graphics()->QuadsEnd();
 
 	const float Rounding = 10.0f;
-	const float VMargin = MainView.w / 2 - 190.0f;
+	const float VMargin = MainView.w / 2 - (g_Config.m_KgMenuStyle ? 150.0f : 190.0f);
 
 	CUIRect Button;
 	int NewPage = -1;
@@ -321,62 +321,37 @@ bool CMenusStart::StartButton(CButtonContainer *pButtonContainer, const char *pT
 
 bool CMenusStart::DoKingButton(CButtonContainer *pButtonContainer, const char *pText, const char *pIcon, const CUIRect *pRect, int Style)
 {
+	// flat, quiet buttons; the only colour is the accent on Play
 	const bool Hot = Ui()->HotItem() == pButtonContainer;
 	const bool Pressed = Hot && Ui()->CheckActiveItem(pButtonContainer);
-	const float Rounding = 8.0f;
+	const ColorRGBA Accent(0.91f, 0.70f, 0.29f, 1.0f);
 
-	ColorRGBA Border, Top, Bottom, TextColor, IconColor;
-	if(Style == KING_BUTTON_PRIMARY)
+	ColorRGBA Fill, TextColor;
+	switch(Style)
 	{
-		Border = Hot ? ColorRGBA(1.0f, 0.92f, 0.6f, 1.0f) : ColorRGBA(1.0f, 0.82f, 0.4f, 0.9f);
-		Top = Hot ? ColorRGBA(1.0f, 0.84f, 0.38f, 0.97f) : ColorRGBA(0.97f, 0.77f, 0.3f, 0.95f);
-		Bottom = Hot ? ColorRGBA(0.86f, 0.58f, 0.14f, 0.97f) : ColorRGBA(0.76f, 0.5f, 0.1f, 0.95f);
-		TextColor = ColorRGBA(0.16f, 0.09f, 0.02f, 1.0f);
-		IconColor = TextColor;
-	}
-	else
-	{
-		ColorRGBA Accent = ColorRGBA(0.95f, 0.72f, 0.26f, 1.0f);
-		if(Style == KING_BUTTON_DANGER)
-			Accent = ColorRGBA(0.95f, 0.35f, 0.3f, 1.0f);
-		else if(Style == KING_BUTTON_ACTIVE)
-			Accent = ColorRGBA(0.4f, 0.9f, 0.45f, 1.0f);
-		Border = Accent.WithAlpha(Hot ? 0.95f : 0.4f);
-		Top = Hot ? ColorRGBA(0.2f, 0.15f, 0.1f, 0.88f) : ColorRGBA(0.11f, 0.09f, 0.12f, 0.8f);
-		Bottom = Hot ? ColorRGBA(0.1f, 0.07f, 0.05f, 0.92f) : ColorRGBA(0.04f, 0.035f, 0.05f, 0.85f);
-		TextColor = Hot ? ColorRGBA(1.0f, 0.9f, 0.65f, 1.0f) : ColorRGBA(0.95f, 0.93f, 0.9f, 1.0f);
-		IconColor = Accent.WithAlpha(Hot ? 1.0f : 0.85f);
+	case KING_BUTTON_PRIMARY:
+		Fill = Hot ? ColorRGBA(0.96f, 0.76f, 0.36f, 1.0f) : Accent;
+		TextColor = ColorRGBA(0.08f, 0.06f, 0.04f, 1.0f);
+		break;
+	case KING_BUTTON_ACTIVE:
+		Fill = ColorRGBA(0.3f, 0.75f, 0.4f, Hot ? 0.3f : 0.2f);
+		TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.95f);
+		break;
+	case KING_BUTTON_DANGER:
+		Fill = Hot ? ColorRGBA(0.85f, 0.3f, 0.28f, 0.22f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f);
+		TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, Hot ? 0.9f : 0.65f);
+		break;
+	default:
+		Fill = ColorRGBA(1.0f, 1.0f, 1.0f, Hot ? 0.09f : 0.04f);
+		TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, Hot ? 0.95f : 0.8f);
+		break;
 	}
 	if(Pressed)
-	{
-		Top = Top.Multiply(ColorRGBA(0.85f, 0.85f, 0.85f, 1.0f));
-		Bottom = Bottom.Multiply(ColorRGBA(0.85f, 0.85f, 0.85f, 1.0f));
-	}
+		Fill = Fill.Multiply(ColorRGBA(0.85f, 0.85f, 0.85f, 1.0f));
 
-	// thin border, then the gradient body inside it
-	Graphics()->DrawRect(pRect->x, pRect->y, pRect->w, pRect->h, Border, IGraphics::CORNER_ALL, Rounding);
-	CUIRect Body;
-	pRect->Margin(1.2f, &Body);
-	Graphics()->DrawRect4(Body.x, Body.y, Body.w, Body.h, Top, Top, Bottom, Bottom, IGraphics::CORNER_ALL, Rounding - 1.0f);
-
-	// label centered on the whole button
-	const float FontSize = pRect->h * 0.42f;
+	pRect->Draw(Fill, IGraphics::CORNER_ALL, 6.0f);
 	TextRender()->TextColor(TextColor);
-	Ui()->DoLabel(pRect, pText, FontSize, TEXTALIGN_MC);
-
-	// icon on the left
-	if(pIcon)
-	{
-		CUIRect IconRect;
-		pRect->VSplitLeft(pRect->h * 1.3f, &IconRect, nullptr);
-		IconRect.VSplitLeft(pRect->h * 0.35f, nullptr, &IconRect);
-		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-		TextRender()->TextColor(IconColor);
-		Ui()->DoLabel(&IconRect, pIcon, FontSize * 0.9f, TEXTALIGN_MC);
-		TextRender()->SetRenderFlags(0);
-		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	}
+	Ui()->DoLabel(pRect, pText, pRect->h * 0.42f, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	return Ui()->DoButtonLogic(pButtonContainer, 0, pRect, BUTTONFLAG_LEFT);

@@ -128,14 +128,14 @@ int CMenus::DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText,
 
 	if(g_Config.m_KgMenuStyle)
 	{
-		// KING style: dark buttons, gold when hovered or selected
+		// KING style: flat buttons, accent only when selected
 		const bool DefaultColor = Color.r == 1.0f && Color.g == 1.0f && Color.b == 1.0f;
 		if(Checked)
-			Color = ColorRGBA(0.78f, 0.55f, 0.14f, 0.85f);
-		else if(Ui()->HotItem() == pButtonContainer)
-			Color = ColorRGBA(0.85f, 0.62f, 0.18f, Ui()->CheckActiveItem(pButtonContainer) ? 0.35f : 0.55f);
+			Color = ColorRGBA(0.91f, 0.70f, 0.29f, 0.85f);
 		else if(DefaultColor)
-			Color = ColorRGBA(0.10f, 0.09f, 0.12f, 0.80f);
+			Color = ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == pButtonContainer ? 0.1f : 0.05f);
+		else
+			Color.a *= Ui()->ButtonColorMul(pButtonContainer);
 	}
 	else if(Checked)
 		Color = ColorRGBA(0.6f, 0.6f, 0.6f, 0.5f);
@@ -219,7 +219,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 				Accent.VMargin(std::min(12.0f, Rect.w / 6.0f), &Accent);
 				Accent.h = 2.0f; // horizontal tabs: strip on top
 			}
-			Accent.Draw(ColorRGBA(0.98f, 0.74f, 0.22f, 1.0f), IGraphics::CORNER_ALL, 1.0f);
+			Accent.Draw(ColorRGBA(0.91f, 0.70f, 0.29f, 1.0f), IGraphics::CORNER_ALL, 1.0f);
 		}
 	}
 	else
@@ -267,11 +267,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 	{
 		CUIRect Label;
 		Rect.HMargin(2.0f, &Label);
-		if(g_Config.m_KgMenuStyle && Checked)
-			TextRender()->TextColor(1.0f, 0.82f, 0.36f, 1.0f);
 		Ui()->DoLabel(&Label, pText, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
-		if(g_Config.m_KgMenuStyle && Checked)
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
 	return Ui()->DoButtonLogic(pButtonContainer, Checked, pRect, BUTTONFLAG_LEFT);
@@ -316,7 +312,7 @@ int CMenus::DoButton_CheckBox_Common(const void *pId, const char *pText, const c
 
 	Box.Margin(2.0f, &Box);
 	if(g_Config.m_KgMenuStyle)
-		Box.Draw(*pBoxText == 'X' ? ColorRGBA(0.92f, 0.68f, 0.2f, 0.9f * std::min(1.0f, Ui()->ButtonColorMul(pId) + 0.3f)) : ColorRGBA(1, 1, 1, 0.12f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
+		Box.Draw(*pBoxText == 'X' ? ColorRGBA(0.91f, 0.70f, 0.29f, 0.9f) : ColorRGBA(1, 1, 1, 0.1f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
 	else
 		Box.Draw(ColorRGBA(1, 1, 1, 0.25f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
 
@@ -888,8 +884,6 @@ void CMenus::OnInit()
 	Console()->Chain("demo_speed", ConchainDemoSpeed, this);
 
 	m_TextureBlob = Graphics()->LoadTexture("blob.png", IStorage::TYPE_ALL);
-	// KING: menu background picture (a file with the same path in the user folder overrides it)
-	m_KingBackgroundTexture = Graphics()->LoadTexture("king/menu_background.png", IStorage::TYPE_ALL);
 
 	// setup load amount
 	m_LoadingState.m_Current = 0;
@@ -2487,139 +2481,38 @@ void CMenus::UpdateColors()
 
 	if(g_Config.m_KgMenuStyle)
 	{
-		// KING style: near-black panels, gold hover
-		ms_ColorTabbarInactiveOutgame = ColorRGBA(0.02f, 0.02f, 0.03f, 0.55f);
-		ms_ColorTabbarActiveOutgame = ColorRGBA(0.07f, 0.06f, 0.09f, 0.85f);
-		ms_ColorTabbarHoverOutgame = ColorRGBA(0.95f, 0.7f, 0.22f, 0.3f);
-		ms_ColorTabbarInactiveIngame = ColorRGBA(0.02f, 0.02f, 0.03f, 0.7f);
-		ms_ColorTabbarActiveIngame = ColorRGBA(0.06f, 0.05f, 0.08f, 0.92f);
-		ms_ColorTabbarHoverIngame = ColorRGBA(0.95f, 0.7f, 0.22f, 0.35f);
+		// KING style: neutral near-black panels
+		ms_ColorTabbarInactiveOutgame = ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f);
+		ms_ColorTabbarActiveOutgame = ColorRGBA(0.075f, 0.075f, 0.09f, 0.9f);
+		ms_ColorTabbarHoverOutgame = ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f);
+		ms_ColorTabbarInactiveIngame = ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f);
+		ms_ColorTabbarActiveIngame = ColorRGBA(0.075f, 0.075f, 0.09f, 0.94f);
+		ms_ColorTabbarHoverIngame = ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f);
 	}
 }
 
 void CMenus::RenderKingBackground()
 {
+	// quiet near-black background with a very soft warm light behind the wordmark
 	const float ScreenHeight = 300.0f;
 	const float ScreenWidth = ScreenHeight * Graphics()->ScreenAspect();
 	Graphics()->MapScreenToSize(ScreenWidth, ScreenHeight);
-	const float Time = Client()->GlobalTime();
 
-	if(m_KingBackgroundTexture.IsValid())
-	{
-		// picture, scaled to cover the screen without stretching
-		const float ImageAspect = 16.0f / 9.0f;
-		const float ScreenAspect = ScreenWidth / ScreenHeight;
-		float U0 = 0.0f, V0 = 0.0f, U1 = 1.0f, V1 = 1.0f;
-		if(ScreenAspect > ImageAspect)
-		{
-			const float Visible = ImageAspect / ScreenAspect;
-			V0 = (1.0f - Visible) / 2.0f;
-			V1 = V0 + Visible;
-		}
-		else
-		{
-			const float Visible = ScreenAspect / ImageAspect;
-			U0 = (1.0f - Visible) / 2.0f;
-			U1 = U0 + Visible;
-		}
-		Graphics()->TextureSet(m_KingBackgroundTexture);
-		Graphics()->QuadsBegin();
-		Graphics()->QuadsSetSubset(U0, V0, U1, V1);
-		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
-		const IGraphics::CQuadItem PictureItem(0, 0, ScreenWidth, ScreenHeight);
-		Graphics()->QuadsDrawTL(&PictureItem, 1);
-		Graphics()->QuadsEnd();
-
-		// a few drifting gold sparks on top so the picture feels alive
-		Graphics()->TextureClear();
-		Graphics()->QuadsBegin();
-		constexpr int NUM_PIC_SPARKS = 28;
-		IGraphics::CQuadItem aPicSparks[NUM_PIC_SPARKS];
-		for(int i = 0; i < NUM_PIC_SPARKS; i++)
-		{
-			const float R1 = absolute(std::fmod(std::sin(i * 12.9898f) * 43758.5453f, 1.0f));
-			const float R2 = absolute(std::fmod(std::sin(i * 78.233f) * 12543.123f, 1.0f));
-			const float Speed = 4.0f + R2 * 7.0f;
-			const float Life = std::fmod(Time * Speed / ScreenHeight + R1, 1.0f);
-			const float X = ScreenWidth * (0.25f + R1 * 0.5f) + std::sin(Time * 0.6f + i) * 8.0f;
-			const float Y = ScreenHeight * (0.85f - Life * 0.9f);
-			const float Size = 0.6f + R2 * 1.0f;
-			aPicSparks[i] = IGraphics::CQuadItem(X, Y, Size, Size);
-		}
-		Graphics()->SetColor(1.0f, 0.82f, 0.4f, 0.45f);
-		Graphics()->QuadsDrawTL(aPicSparks, NUM_PIC_SPARKS);
-		Graphics()->QuadsEnd();
-
-		Ui()->MapScreen();
-		return;
-	}
-
-	// no picture: procedural fallback
-	// dark purple-black gradient
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
-	const ColorRGBA Top(0.105f, 0.082f, 0.125f, 1.0f);
-	const ColorRGBA Bottom(0.035f, 0.031f, 0.047f, 1.0f);
+	const ColorRGBA Top(0.067f, 0.067f, 0.078f, 1.0f);
+	const ColorRGBA Bottom(0.039f, 0.039f, 0.047f, 1.0f);
 	Graphics()->SetColor4(Top, Top, Bottom, Bottom);
 	const IGraphics::CQuadItem BaseItem(0, 0, ScreenWidth, ScreenHeight);
 	Graphics()->QuadsDrawTL(&BaseItem, 1);
 	Graphics()->QuadsEnd();
 
-	// slowly rotating gold rays from behind the logo
-	const vec2 Center(ScreenWidth / 2.0f, 62.0f);
-	const float RayLen = ScreenWidth * 1.3f;
-	constexpr int NUM_RAYS = 18;
-	const float RayWidth = pi / NUM_RAYS * 0.45f;
 	Graphics()->QuadsBegin();
-	const ColorRGBA RayInner(1.0f, 0.74f, 0.2f, 0.08f);
-	const ColorRGBA RayOuter(1.0f, 0.6f, 0.1f, 0.0f);
-	Graphics()->SetColor4(RayInner, RayInner, RayOuter, RayOuter);
-	IGraphics::CFreeformItem aRays[NUM_RAYS];
-	for(int i = 0; i < NUM_RAYS; i++)
+	for(int Ring = 10; Ring >= 1; Ring--)
 	{
-		const float Angle = Time * 0.05f + i * (2.0f * pi / NUM_RAYS);
-		const vec2 A = Center + direction(Angle - RayWidth) * RayLen;
-		const vec2 B = Center + direction(Angle + RayWidth) * RayLen;
-		aRays[i] = IGraphics::CFreeformItem(Center, Center, A, B);
+		Graphics()->SetColor(1.0f, 0.75f, 0.35f, 0.006f);
+		Graphics()->DrawCircle(ScreenWidth / 2.0f, 62.0f, Ring * 16.0f, 64);
 	}
-	Graphics()->QuadsDrawFreeform(aRays, NUM_RAYS);
-	Graphics()->QuadsEnd();
-
-	// soft glow behind the crown
-	Graphics()->QuadsBegin();
-	for(int Ring = 6; Ring >= 1; Ring--)
-	{
-		Graphics()->SetColor(1.0f, 0.72f, 0.18f, 0.025f);
-		Graphics()->DrawCircle(Center.x, Center.y, Ring * 18.0f, 48);
-	}
-	Graphics()->QuadsEnd();
-
-	// rising gold sparks
-	Graphics()->QuadsBegin();
-	constexpr int NUM_SPARKS = 48;
-	IGraphics::CQuadItem aSparks[NUM_SPARKS];
-	for(int i = 0; i < NUM_SPARKS; i++)
-	{
-		// cheap deterministic pseudo random per spark
-		const float R1 = std::fmod(std::sin(i * 12.9898f) * 43758.5453f, 1.0f);
-		const float R2 = std::fmod(std::sin(i * 78.233f) * 12543.123f, 1.0f);
-		const float Speed = 6.0f + absolute(R2) * 10.0f;
-		const float Life = std::fmod(Time * Speed / ScreenHeight + absolute(R1), 1.0f);
-		const float X = absolute(R1) * ScreenWidth + std::sin(Time * 0.7f + i) * 6.0f;
-		const float Y = ScreenHeight * (1.05f - Life * 1.1f);
-		const float Size = 0.8f + absolute(R2) * 1.4f;
-		aSparks[i] = IGraphics::CQuadItem(X, Y, Size, Size);
-	}
-	Graphics()->SetColor(1.0f, 0.8f, 0.3f, 0.35f);
-	Graphics()->QuadsDrawTL(aSparks, NUM_SPARKS);
-	Graphics()->QuadsEnd();
-
-	// border fade
-	Graphics()->TextureSet(m_TextureBlob);
-	Graphics()->QuadsBegin();
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
-	const IGraphics::CQuadItem BlobQuadItem = IGraphics::CQuadItem(-100, -100, ScreenWidth + 200, ScreenHeight + 200);
-	Graphics()->QuadsDrawTL(&BlobQuadItem, 1);
 	Graphics()->QuadsEnd();
 
 	Ui()->MapScreen();

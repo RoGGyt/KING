@@ -101,14 +101,8 @@ const CScrollBarColorFunction CUi::ms_ScrollBarColorFunction;
 
 ColorRGBA CScrollBarColorFunction::GetColor(bool Active, bool Hovered) const
 {
-	if(g_Config.m_KgMenuStyle)
-	{
-		if(Active)
-			return ColorRGBA(0.85f, 0.6f, 0.15f, 1.0f);
-		else if(Hovered)
-			return ColorRGBA(1.0f, 0.8f, 0.35f, 1.0f);
-		return ColorRGBA(0.95f, 0.7f, 0.22f, 1.0f);
-	}
+	if(g_Config.m_KgMenuStyle && Active)
+		return ColorRGBA(0.91f, 0.70f, 0.29f, 1.0f); // accent only while dragging
 	if(Active)
 		return ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f);
 	else if(Hovered)
@@ -1612,7 +1606,7 @@ void CUi::RenderProgressBar(CUIRect ProgressBar, float Progress)
 	const float Rounding = std::min(5.0f, ProgressBar.h / 2.0f);
 	ProgressBar.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, Rounding);
 	ProgressBar.w = std::max(ProgressBar.w * Progress, 2 * Rounding);
-	ProgressBar.Draw(g_Config.m_KgMenuStyle ? ColorRGBA(0.95f, 0.7f, 0.22f, 0.9f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), IGraphics::CORNER_ALL, Rounding);
+	ProgressBar.Draw(g_Config.m_KgMenuStyle ? ColorRGBA(0.91f, 0.70f, 0.29f, 0.9f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), IGraphics::CORNER_ALL, Rounding);
 }
 
 void CCachedText::Update(ITextRender *pTextRender, const char *pText, float FontSize, float LineWidth, int CursorFlags)
