@@ -888,6 +888,8 @@ void CMenus::OnInit()
 	Console()->Chain("demo_speed", ConchainDemoSpeed, this);
 
 	m_TextureBlob = Graphics()->LoadTexture("blob.png", IStorage::TYPE_ALL);
+	// KING: menu background picture (a file with the same path in the user folder overrides it)
+	m_KingBackgroundTexture = Graphics()->LoadTexture("king/menu_background.png", IStorage::TYPE_ALL);
 
 	// setup load amount
 	m_LoadingState.m_Current = 0;
@@ -2502,6 +2504,57 @@ void CMenus::RenderKingBackground()
 	Graphics()->MapScreenToSize(ScreenWidth, ScreenHeight);
 	const float Time = Client()->GlobalTime();
 
+	if(m_KingBackgroundTexture.IsValid())
+	{
+		// picture, scaled to cover the screen without stretching
+		const float ImageAspect = 16.0f / 9.0f;
+		const float ScreenAspect = ScreenWidth / ScreenHeight;
+		float U0 = 0.0f, V0 = 0.0f, U1 = 1.0f, V1 = 1.0f;
+		if(ScreenAspect > ImageAspect)
+		{
+			const float Visible = ImageAspect / ScreenAspect;
+			V0 = (1.0f - Visible) / 2.0f;
+			V1 = V0 + Visible;
+		}
+		else
+		{
+			const float Visible = ScreenAspect / ImageAspect;
+			U0 = (1.0f - Visible) / 2.0f;
+			U1 = U0 + Visible;
+		}
+		Graphics()->TextureSet(m_KingBackgroundTexture);
+		Graphics()->QuadsBegin();
+		Graphics()->QuadsSetSubset(U0, V0, U1, V1);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+		const IGraphics::CQuadItem PictureItem(0, 0, ScreenWidth, ScreenHeight);
+		Graphics()->QuadsDrawTL(&PictureItem, 1);
+		Graphics()->QuadsEnd();
+
+		// a few drifting gold sparks on top so the picture feels alive
+		Graphics()->TextureClear();
+		Graphics()->QuadsBegin();
+		constexpr int NUM_PIC_SPARKS = 28;
+		IGraphics::CQuadItem aPicSparks[NUM_PIC_SPARKS];
+		for(int i = 0; i < NUM_PIC_SPARKS; i++)
+		{
+			const float R1 = absolute(std::fmod(std::sin(i * 12.9898f) * 43758.5453f, 1.0f));
+			const float R2 = absolute(std::fmod(std::sin(i * 78.233f) * 12543.123f, 1.0f));
+			const float Speed = 4.0f + R2 * 7.0f;
+			const float Life = std::fmod(Time * Speed / ScreenHeight + R1, 1.0f);
+			const float X = ScreenWidth * (0.25f + R1 * 0.5f) + std::sin(Time * 0.6f + i) * 8.0f;
+			const float Y = ScreenHeight * (0.85f - Life * 0.9f);
+			const float Size = 0.6f + R2 * 1.0f;
+			aPicSparks[i] = IGraphics::CQuadItem(X, Y, Size, Size);
+		}
+		Graphics()->SetColor(1.0f, 0.82f, 0.4f, 0.45f);
+		Graphics()->QuadsDrawTL(aPicSparks, NUM_PIC_SPARKS);
+		Graphics()->QuadsEnd();
+
+		Ui()->MapScreen();
+		return;
+	}
+
+	// no picture: procedural fallback
 	// dark purple-black gradient
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();

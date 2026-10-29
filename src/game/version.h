@@ -27,7 +27,7 @@ extern const char *GIT_SHORTREV_HASH;
 
 // KING (based on TClient)
 #ifndef KING_VERSION
-#define KING_VERSION "1.0.5"
+#define KING_VERSION "1.0.6"
 #endif
 // GitHub repository whose releases are checked for KING updates
 #ifndef KING_UPDATE_REPO

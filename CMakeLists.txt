@@ -1717,6 +1717,7 @@ set(EXPECTED_DATA
   gui_icons.png
   gui_logo.png
   hud.png
+  king/menu_background.png
   languages/README.txt
   languages/arabic.txt
   languages/azerbaijani.txt

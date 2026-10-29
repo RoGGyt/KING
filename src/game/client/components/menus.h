@@ -656,6 +656,7 @@ protected:
 	void UpdateColors();
 
 	IGraphics::CTextureHandle m_TextureBlob;
+	IGraphics::CTextureHandle m_KingBackgroundTexture; // KING
 
 public:
 	void RenderBackground();

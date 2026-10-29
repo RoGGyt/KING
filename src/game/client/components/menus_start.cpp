@@ -29,7 +29,10 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1, 1, 1, 1);
-	IGraphics::CQuadItem QuadItem(MainView.w / 2 - 170, 60, 360, 103);
+	// KING logo is 1280x583 (aspect ~2.2)
+	const float LogoH = 135.0f;
+	const float LogoW = LogoH * (1280.0f / 583.0f);
+	IGraphics::CQuadItem QuadItem(MainView.w / 2 - LogoW / 2, 40, LogoW, LogoH);
 	Graphics()->QuadsDrawTL(&QuadItem, 1);
 	Graphics()->QuadsEnd();
 

@@ -18,7 +18,7 @@ KING is a DDNet client for KoG (King of Gores), based on [TClient](https://githu
   * 45° aim: `+kg_45` while held, or the `kg_aim_45` toggle. The cursor snaps to 45° steps and keeps its distance; the real cursor keeps moving underneath, so releasing returns to it.
   * Small sensitivity: `+kg_small_sens` while held, or the `kg_small_sens` toggle, set to `kg_small_sens_factor`% of the normal sensitivity.
 * **Auto prediction margin** (`kg_auto_margin`, `kg_auto_margin_min/max/safety`). For every input, the server reports how early the input arrived. KING sets the margin to the measured spread plus a safety value. The margin goes up quickly when inputs start arriving late and comes back down slowly (1 ms/s). On a stable wired connection this settles around 4–7 ms instead of the fixed 10 ms. Servers without the `SyncWeaponInput` capability force 10 ms, and the HUD shows this as "locked by server".
-* **KING look**: gold crown logo, a dark menu background with slowly rotating gold rays and sparks (`kg_menu_style`, set to 0 for DDNet map themes), and a dark gold interface color applied once on first start.
+* **KING look**: gold crown logo and a royal hall picture as the menu background with drifting gold sparks (`kg_menu_style`, set to 0 for DDNet map themes). Put your own `king/menu_background.png` (16:9) into the user folder (`%APPDATA%\DDNet\king\`) to replace the picture. The UI uses a dark gold theme: tabs, buttons, checkboxes and scrollbars.
 * **Network HUD** (`kg_net_hud`): ping, jitter, current margin, late inputs, input mode.
 * **KoG preset** (`kg_kog_preset`, also a button in Settings → KING → KING): KING input, antiping on, vsync off, uncapped update rate. It is applied once on first start.
 
