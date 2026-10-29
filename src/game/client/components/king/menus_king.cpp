@@ -80,7 +80,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	switch(g_Config.m_KgInputMode)
 	{
 	case CKing::INPUT_MODE_CLASSIC:
-		TextLine(Ui(), LeftView, "Old TClient fast input (tc_fast_input 1-5): your tee");
+		TextLine(Ui(), LeftView, "Classic fast input in whole ticks (1-5): your tee");
 		TextLine(Ui(), LeftView, "is shown whole ticks ahead with your newest input.");
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
@@ -136,7 +136,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_KgSmoothMs, &g_Config.m_KgSmoothMs, &Button, "Smoothing", 10, 300, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		break;
 	default:
-		TextLine(Ui(), LeftView, "Uses the TClient settings as they are");
+		TextLine(Ui(), LeftView, "Uses the fast input settings as they are");
 		TextLine(Ui(), LeftView, "(Settings tab > Input).");
 		break;
 	}

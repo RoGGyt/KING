@@ -123,7 +123,7 @@ public:
 		mem_zero(&m_Activity, sizeof(DiscordActivity));
 
 		str_copy(m_Activity.assets.large_image, "tclient_logo");
-		str_copy(m_Activity.assets.large_text, "TClient logo");
+		str_copy(m_Activity.assets.large_text, "KING logo");
 		m_Activity.timestamps.start = time_timestamp();
 		str_copy(m_Activity.details, "Offline");
 		m_Activity.instance = false;
@@ -136,7 +136,7 @@ public:
 		mem_zero(&m_Activity, sizeof(DiscordActivity));
 
 		str_copy(m_Activity.assets.large_image, "tclient_logo");
-		str_copy(m_Activity.assets.large_text, "TClient logo");
+		str_copy(m_Activity.assets.large_text, "KING logo");
 		m_Activity.timestamps.start = time_timestamp();
 		str_copy(m_Activity.name, "Online");
 		m_Activity.instance = true;

@@ -126,9 +126,20 @@ int CMenus::DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText,
 {
 	CUIRect Text = *pRect;
 
-	if(Checked)
+	if(g_Config.m_KgMenuStyle)
+	{
+		// KING style: dark buttons, gold when hovered or selected
+		const bool DefaultColor = Color.r == 1.0f && Color.g == 1.0f && Color.b == 1.0f;
+		if(Checked)
+			Color = ColorRGBA(0.78f, 0.55f, 0.14f, 0.85f);
+		else if(Ui()->HotItem() == pButtonContainer)
+			Color = ColorRGBA(0.85f, 0.62f, 0.18f, Ui()->CheckActiveItem(pButtonContainer) ? 0.35f : 0.55f);
+		else if(DefaultColor)
+			Color = ColorRGBA(0.10f, 0.09f, 0.12f, 0.80f);
+	}
+	else if(Checked)
 		Color = ColorRGBA(0.6f, 0.6f, 0.6f, 0.5f);
-	else // TClient, why was this not here? ig they never use "checked" anywhere important
+	else // why was this not here? ig they never use "checked" anywhere important
 		Color.a *= Ui()->ButtonColorMul(pButtonContainer);
 
 	pRect->Draw(Color, Corners, Rounding);
@@ -197,6 +208,19 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 			ColorMenuTab = *pActiveColor;
 
 		Rect.Draw(ColorMenuTab, Corners, EdgeRounding);
+		if(g_Config.m_KgMenuStyle && !pActiveColor)
+		{
+			// KING style: gold accent on the selected tab
+			CUIRect Accent = Rect;
+			if(pAnimator != nullptr)
+				Accent.w = 3.0f; // vertical sidebar tabs: strip on the left
+			else
+			{
+				Accent.VMargin(std::min(12.0f, Rect.w / 6.0f), &Accent);
+				Accent.h = 2.0f; // horizontal tabs: strip on top
+			}
+			Accent.Draw(ColorRGBA(0.98f, 0.74f, 0.22f, 1.0f), IGraphics::CORNER_ALL, 1.0f);
+		}
 	}
 	else
 	{
@@ -243,7 +267,11 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 	{
 		CUIRect Label;
 		Rect.HMargin(2.0f, &Label);
+		if(g_Config.m_KgMenuStyle && Checked)
+			TextRender()->TextColor(1.0f, 0.82f, 0.36f, 1.0f);
 		Ui()->DoLabel(&Label, pText, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+		if(g_Config.m_KgMenuStyle && Checked)
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
 	return Ui()->DoButtonLogic(pButtonContainer, Checked, pRect, BUTTONFLAG_LEFT);
@@ -287,7 +315,10 @@ int CMenus::DoButton_CheckBox_Common(const void *pId, const char *pText, const c
 	Label.VSplitLeft(5.0f, nullptr, &Label);
 
 	Box.Margin(2.0f, &Box);
-	Box.Draw(ColorRGBA(1, 1, 1, 0.25f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
+	if(g_Config.m_KgMenuStyle)
+		Box.Draw(*pBoxText == 'X' ? ColorRGBA(0.92f, 0.68f, 0.2f, 0.9f * std::min(1.0f, Ui()->ButtonColorMul(pId) + 0.3f)) : ColorRGBA(1, 1, 1, 0.12f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
+	else
+		Box.Draw(ColorRGBA(1, 1, 1, 0.25f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
 
 	const bool Checkable = *pBoxText == 'X';
 	if(Checkable)
@@ -2451,6 +2482,17 @@ void CMenus::UpdateColors()
 		ms_GuiColor.a);
 
 	ms_ColorTabbarHoverIngame = ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f);
+
+	if(g_Config.m_KgMenuStyle)
+	{
+		// KING style: near-black panels, gold hover
+		ms_ColorTabbarInactiveOutgame = ColorRGBA(0.02f, 0.02f, 0.03f, 0.55f);
+		ms_ColorTabbarActiveOutgame = ColorRGBA(0.07f, 0.06f, 0.09f, 0.85f);
+		ms_ColorTabbarHoverOutgame = ColorRGBA(0.95f, 0.7f, 0.22f, 0.3f);
+		ms_ColorTabbarInactiveIngame = ColorRGBA(0.02f, 0.02f, 0.03f, 0.7f);
+		ms_ColorTabbarActiveIngame = ColorRGBA(0.06f, 0.05f, 0.08f, 0.92f);
+		ms_ColorTabbarHoverIngame = ColorRGBA(0.95f, 0.7f, 0.22f, 0.35f);
+	}
 }
 
 void CMenus::RenderKingBackground()

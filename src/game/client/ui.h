@@ -134,14 +134,7 @@ public:
 class CScrollBarColorFunction : public IButtonColorFunction
 {
 public:
-	ColorRGBA GetColor(bool Active, bool Hovered) const override
-	{
-		if(Active)
-			return ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f);
-		else if(Hovered)
-			return ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
-		return ColorRGBA(0.8f, 0.8f, 0.8f, 1.0f);
-	}
+	ColorRGBA GetColor(bool Active, bool Hovered) const override; // KING: gold handles in KING style
 };
 
 class CUi;

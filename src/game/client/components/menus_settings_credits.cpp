@@ -9,6 +9,7 @@
 void CMenus::RenderSettingsCredits(CUIRect MainView)
 {
 	static constexpr const char *const CREDITS =
+		"KING by RoGGyt. Built on the open source DDNet client and TClient.\n"
 		"\n"
 		"Help and code by eeeee, HMH, east, CookieMichal, Learath2, "
 		"Savander, laxa, Tobii, BeaR, Wohoo, nuborn, timakro, Shiki, "

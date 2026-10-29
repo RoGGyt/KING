@@ -28,7 +28,7 @@ const char *CKing::InputModeName(int Mode)
 	switch(Mode)
 	{
 	case INPUT_MODE_CUSTOM: return "Custom";
-	case INPUT_MODE_CLASSIC: return "Classic TClient";
+	case INPUT_MODE_CLASSIC: return "Classic";
 	case INPUT_MODE_KING: return "KING";
 	case INPUT_MODE_DELTA: return "Delta";
 	case INPUT_MODE_PING_COMP: return "Ping Comp";
