@@ -18,6 +18,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#undef NOGDI // mmreg.h needs BITMAPINFOHEADER; nothing in this file uses the name ERROR
 #include <windows.h>
 // the build defines WIN32_LEAN_AND_MEAN, so COM basics have to be pulled in by hand
 #include <objbase.h>
