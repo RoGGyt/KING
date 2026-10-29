@@ -10,6 +10,7 @@
 
 #include <engine/client.h>
 #include <engine/console.h>
+#include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
@@ -41,7 +42,14 @@ void CKing::OnConsoleInit()
 {
 	Console()->Register("kg_kog_preset", "", CFGFLAG_CLIENT, ConKogPreset, this, "Apply KING recommended settings for KoG (antiping, low latency rendering, KING input)");
 	Console()->Register("kg_check_update", "", CFGFLAG_CLIENT, ConCheckUpdate, this, "Check GitHub for a new KING release");
+	Console()->Register("kg_music_toggle", "", CFGFLAG_CLIENT, ConMusicToggle, this, "Music player: play/pause what plays on your PC");
+	Console()->Register("kg_music_next", "", CFGFLAG_CLIENT, ConMusicNext, this, "Music player: next track");
+	Console()->Register("kg_music_prev", "", CFGFLAG_CLIENT, ConMusicPrev, this, "Music player: previous track");
 }
+
+void CKing::ConMusicToggle(IConsole::IResult *pResult, void *pUserData) { static_cast<CKing *>(pUserData)->m_Media.Command(CKingMedia::COMMAND_TOGGLE); }
+void CKing::ConMusicNext(IConsole::IResult *pResult, void *pUserData) { static_cast<CKing *>(pUserData)->m_Media.Command(CKingMedia::COMMAND_NEXT); }
+void CKing::ConMusicPrev(IConsole::IResult *pResult, void *pUserData) { static_cast<CKing *>(pUserData)->m_Media.Command(CKingMedia::COMMAND_PREVIOUS); }
 
 void CKing::ConCheckUpdate(IConsole::IResult *pResult, void *pUserData)
 {
@@ -69,6 +77,7 @@ void CKing::OnInit()
 		g_Config.m_KgMenuStyle = 1;
 		g_Config.m_KgThemeApplied = 1;
 	}
+	m_Media.Start();
 	ReadLastInstallResult();
 	if(g_Config.m_KgUpdateCheck)
 		CheckForUpdates();
@@ -76,6 +85,7 @@ void CKing::OnInit()
 
 void CKing::OnShutdown()
 {
+	m_Media.Stop();
 	if(m_pUpdateTask)
 	{
 		m_pUpdateTask->Abort();
@@ -498,6 +508,8 @@ void CKing::OnRender()
 		return;
 	if(g_Config.m_KgNetHud)
 		RenderNetHud();
+	if(g_Config.m_KgMusicHud && g_Config.m_ClShowhud)
+		RenderMusicHud();
 }
 
 void CKing::RenderNetHud()
@@ -584,4 +596,82 @@ void CKing::RenderNetHud()
 	}
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
+}
+
+static void KingFormatTime(char *pBuf, int Size, float Seconds)
+{
+	const int Total = std::max(0, (int)Seconds);
+	str_format(pBuf, Size, "%d:%02d", Total / 60, Total % 60);
+}
+
+void CKing::RenderMusicHud()
+{
+	const SKingMediaInfo Info = m_Media.Get();
+	if(!Info.m_Valid || (!Info.m_Playing && !g_Config.m_KgMusicShowPaused) || (Info.m_aTitle[0] == '\0' && Info.m_aArtist[0] == '\0'))
+		return;
+
+	const float Height = 300.0f;
+	const float Width = Height * Graphics()->ScreenAspect();
+	Graphics()->MapScreenToSize(Width, Height);
+
+	// left of the race timer at the top
+	const float BoxW = 132.0f;
+	const float BoxH = 14.0f;
+	const float BoxX = Width / 2.0f - 30.0f - BoxW;
+	const float BoxY = 2.0f;
+	const ColorRGBA Accent(0.91f, 0.70f, 0.29f, 1.0f);
+	Graphics()->DrawRect(BoxX, BoxY, BoxW, BoxH, ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 3.0f);
+
+	// play state icon
+	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+	TextRender()->TextColor(Accent);
+	TextRender()->Text(BoxX + 4.0f, BoxY + 3.0f, 5.5f, Info.m_Playing ? FontIcon::PLAY : FontIcon::PAUSE);
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+
+	// time on the right
+	char aTime[32];
+	KingFormatTime(aTime, sizeof(aTime), Info.m_PositionSec);
+	const float TimeFont = 4.5f;
+	const float TimeW = TextRender()->TextWidth(TimeFont, aTime);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
+	TextRender()->Text(BoxX + BoxW - 4.0f - TimeW, BoxY + 3.6f, TimeFont, aTime);
+
+	// "Title - Artist", cut to fit
+	char aText[512];
+	if(Info.m_aArtist[0] && Info.m_aTitle[0])
+		str_format(aText, sizeof(aText), "%s - %s", Info.m_aTitle, Info.m_aArtist);
+	else
+		str_copy(aText, Info.m_aTitle[0] ? Info.m_aTitle : Info.m_aArtist);
+	const float TextFont = 5.2f;
+	const float MaxTextW = BoxW - 14.0f - TimeW - 6.0f;
+	if(TextRender()->TextWidth(TextFont, aText) > MaxTextW)
+	{
+		int Len = str_length(aText);
+		while(Len > 1)
+		{
+			Len = str_utf8_rewind(aText, Len);
+			char aCut[512];
+			str_truncate(aCut, sizeof(aCut), aText, Len);
+			str_append(aCut, "...");
+			if(TextRender()->TextWidth(TextFont, aCut) <= MaxTextW)
+			{
+				str_copy(aText, aCut);
+				break;
+			}
+		}
+	}
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.92f);
+	TextRender()->Text(BoxX + 12.0f, BoxY + 3.2f, TextFont, aText);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	// progress line along the bottom
+	if(Info.m_DurationSec > 0.0f)
+	{
+		const float Progress = std::clamp(Info.m_PositionSec / Info.m_DurationSec, 0.0f, 1.0f);
+		const float LineX = BoxX + 4.0f;
+		const float LineW = BoxW - 8.0f;
+		const float LineY = BoxY + BoxH - 2.6f;
+		Graphics()->DrawRect(LineX, LineY, LineW, 1.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.15f), IGraphics::CORNER_ALL, 0.5f);
+		Graphics()->DrawRect(LineX, LineY, LineW * Progress, 1.0f, Accent, IGraphics::CORNER_ALL, 0.5f);
+	}
 }

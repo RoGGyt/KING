@@ -5,6 +5,8 @@
 #include <engine/console.h>
 #include <engine/http.h>
 
+#include "king_media.h"
+
 #include <game/client/component.h>
 
 #include <memory>
@@ -63,9 +65,13 @@ public:
 	float DownloadProgress() const;
 	const char *InstallError() const { return m_aInstallError; }
 
+	// Music player (system "now playing")
+	CKingMedia m_Media;
+
 private:
 	void ApplyInputMode();
 	void RenderNetHud();
+	void RenderMusicHud();
 	void FinishUpdateCheck();
 	void FinishDownload();
 	bool LaunchInstaller();
@@ -82,6 +88,9 @@ private:
 
 	static void ConKogPreset(IConsole::IResult *pResult, void *pUserData);
 	static void ConCheckUpdate(IConsole::IResult *pResult, void *pUserData);
+	static void ConMusicToggle(IConsole::IResult *pResult, void *pUserData);
+	static void ConMusicNext(IConsole::IResult *pResult, void *pUserData);
+	static void ConMusicPrev(IConsole::IResult *pResult, void *pUserData);
 };
 
 #endif

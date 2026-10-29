@@ -5,6 +5,7 @@
 #include <base/str.h>
 
 #include <engine/client.h>
+#include <engine/font_icons.h>
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
 
@@ -329,4 +330,41 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	Headline(Ui(), RightView, "Interface");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicHud, "Music player in game (top, next to the timer)", &g_Config.m_KgMusicHud, &RightView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicShowPaused, "Keep it visible while paused", &g_Config.m_KgMusicShowPaused, &RightView, KING_LINE);
+
+	// now playing + controls
+	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
+	Headline(Ui(), RightView, "Music");
+	CKingMedia &Media = GameClient()->m_King.m_Media;
+	if(!Media.Supported())
+		TextLine(Ui(), RightView, "Not supported on this system.", 11.0f);
+	else
+	{
+		const SKingMediaInfo Info = Media.Get();
+		char aBuf[600];
+		if(Info.m_Valid && (Info.m_aTitle[0] || Info.m_aArtist[0]))
+			str_format(aBuf, sizeof(aBuf), "%s %s%s%s", Info.m_Playing ? "Playing:" : "Paused:", Info.m_aTitle, Info.m_aArtist[0] ? " - " : "", Info.m_aArtist);
+		else
+			str_copy(aBuf, "Nothing is playing (Spotify, browser, Yandex Music...)");
+		TextLine(Ui(), RightView, aBuf, 12.0f);
+
+		CUIRect Row, Prev, Toggle, Next;
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
+		RightView.HSplitTop(KING_LINE * 1.25f, &Row, &RightView);
+		Row.VSplitLeft(Row.h * 2.0f, &Prev, &Row);
+		Row.VSplitLeft(KING_MARGIN_SMALL, nullptr, &Row);
+		Row.VSplitLeft(Row.h * 2.0f, &Toggle, &Row);
+		Row.VSplitLeft(KING_MARGIN_SMALL, nullptr, &Row);
+		Row.VSplitLeft(Row.h * 2.0f, &Next, &Row);
+		static CButtonContainer s_Prev, s_Toggle, s_Next;
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		if(DoButton_Menu(&s_Prev, FontIcon::BACKWARD_STEP, 0, &Prev))
+			Media.Command(CKingMedia::COMMAND_PREVIOUS);
+		if(DoButton_Menu(&s_Toggle, Info.m_Playing ? FontIcon::PAUSE : FontIcon::PLAY, 0, &Toggle))
+			Media.Command(CKingMedia::COMMAND_TOGGLE);
+		if(DoButton_Menu(&s_Next, FontIcon::FORWARD_STEP, 0, &Next))
+			Media.Command(CKingMedia::COMMAND_NEXT);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		TextLine(Ui(), RightView, "Binds: kg_music_toggle, kg_music_next, kg_music_prev", 11.0f);
+	}
 }
