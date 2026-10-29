@@ -412,7 +412,7 @@ bool CMenusStart::DoKingMenuItem(CButtonContainer *pButtonContainer, const char 
 
 void CMenusStart::RenderKingPlayer(CUIRect Area)
 {
-	const float Size = std::min(Area.h * 0.42f, Area.w * 0.45f);
+	const float Size = std::min(Area.h * 0.28f, Area.w * 0.3f);
 	const vec2 Center(Area.x + Area.w / 2.0f, Area.y + Area.h * 0.55f);
 
 	CTeeRenderInfo TeeInfo;
@@ -459,10 +459,10 @@ void CMenusStart::RenderKingPlayer(CUIRect Area)
 	CUIRect NameRect;
 	NameRect.x = Area.x;
 	NameRect.w = Area.w;
-	NameRect.h = 30.0f;
-	NameRect.y = Center.y - Size * 0.56f - NameRect.h;
+	NameRect.h = 40.0f;
+	NameRect.y = Center.y - Size * 0.58f - NameRect.h;
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
-	Ui()->DoLabel(&NameRect, Client()->PlayerName(), 22.0f, TEXTALIGN_MC);
+	Ui()->DoLabel(&NameRect, Client()->PlayerName(), 30.0f, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	// clicking the tee opens the tee settings
@@ -488,7 +488,7 @@ void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 	const float Left = MainView.x + MainView.w * 0.1f;
 
 	// wordmark (694x282), left aligned
-	const float LogoH = 52.0f;
+	const float LogoH = 62.0f;
 	const float LogoW = LogoH * (694.0f / 282.0f);
 	const float LogoY = MainView.y + MainView.h * 0.17f;
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
@@ -499,19 +499,19 @@ void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 	Graphics()->QuadsEnd();
 
 	// menu
-	const float Row = 36.0f;
-	float Y = LogoY + LogoH + 58.0f;
+	const float Row = 46.0f;
+	float Y = LogoY + LogoH + 64.0f;
 
 	static CButtonContainer s_PlayButton, s_DemoButton, s_EditorButton, s_ServerButton, s_SettingsButton, s_QuitButton;
-	if(DoKingMenuItem(&s_PlayButton, Localize("Play", "Start menu"), Left, Y, 24.0f, KING_BUTTON_PRIMARY) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) || CheckHotKey(KEY_P))
+	if(DoKingMenuItem(&s_PlayButton, Localize("Play", "Start menu"), Left, Y, 32.0f, KING_BUTTON_PRIMARY) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) || CheckHotKey(KEY_P))
 		NewPage = g_Config.m_UiPage >= CMenus::PAGE_INTERNET && g_Config.m_UiPage <= CMenus::PAGE_FAVORITE_COMMUNITY_5 ? g_Config.m_UiPage : CMenus::PAGE_INTERNET;
-	Y += Row + 4.0f;
+	Y += Row + 6.0f;
 
-	if(DoKingMenuItem(&s_DemoButton, Localize("Demos"), Left, Y, 20.0f, KING_BUTTON_NORMAL) || CheckHotKey(KEY_D))
+	if(DoKingMenuItem(&s_DemoButton, Localize("Demos"), Left, Y, 26.0f, KING_BUTTON_NORMAL) || CheckHotKey(KEY_D))
 		NewPage = CMenus::PAGE_DEMOS;
 	Y += Row;
 
-	if(DoKingMenuItem(&s_EditorButton, Localize("Editor"), Left, Y, 20.0f, GameClient()->Editor()->HasUnsavedData() ? KING_BUTTON_ACTIVE : KING_BUTTON_NORMAL) || CheckHotKey(KEY_E))
+	if(DoKingMenuItem(&s_EditorButton, Localize("Editor"), Left, Y, 26.0f, GameClient()->Editor()->HasUnsavedData() ? KING_BUTTON_ACTIVE : KING_BUTTON_NORMAL) || CheckHotKey(KEY_E))
 	{
 		g_Config.m_ClEditor = 1;
 		Input()->MouseModeRelative();
@@ -519,7 +519,7 @@ void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 	Y += Row;
 
 	const bool LocalServerRunning = GameClient()->m_LocalServer.IsServerRunning();
-	if(DoKingMenuItem(&s_ServerButton, LocalServerRunning ? Localize("Stop server") : Localize("Run server"), Left, Y, 20.0f, LocalServerRunning ? KING_BUTTON_ACTIVE : KING_BUTTON_NORMAL) || (CheckHotKey(KEY_R) && Input()->KeyPress(KEY_R)))
+	if(DoKingMenuItem(&s_ServerButton, LocalServerRunning ? Localize("Stop server") : Localize("Run server"), Left, Y, 26.0f, LocalServerRunning ? KING_BUTTON_ACTIVE : KING_BUTTON_NORMAL) || (CheckHotKey(KEY_R) && Input()->KeyPress(KEY_R)))
 	{
 		if(LocalServerRunning)
 			GameClient()->m_LocalServer.KillServer();
@@ -528,12 +528,12 @@ void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 	}
 	Y += Row;
 
-	if(DoKingMenuItem(&s_SettingsButton, Localize("Settings"), Left, Y, 20.0f, KING_BUTTON_NORMAL) || CheckHotKey(KEY_S))
+	if(DoKingMenuItem(&s_SettingsButton, Localize("Settings"), Left, Y, 26.0f, KING_BUTTON_NORMAL) || CheckHotKey(KEY_S))
 		NewPage = CMenus::PAGE_SETTINGS;
-	Y += Row * 2.0f;
+	Y += Row * 1.8f;
 
 	bool UsedEscape = false;
-	if(DoKingMenuItem(&s_QuitButton, Localize("Quit"), Left, Y, 20.0f, KING_BUTTON_DANGER) || (UsedEscape = Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE)) || CheckHotKey(KEY_Q))
+	if(DoKingMenuItem(&s_QuitButton, Localize("Quit"), Left, Y, 26.0f, KING_BUTTON_DANGER) || (UsedEscape = Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE)) || CheckHotKey(KEY_Q))
 	{
 		if(UsedEscape || GameClient()->Editor()->HasUnsavedData() || (GameClient()->CurrentRaceTime() / 60 >= g_Config.m_ClConfirmQuitTime && g_Config.m_ClConfirmQuitTime >= 0))
 			GameClient()->m_Menus.ShowQuitPopup();
@@ -544,7 +544,7 @@ void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 	// your tee on the right
 	CUIRect PlayerArea;
 	PlayerArea.x = MainView.x + MainView.w * 0.5f;
-	PlayerArea.y = MainView.y + MainView.h * 0.12f;
+	PlayerArea.y = MainView.y + MainView.h * 0.14f;
 	PlayerArea.w = MainView.w * 0.4f;
 	PlayerArea.h = MainView.h * 0.76f;
 	RenderKingPlayer(PlayerArea);
