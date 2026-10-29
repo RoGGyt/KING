@@ -75,6 +75,77 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 		return;
 
 	*pState->m_apVariables[g_Config.m_ClDummy] = pResult->GetInteger(0);
+
+	// KING: remember which direction was pressed last (Snap Tap)
+	CControls *pControls = pState->m_pControls;
+	const int Dummy = g_Config.m_ClDummy;
+	if(pResult->GetInteger(0))
+	{
+		if(pState->m_apVariables[Dummy] == &pControls->m_aInputDirectionLeft[Dummy])
+		{
+			pControls->m_aKingLastDirPressed[Dummy] = -1;
+			pControls->m_aKingDirPressTime[Dummy] = time_get();
+		}
+		else if(pState->m_apVariables[Dummy] == &pControls->m_aInputDirectionRight[Dummy])
+		{
+			pControls->m_aKingLastDirPressed[Dummy] = 1;
+			pControls->m_aKingDirPressTime[Dummy] = time_get();
+		}
+	}
+}
+
+int CControls::KingDirection(int Dummy) const
+{
+	const bool Left = m_aInputDirectionLeft[Dummy];
+	const bool Right = m_aInputDirectionRight[Dummy];
+	if(Left && !Right)
+		return -1;
+	if(Right && !Left)
+		return 1;
+	if(!Left || !g_Config.m_KgSnapTap)
+		return 0; // nothing held, or both held without Snap Tap (vanilla: stand still)
+	// Snap Tap: both held -> the key pressed last wins (optionally after a delay)
+	const int Last = m_aKingLastDirPressed[Dummy] ? m_aKingLastDirPressed[Dummy] : 1;
+	if(g_Config.m_KgSnapTapDelay > 0 && time_get() - m_aKingDirPressTime[Dummy] < (int64_t)g_Config.m_KgSnapTapDelay * time_freq() / 1000)
+		return -Last; // still in the delay window: keep the direction that was held first
+	return Last;
+}
+
+static vec2 KingSnap45(vec2 Pos)
+{
+	const float Len = length(Pos);
+	if(Len < 0.001f)
+		return Pos;
+	const float Step = pi / 4.0f;
+	const float Angle = std::round(std::atan2(Pos.y, Pos.x) / Step) * Step;
+	return vec2(std::cos(Angle), std::sin(Angle)) * Len;
+}
+
+void CControls::KingUpdate45()
+{
+	const int Dummy = g_Config.m_ClDummy;
+	const bool Want = King45Active();
+	if(Want && !m_King45Applied)
+	{
+		m_aKingRawMouse[Dummy] = m_aMousePos[Dummy];
+		m_aMousePos[Dummy] = KingSnap45(m_aKingRawMouse[Dummy]);
+	}
+	else if(!Want && m_King45Applied)
+		m_aMousePos[Dummy] = m_aKingRawMouse[Dummy];
+	m_King45Applied = Want;
+}
+
+void CControls::ConKing45(IConsole::IResult *pResult, void *pUserData)
+{
+	CControls *pSelf = (CControls *)pUserData;
+	pSelf->m_King45Hold = pResult->GetInteger(0) != 0;
+	pSelf->KingUpdate45();
+}
+
+void CControls::ConKingSmallSens(IConsole::IResult *pResult, void *pUserData)
+{
+	CControls *pSelf = (CControls *)pUserData;
+	pSelf->m_KingSmallSensHold = pResult->GetInteger(0) != 0;
 }
 
 void CControls::ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData)
@@ -115,6 +186,10 @@ void CControls::ConKeyInputNextPrevWeapon(IConsole::IResult *pResult, void *pUse
 
 void CControls::OnConsoleInit()
 {
+	// KING input helpers
+	Console()->Register("+kg_45", "", CFGFLAG_CLIENT, ConKing45, this, "Hold: snap aim to 45 degree steps (KING)");
+	Console()->Register("+kg_small_sens", "", CFGFLAG_CLIENT, ConKingSmallSens, this, "Hold: lower mouse sensitivity for precise aiming (KING)");
+
 	// game commands
 	{
 		static CInputState s_State = {this, {&m_aInputDirectionLeft[0], &m_aInputDirectionLeft[1]}};
@@ -283,11 +358,7 @@ int CControls::SnapInput(int *pData)
 			m_aInputData[g_Config.m_ClDummy].m_TargetX = 1;
 
 		// set direction
-		m_aInputData[g_Config.m_ClDummy].m_Direction = 0;
-		if(m_aInputDirectionLeft[g_Config.m_ClDummy] && !m_aInputDirectionRight[g_Config.m_ClDummy])
-			m_aInputData[g_Config.m_ClDummy].m_Direction = -1;
-		if(!m_aInputDirectionLeft[g_Config.m_ClDummy] && m_aInputDirectionRight[g_Config.m_ClDummy])
-			m_aInputData[g_Config.m_ClDummy].m_Direction = 1;
+		m_aInputData[g_Config.m_ClDummy].m_Direction = KingDirection(g_Config.m_ClDummy); // KING: Snap Tap aware
 
 		// dummy copy moves
 		if(g_Config.m_ClDummyCopyMoves)
@@ -369,6 +440,8 @@ int CControls::SnapInput(int *pData)
 
 void CControls::OnRender()
 {
+	KingUpdate45(); // KING: pick up kg_aim_45 toggles
+
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
@@ -452,6 +525,22 @@ bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0)
 		Factor *= GameClient()->m_Camera.m_Zoom;
 
+	// KING: small sensitivity while held/toggled
+	if(KingSmallSensActive())
+		Factor *= g_Config.m_KgSmallSensFactor / 100.0f;
+
+	KingUpdate45();
+	if(m_King45Applied && !GameClient()->m_Snap.m_SpecInfo.m_Active)
+	{
+		// move the hidden raw cursor, show/send the snapped one
+		m_aMousePos[g_Config.m_ClDummy] = m_aKingRawMouse[g_Config.m_ClDummy] + vec2(x, y) * Factor;
+		GameClient()->m_Controls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::RELATIVE;
+		ClampMousePos();
+		m_aKingRawMouse[g_Config.m_ClDummy] = m_aMousePos[g_Config.m_ClDummy];
+		m_aMousePos[g_Config.m_ClDummy] = KingSnap45(m_aKingRawMouse[g_Config.m_ClDummy]);
+		return true;
+	}
+
 	m_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor;
 	GameClient()->m_Controls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::RELATIVE;
 	ClampMousePos();
@@ -519,11 +608,7 @@ bool CControls::CheckNewInput()
 		CNetObj_PlayerInput TestInput = m_aInputData[Dummy];
 		if(Dummy == g_Config.m_ClDummy)
 		{
-			TestInput.m_Direction = 0;
-			if(m_aInputDirectionLeft[Dummy] && !m_aInputDirectionRight[Dummy])
-				TestInput.m_Direction = -1;
-			if(!m_aInputDirectionLeft[Dummy] && m_aInputDirectionRight[Dummy])
-				TestInput.m_Direction = 1;
+			TestInput.m_Direction = KingDirection(Dummy); // KING: Snap Tap aware
 		}
 
 		if(m_aFastInput[Dummy].m_Direction != TestInput.m_Direction)

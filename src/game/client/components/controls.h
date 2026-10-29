@@ -7,6 +7,7 @@
 
 #include <engine/client.h>
 #include <engine/console.h>
+#include <engine/shared/config.h>
 
 #include <generated/protocol.h>
 
@@ -45,6 +46,18 @@ public:
 	bool m_FastInputHookAction = false;
 	bool m_FastInputFireAction = false;
 
+	// KING input helpers
+	int KingDirection(int Dummy) const; // left/right with optional Snap Tap
+	bool King45Active() const { return m_King45Hold || g_Config.m_KgAim45; }
+	bool KingSmallSensActive() const { return m_KingSmallSensHold || g_Config.m_KgSmallSens; }
+	void KingUpdate45(); // call when 45 degree state may have changed
+	int m_aKingLastDirPressed[NUM_DUMMIES] = {}; // -1 left, 1 right, 0 none
+	int64_t m_aKingDirPressTime[NUM_DUMMIES] = {};
+	bool m_King45Hold = false;
+	bool m_KingSmallSensHold = false;
+	bool m_King45Applied = false;
+	vec2 m_aKingRawMouse[NUM_DUMMIES];
+
 	CControls();
 	int Sizeof() const override { return sizeof(*this); }
 
@@ -65,5 +78,7 @@ private:
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputNextPrevWeapon(IConsole::IResult *pResult, void *pUserData);
+	static void ConKing45(IConsole::IResult *pResult, void *pUserData);
+	static void ConKingSmallSens(IConsole::IResult *pResult, void *pUserData);
 };
 #endif

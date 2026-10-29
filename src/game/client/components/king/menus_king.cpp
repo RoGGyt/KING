@@ -11,8 +11,10 @@
 #include <game/client/components/menus.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
+#include <game/client/ui_scrollregion.h>
 #include <game/version.h>
 
+#include <algorithm>
 #include <vector>
 
 namespace
@@ -42,25 +44,36 @@ void TextLine(CUi *pUi, CUIRect &View, const char *pText, float Size = KING_TEXT
 
 void CMenus::RenderSettingsKing(CUIRect MainView)
 {
+	static CScrollRegion s_ScrollRegion;
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 60.0f;
+	ScrollParams.m_ScrollbarMargin = 5.0f;
+	s_ScrollRegion.Begin(&MainView, &ScrollParams);
+	MainView.VSplitRight(10.0f, &MainView, nullptr); // room for the scrollbar
+
 	CUIRect LeftView, RightView, Button;
 	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 3.0f);
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
-	// ***** Input ***** //
+	// ***** Input mode ***** //
 	Headline(Ui(), LeftView, "KING Input");
-
 	{
-		static std::vector<CButtonContainer> s_vModeButtons = {{}, {}, {}};
 		int Mode = g_Config.m_KgInputMode;
-		if(DoLine_RadioMenu(LeftView, "Mode",
-			   s_vModeButtons,
-			   {CKing::InputModeName(CKing::INPUT_MODE_CUSTOM), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC), CKing::InputModeName(CKing::INPUT_MODE_KING)},
-			   {CKing::INPUT_MODE_CUSTOM, CKing::INPUT_MODE_CLASSIC, CKing::INPUT_MODE_KING},
-			   Mode))
-		{
+		static std::vector<CButtonContainer> s_vModeButtonsA = {{}, {}, {}};
+		static std::vector<CButtonContainer> s_vModeButtonsB = {{}, {}, {}};
+		bool Changed = DoLine_RadioMenu(LeftView, "Mode",
+			s_vModeButtonsA,
+			{CKing::InputModeName(CKing::INPUT_MODE_CUSTOM), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC), CKing::InputModeName(CKing::INPUT_MODE_KING)},
+			{CKing::INPUT_MODE_CUSTOM, CKing::INPUT_MODE_CLASSIC, CKing::INPUT_MODE_KING},
+			Mode);
+		Changed |= DoLine_RadioMenu(LeftView, "",
+			s_vModeButtonsB,
+			{CKing::InputModeName(CKing::INPUT_MODE_DELTA), CKing::InputModeName(CKing::INPUT_MODE_PING_COMP), CKing::InputModeName(CKing::INPUT_MODE_SMOOTH)},
+			{CKing::INPUT_MODE_DELTA, CKing::INPUT_MODE_PING_COMP, CKing::INPUT_MODE_SMOOTH},
+			Mode);
+		if(Changed)
 			g_Config.m_KgInputMode = Mode;
-		}
 	}
 	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 
@@ -80,13 +93,47 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		}
 		break;
 	case CKing::INPUT_MODE_KING:
-		TextLine(Ui(), LeftView, "Classic one-tick fast input + auto margin that");
-		TextLine(Ui(), LeftView, "follows your real jitter. Best for stable wired ping.");
+		TextLine(Ui(), LeftView, "Fast input + auto margin that follows your real");
+		TextLine(Ui(), LeftView, "jitter. Best for stable wired ping.");
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, "Fast input", 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 		TextLine(Ui(), LeftView, "20 ms = one tick. Higher shows you further ahead", 11.0f);
 		TextLine(Ui(), LeftView, "but corrects more when you change direction.", 11.0f);
+		break;
+	case CKing::INPUT_MODE_DELTA:
+		TextLine(Ui(), LeftView, "Fixed offset in hundredths of a tick, also between");
+		TextLine(Ui(), LeftView, "whole ticks (e.g. 0.75 tick = 15 ms).");
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		{
+			char aLabel[64];
+			str_format(aLabel, sizeof(aLabel), "Offset %d.%02d ticks", g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100);
+			Ui()->DoScrollbarOption(&g_Config.m_KgDeltaAmount, &g_Config.m_KgDeltaAmount, &Button, aLabel, 0, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
+		}
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgDeltaOthers, "Shift other tees too", &g_Config.m_KgDeltaOthers, &LeftView, KING_LINE);
+		break;
+	case CKing::INPUT_MODE_PING_COMP:
+		TextLine(Ui(), LeftView, "Fast input grows with your ping: you see your tee");
+		TextLine(Ui(), LeftView, "this share of the round trip ahead (max 100 ms).");
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgPingComp, &g_Config.m_KgPingComp, &Button, "Share of ping", 0, 50, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		{
+			char aNow[64];
+			str_format(aNow, sizeof(aNow), "Now: %d ms ahead", GameClient()->m_King.PingCompAmount());
+			TextLine(Ui(), LeftView, aNow, 11.0f);
+		}
+		break;
+	case CKing::INPUT_MODE_SMOOTH:
+		TextLine(Ui(), LeftView, "KING mode, but when the server corrects your tee it");
+		TextLine(Ui(), LeftView, "glides to the right spot instead of jumping. Only");
+		TextLine(Ui(), LeftView, "visual: your inputs and hitbox are not delayed.");
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, "Fast input", 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgSmoothMs, &g_Config.m_KgSmoothMs, &Button, "Smoothing", 10, 300, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		break;
 	default:
 		TextLine(Ui(), LeftView, "Uses the TClient settings as they are");
@@ -94,13 +141,32 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		break;
 	}
 
+	// ***** Input helpers ***** //
+	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
+	Headline(Ui(), LeftView, "Input Helpers");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSnapTap, "Snap Tap (left+right: last pressed wins)", &g_Config.m_KgSnapTap, &LeftView, KING_LINE);
+	if(g_Config.m_KgSnapTap)
+	{
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgSnapTapDelay, &g_Config.m_KgSnapTapDelay, &Button, "Snap Tap delay", 0, 200, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+	}
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAim45, "45 degree aim (toggle)", &g_Config.m_KgAim45, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmallSens, "Small sensitivity (toggle)", &g_Config.m_KgSmallSens, &LeftView, KING_LINE);
+	LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+	Ui()->DoScrollbarOption(&g_Config.m_KgSmallSensFactor, &g_Config.m_KgSmallSensFactor, &Button, "Small sens", 5, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+	TextLine(Ui(), LeftView, "Hold binds: bind <key> +kg_45 / +kg_small_sens", 11.0f);
+
 	// ***** Prediction margin ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
 	Headline(Ui(), LeftView, "Prediction Margin");
 
-	const bool ForcedAuto = g_Config.m_KgInputMode == CKing::INPUT_MODE_KING;
+	const bool ForcedAuto = CKing::ModeUsesAutoMargin(g_Config.m_KgInputMode);
 	if(ForcedAuto)
-		TextLine(Ui(), LeftView, "Auto margin: on (KING mode)");
+	{
+		char aForced[64];
+		str_format(aForced, sizeof(aForced), "Auto margin: on (%s mode)", CKing::InputModeName(g_Config.m_KgInputMode));
+		TextLine(Ui(), LeftView, aForced);
+	}
 	else
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAutoMargin, "Auto margin (adapts to jitter)", &g_Config.m_KgAutoMargin, &LeftView, KING_LINE);
 
@@ -209,4 +275,13 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 		}
 	}
+
+	// scroll height = taller column
+	CUIRect ScrollRect;
+	ScrollRect.x = MainView.x;
+	ScrollRect.y = std::max(LeftView.y, RightView.y) + KING_MARGIN;
+	ScrollRect.w = MainView.w;
+	ScrollRect.h = 0.0f;
+	s_ScrollRegion.AddRect(ScrollRect);
+	s_ScrollRegion.End();
 }

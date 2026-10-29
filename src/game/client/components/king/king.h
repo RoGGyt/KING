@@ -17,6 +17,9 @@ public:
 		INPUT_MODE_CUSTOM = 0, // leave TClient settings alone
 		INPUT_MODE_CLASSIC, // old TClient fast input: exactly one tick ahead
 		INPUT_MODE_KING, // classic input + adaptive prediction margin
+		INPUT_MODE_DELTA, // fixed sub-tick offset in 0.01 ticks
+		INPUT_MODE_PING_COMP, // offset follows a share of the measured ping
+		INPUT_MODE_SMOOTH, // KING + blend out server corrections of the own tee
 		NUM_INPUT_MODES,
 	};
 
@@ -40,6 +43,8 @@ public:
 	void ApplyKogPreset();
 
 	static const char *InputModeName(int Mode);
+	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH; }
+	int PingCompAmount() const { return m_PingCompAmount; }
 
 	// Updates (GitHub releases of KING_UPDATE_REPO)
 	void CheckForUpdates();
@@ -65,6 +70,7 @@ private:
 	bool LaunchInstaller();
 	void ReadLastInstallResult();
 
+	int m_PingCompAmount = 20;
 	std::shared_ptr<IHttpRequest> m_pUpdateTask = nullptr;
 	EUpdateState m_UpdateState = UPDATE_IDLE;
 	char m_aLatestVersion[32] = "";

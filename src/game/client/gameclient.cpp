@@ -2781,6 +2781,20 @@ void CGameClient::OnPredict()
 	int LocalTee = g_Config.m_ClDummy ^ m_IsDummySwapping;
 	int DummyTee = LocalTee ^ 1;
 
+	// KING Smooth: remember last prediction of a tick whose input was already final,
+	// so a change after this repredict can only come from the server (a correction)
+	const int KingLocalId = m_Snap.m_LocalClientId;
+	const int KingCheckTick = m_KingPrevFinalRegular;
+	bool KingHaveOld = false;
+	vec2 KingOldPos = vec2(0.0f, 0.0f);
+	if(g_Config.m_KgInputMode == CKing::INPUT_MODE_SMOOTH && KingLocalId >= 0 &&
+		KingCheckTick > Client()->GameTick(g_Config.m_ClDummy) && KingCheckTick <= FinalTickRegular &&
+		m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
+	{
+		KingOldPos = m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
+		KingHaveOld = true;
+	}
+
 	for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= FinalTickSelf; Tick++)
 	{
 		// fetch the previous characters
@@ -2980,6 +2994,23 @@ void CGameClient::OnPredict()
 			}
 		}
 	}
+
+	// KING Smooth: turn the correction into a render offset that fades out
+	if(KingHaveOld && m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
+	{
+		const vec2 Err = KingOldPos - m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
+		const float ErrLen = length(Err);
+		if(ErrLen > 64.0f)
+			m_KingSmoothOffset = vec2(0.0f, 0.0f); // teleport or huge correction: snap
+		else if(ErrLen > 0.5f)
+		{
+			m_KingSmoothOffset += Err;
+			const float OffsetLen = length(m_KingSmoothOffset);
+			if(OffsetLen > 64.0f)
+				m_KingSmoothOffset = m_KingSmoothOffset * (64.0f / OffsetLen);
+		}
+	}
+	m_KingPrevFinalRegular = FinalTickRegular;
 
 	// detect mispredictions of other players and make corrections smoother when possible
 	if(g_Config.m_ClAntiPingSmooth &&
@@ -4218,6 +4249,17 @@ void CGameClient::UpdateSpectatorCursor()
 
 void CGameClient::UpdateRenderedCharacters()
 {
+	// KING Smooth: fade the correction offset (exponential, time constant kg_smooth_ms)
+	if(g_Config.m_KgInputMode == CKing::INPUT_MODE_SMOOTH && Predict())
+	{
+		const float Fade = std::exp(-Client()->RenderFrameTime() * 1000.0f / (float)std::max(g_Config.m_KgSmoothMs, 1));
+		m_KingSmoothOffset = m_KingSmoothOffset * Fade;
+		if(length(m_KingSmoothOffset) < 0.05f)
+			m_KingSmoothOffset = vec2(0.0f, 0.0f);
+	}
+	else
+		m_KingSmoothOffset = vec2(0.0f, 0.0f);
+
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(!m_Snap.m_aCharacters[i].m_Active)
@@ -4290,6 +4332,9 @@ void CGameClient::UpdateRenderedCharacters()
 					Pos = UnpredPos;
 			}
 		}
+		// KING Smooth: add the fading correction offset to our own tee
+		if(i == m_Snap.m_LocalClientId && m_aClients[i].m_IsPredictedLocal && g_Config.m_KgInputMode == CKing::INPUT_MODE_SMOOTH)
+			Pos += m_KingSmoothOffset;
 		m_aClients[i].m_RenderPos = Pos;
 		if(Predict() && i == m_Snap.m_LocalClientId)
 			m_LocalCharacterPos = Pos;

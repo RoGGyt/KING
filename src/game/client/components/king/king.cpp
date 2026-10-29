@@ -30,6 +30,9 @@ const char *CKing::InputModeName(int Mode)
 	case INPUT_MODE_CUSTOM: return "Custom";
 	case INPUT_MODE_CLASSIC: return "Classic TClient";
 	case INPUT_MODE_KING: return "KING";
+	case INPUT_MODE_DELTA: return "Delta";
+	case INPUT_MODE_PING_COMP: return "Ping Comp";
+	case INPUT_MODE_SMOOTH: return "Smooth";
 	}
 	return "?";
 }
@@ -415,12 +418,37 @@ void CKing::ApplyInputMode()
 		g_Config.m_TcFastInputRepredictHook = 0;
 		break;
 	case INPUT_MODE_KING:
+	case INPUT_MODE_SMOOTH: // smoothing itself is applied when rendering our tee (gameclient.cpp)
 		g_Config.m_TcFastInput = 1;
 		g_Config.m_TcFastInputAmount = g_Config.m_KgFastInputAmount;
 		g_Config.m_TcFastInputOthers = 0;
 		g_Config.m_TcFastInputRepredictHook = 0;
 		g_Config.m_KgAutoMargin = 1;
 		break;
+	case INPUT_MODE_DELTA:
+		// 0.01 tick units -> ms (1 tick = 20 ms). 0 turns fast input off.
+		g_Config.m_TcFastInput = g_Config.m_KgDeltaAmount > 0;
+		g_Config.m_TcFastInputAmount = std::clamp(round_to_int(g_Config.m_KgDeltaAmount * 0.2f), 1, 100);
+		g_Config.m_TcFastInputOthers = g_Config.m_KgDeltaOthers;
+		g_Config.m_TcFastInputRepredictHook = 0;
+		break;
+	case INPUT_MODE_PING_COMP:
+	{
+		// show our tee a share of the round trip ahead; only move in 2 ms steps so it does not flicker with jitter
+		const SKingNetStats Stats = Client()->KingNetStats();
+		if(Stats.m_Valid)
+		{
+			const int Wanted = std::clamp(round_to_int(Stats.m_RttMs * g_Config.m_KgPingComp / 100.0f), 1, 100);
+			if(absolute(Wanted - m_PingCompAmount) >= 2)
+				m_PingCompAmount = Wanted;
+		}
+		g_Config.m_TcFastInput = 1;
+		g_Config.m_TcFastInputAmount = m_PingCompAmount;
+		g_Config.m_TcFastInputOthers = 0;
+		g_Config.m_TcFastInputRepredictHook = 0;
+		g_Config.m_KgAutoMargin = 1;
+		break;
+	}
 	default:
 		break;
 	}
@@ -474,14 +502,29 @@ void CKing::RenderNetHud()
 
 	if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_CLASSIC)
 		str_format(aLine3, sizeof(aLine3), "%s input   %d tick%s (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgClassicTicks, g_Config.m_KgClassicTicks == 1 ? "" : "s", g_Config.m_TcFastInputAmount);
+	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_DELTA)
+		str_format(aLine3, sizeof(aLine3), "%s input   %d.%02d ticks (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100, g_Config.m_TcFastInputAmount);
+	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_SMOOTH)
+		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms, smooth %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount, g_Config.m_KgSmoothMs);
 	else if(g_Config.m_TcFastInput)
 		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount);
 	else
 		str_format(aLine3, sizeof(aLine3), "%s input   fast off", InputModeName(g_Config.m_KgInputMode));
 
-	const float TextW = std::max({TextRender()->TextWidth(FontSize, aLine1), TextRender()->TextWidth(FontSize, aLine2), TextRender()->TextWidth(FontSize, aLine3), TextRender()->TextWidth(FontSize, "KING")});
+	char aLine4[96] = "";
+	{
+		const CControls &Controls = GameClient()->m_Controls;
+		if(g_Config.m_KgSnapTap)
+			str_append(aLine4, "SnapTap  ");
+		if(Controls.King45Active())
+			str_append(aLine4, "45deg  ");
+		if(Controls.KingSmallSensActive())
+			str_append(aLine4, "SmallSens");
+	}
+	const bool HasLine4 = aLine4[0] != '\0';
+	const float TextW = std::max({TextRender()->TextWidth(FontSize, aLine4), TextRender()->TextWidth(FontSize, aLine1), TextRender()->TextWidth(FontSize, aLine2), TextRender()->TextWidth(FontSize, aLine3), TextRender()->TextWidth(FontSize, "KING")});
 	const float BoxW = TextW + Pad * 2.0f;
-	const float BoxH = LineHeight * 4.0f + Pad * 2.0f - 1.5f;
+	const float BoxH = LineHeight * (HasLine4 ? 5.0f : 4.0f) + Pad * 2.0f - 1.5f;
 
 	float y = 5.0f;
 	if(g_Config.m_ClShowfps)
@@ -508,6 +551,12 @@ void CKing::RenderNetHud()
 
 	TextRender()->TextColor(0.75f, 0.75f, 0.75f, 1.0f);
 	TextRender()->Text(x + Pad, Ty, FontSize, aLine3);
+	if(HasLine4)
+	{
+		Ty += LineHeight;
+		TextRender()->TextColor(0.55f, 0.85f, 1.0f, 1.0f);
+		TextRender()->Text(x + Pad, Ty, FontSize, aLine4);
+	}
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
