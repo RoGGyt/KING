@@ -35,6 +35,7 @@ const char *CKing::InputModeName(int Mode)
 	case INPUT_MODE_DELTA: return "Delta";
 	case INPUT_MODE_PING_COMP: return "Ping Comp";
 	case INPUT_MODE_SMOOTH: return "Smooth";
+	case INPUT_MODE_BEST: return "Best";
 	}
 	return "?";
 }
@@ -430,6 +431,50 @@ void CKing::ApplyKogPreset()
 	g_Config.m_KgNetHud = 1;
 }
 
+static void KingSetFastInput(int AmountMs, bool Others)
+{
+	g_Config.m_TcFastInput = AmountMs > 0;
+	g_Config.m_TcFastInputAmount = std::clamp(AmountMs, 1, 100);
+	g_Config.m_TcFastInputOthers = Others;
+	g_Config.m_TcFastInputRepredictHook = 0;
+}
+
+void CKing::UpdateBestInput()
+{
+	const SKingNetStats Stats = Client()->KingNetStats();
+	int OffsetHundredths, LatencyComp, SmoothMs, Curve;
+	if(g_Config.m_KgBestPreset)
+	{
+		// auto: stable connection -> full tick and a short blend,
+		// shaky connection -> a bit less offset and a longer blend
+		const float Jitter = Stats.m_Valid ? Stats.m_JitterMs : 0.0f;
+		OffsetHundredths = Jitter < 3.0f ? 100 : (Jitter < 8.0f ? 80 : 60);
+		LatencyComp = 0;
+		SmoothMs = Jitter < 3.0f ? 50 : (Jitter < 8.0f ? 80 : 110);
+		Curve = SMOOTH_CURVE_SMOOTH;
+	}
+	else
+	{
+		OffsetHundredths = g_Config.m_KgBestOffset;
+		LatencyComp = g_Config.m_KgBestLatencyComp;
+		SmoothMs = round_to_int(g_Config.m_KgBestSmoothing * 1.5f);
+		Curve = std::clamp(g_Config.m_KgBestInterpolation, 0, 2);
+	}
+
+	const float Rtt = Stats.m_Valid ? Stats.m_RttMs : 0.0f;
+	const int Wanted = std::clamp(round_to_int(OffsetHundredths * 0.2f + Rtt * LatencyComp / 100.0f), 0, 100);
+
+	// every change of the offset moves your tee on screen, so only change it now and then
+	const int64_t Now = time_get();
+	if(m_BestFastMs < 0 || (absolute(Wanted - m_BestFastMs) >= 3 && Now - m_BestChanged > 5 * time_freq()) || (!g_Config.m_KgBestPreset && Wanted != m_BestFastMs && LatencyComp == 0))
+	{
+		m_BestFastMs = Wanted;
+		m_BestChanged = Now;
+	}
+	m_BestSmoothMs = SmoothMs;
+	m_BestCurve = Curve;
+}
+
 void CKing::ApplyInputMode()
 {
 	switch(g_Config.m_KgInputMode)
@@ -438,33 +483,23 @@ void CKing::ApplyInputMode()
 		// TClient fast input as it worked before the Feb 2026 "adjustable fast input"
 		// rewrite: old tc_fast_input 1-5 = whole ticks ahead. A multiple of 20 ms
 		// makes the new code take the exact same whole-tick path (no sub-tick part).
-		g_Config.m_TcFastInput = 1;
-		g_Config.m_TcFastInputAmount = std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20;
-		g_Config.m_TcFastInputOthers = 0;
-		g_Config.m_TcFastInputRepredictHook = 0;
+		// Prediction margin stays manual (cl_prediction_margin), exactly like TClient.
+		KingSetFastInput(std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20, false);
 		break;
 	case INPUT_MODE_KING:
 	case INPUT_MODE_SMOOTH: // smoothing itself is applied when rendering our tee (gameclient.cpp)
-		g_Config.m_TcFastInput = 1;
-		g_Config.m_TcFastInputAmount = g_Config.m_KgFastInputAmount;
-		g_Config.m_TcFastInputOthers = 0;
-		g_Config.m_TcFastInputRepredictHook = 0;
-		g_Config.m_KgAutoMargin = 1;
+		KingSetFastInput(g_Config.m_KgFastInputAmount, false);
 		break;
 	case INPUT_MODE_DELTA:
 		// 0.01 tick units -> ms (1 tick = 20 ms). 0 turns fast input off.
-		g_Config.m_TcFastInput = g_Config.m_KgDeltaAmount > 0;
-		g_Config.m_TcFastInputAmount = std::clamp(round_to_int(g_Config.m_KgDeltaAmount * 0.2f), 1, 100);
-		g_Config.m_TcFastInputOthers = g_Config.m_KgDeltaOthers;
-		g_Config.m_TcFastInputRepredictHook = 0;
+		KingSetFastInput(round_to_int(g_Config.m_KgDeltaAmount * 0.2f), g_Config.m_KgDeltaOthers);
 		break;
 	case INPUT_MODE_PING_COMP:
 	{
-		// show our tee a share of the round trip ahead; only move in 2 ms steps so it does not flicker with jitter
+		// show our tee a share of the round trip ahead; change rarely, every change moves the tee
 		const SKingNetStats Stats = Client()->KingNetStats();
 		if(Stats.m_Valid)
 		{
-			// change rarely: every change shifts your tee on screen
 			const int Wanted = std::clamp(round_to_int(Stats.m_RttMs * g_Config.m_KgPingComp / 100.0f), 1, 100);
 			const int64_t Now = time_get();
 			if(absolute(Wanted - m_PingCompAmount) >= 4 && Now - m_PingCompChanged > 10 * time_freq())
@@ -473,15 +508,40 @@ void CKing::ApplyInputMode()
 				m_PingCompChanged = Now;
 			}
 		}
-		g_Config.m_TcFastInput = 1;
-		g_Config.m_TcFastInputAmount = m_PingCompAmount;
-		g_Config.m_TcFastInputOthers = 0;
-		g_Config.m_TcFastInputRepredictHook = 0;
-		g_Config.m_KgAutoMargin = 1;
+		KingSetFastInput(m_PingCompAmount, false);
 		break;
 	}
+	case INPUT_MODE_BEST:
+		UpdateBestInput();
+		KingSetFastInput(m_BestFastMs, false);
+		break;
 	default:
 		break;
+	}
+}
+
+float CKing::SmoothDurationMs() const
+{
+	if(g_Config.m_KgInputMode == INPUT_MODE_SMOOTH)
+		return (float)g_Config.m_KgSmoothMs;
+	if(g_Config.m_KgInputMode == INPUT_MODE_BEST)
+		return (float)m_BestSmoothMs;
+	return 0.0f;
+}
+
+int CKing::SmoothCurve() const
+{
+	return g_Config.m_KgInputMode == INPUT_MODE_BEST ? m_BestCurve : (int)SMOOTH_CURVE_SMOOTH;
+}
+
+float CKing::SmoothEase(float T, int Curve)
+{
+	T = std::clamp(T, 0.0f, 1.0f);
+	switch(Curve)
+	{
+	case SMOOTH_CURVE_LINEAR: return T;
+	case SMOOTH_CURVE_CUBIC: return 1.0f - (1.0f - T) * (1.0f - T) * (1.0f - T); // fast start, soft landing
+	default: return T * T * (3.0f - 2.0f * T); // smoothstep
 	}
 }
 
@@ -555,6 +615,8 @@ void CKing::RenderNetHud()
 		str_format(aLine3, sizeof(aLine3), "%s input   %d tick%s (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgClassicTicks, g_Config.m_KgClassicTicks == 1 ? "" : "s", g_Config.m_TcFastInputAmount);
 	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_DELTA)
 		str_format(aLine3, sizeof(aLine3), "%s input   %d.%02d ticks (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100, g_Config.m_TcFastInputAmount);
+	else if(g_Config.m_KgInputMode == INPUT_MODE_BEST)
+		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms, smooth %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? g_Config.m_TcFastInputAmount : 0, m_BestSmoothMs);
 	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_SMOOTH)
 		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms, smooth %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount, g_Config.m_KgSmoothMs);
 	else if(g_Config.m_TcFastInput)

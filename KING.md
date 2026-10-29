@@ -8,10 +8,11 @@ KING is a DDNet client for KoG (King of Gores), based on [TClient](https://githu
 
 * **Input modes** (`kg_input_mode`):
   * `0` Custom: the TClient input settings are used as they are.
-  * `1` Classic TClient: the old TClient fast input from before the Feb 2026 rewrite. `kg_classic_ticks` (1–5) works like the old `tc_fast_input`: your tee is shown that many whole ticks (20 ms each) ahead with your newest input.
+  * `1` Classic (manual margin, exactly like TClient): the old TClient fast input from before the Feb 2026 rewrite. `kg_classic_ticks` (1–5) works like the old `tc_fast_input`: your tee is shown that many whole ticks (20 ms each) ahead with your newest input.
   * `2` KING (default): classic input plus auto prediction margin. Fast input amount: `kg_fast_input_amount` (20 by default).
   * `3` Delta: a fixed offset in hundredths of a tick (`kg_delta_amount` 0–500, where 100 = 1 tick). It can sit between whole ticks; `kg_delta_others` shifts other tees too.
   * `4` Ping Comp: fast input is `kg_ping_comp`% of your measured ping, capped at 100 ms. It moves in 2 ms steps and uses auto margin.
+  * `6` Best: offset (`kg_best_offset`, 0.01 ticks), latency comp (`kg_best_latency_comp`, % of ping), correction smoothing (`kg_best_smoothing`) and blend curve (`kg_best_interpolation`: linear/cubic/smooth). With `kg_best_preset 1` (auto) these values are picked from your measured jitter.
   * `5` Smooth: KING mode, but when the server corrects your own tee, the correction fades out over `kg_smooth_ms` instead of snapping. This is visual only: inputs and physics are not delayed. Teleports (more than 2 tiles) still snap.
 * **Input helpers**:
   * Snap Tap (`kg_snap_tap`, `kg_snap_tap_delay`): when left and right are both held, the key pressed last wins instead of standing still.

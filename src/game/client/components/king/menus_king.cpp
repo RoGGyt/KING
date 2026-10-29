@@ -62,16 +62,16 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	{
 		int Mode = g_Config.m_KgInputMode;
 		static std::vector<CButtonContainer> s_vModeButtonsA = {{}, {}, {}};
-		static std::vector<CButtonContainer> s_vModeButtonsB = {{}, {}, {}};
+		static std::vector<CButtonContainer> s_vModeButtonsB = {{}, {}, {}, {}};
 		bool Changed = DoLine_RadioMenu(LeftView, "Mode",
 			s_vModeButtonsA,
-			{CKing::InputModeName(CKing::INPUT_MODE_CUSTOM), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC), CKing::InputModeName(CKing::INPUT_MODE_KING)},
-			{CKing::INPUT_MODE_CUSTOM, CKing::INPUT_MODE_CLASSIC, CKing::INPUT_MODE_KING},
+			{CKing::InputModeName(CKing::INPUT_MODE_BEST), CKing::InputModeName(CKing::INPUT_MODE_KING), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC)},
+			{CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_KING, CKing::INPUT_MODE_CLASSIC},
 			Mode);
 		Changed |= DoLine_RadioMenu(LeftView, "",
 			s_vModeButtonsB,
-			{CKing::InputModeName(CKing::INPUT_MODE_DELTA), CKing::InputModeName(CKing::INPUT_MODE_PING_COMP), CKing::InputModeName(CKing::INPUT_MODE_SMOOTH)},
-			{CKing::INPUT_MODE_DELTA, CKing::INPUT_MODE_PING_COMP, CKing::INPUT_MODE_SMOOTH},
+			{CKing::InputModeName(CKing::INPUT_MODE_DELTA), CKing::InputModeName(CKing::INPUT_MODE_PING_COMP), CKing::InputModeName(CKing::INPUT_MODE_SMOOTH), CKing::InputModeName(CKing::INPUT_MODE_CUSTOM)},
+			{CKing::INPUT_MODE_DELTA, CKing::INPUT_MODE_PING_COMP, CKing::INPUT_MODE_SMOOTH, CKing::INPUT_MODE_CUSTOM},
 			Mode);
 		if(Changed)
 			g_Config.m_KgInputMode = Mode;
@@ -80,6 +80,38 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	switch(g_Config.m_KgInputMode)
 	{
+	case CKing::INPUT_MODE_BEST:
+	{
+		TextLine(Ui(), LeftView, "Offset + latency comp + correction smoothing +");
+		TextLine(Ui(), LeftView, "blend curve. Auto picks them from your connection.");
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		static std::vector<CButtonContainer> s_vPreset = {{}, {}};
+		int Preset = g_Config.m_KgBestPreset;
+		if(DoLine_RadioMenu(LeftView, "Preset", s_vPreset, {"Auto", "Custom"}, {1, 0}, Preset))
+			g_Config.m_KgBestPreset = Preset;
+		if(g_Config.m_KgBestPreset)
+		{
+			char aNow[96];
+			str_format(aNow, sizeof(aNow), "Now: %d ms ahead, %d ms smoothing", std::max(GameClient()->m_King.BestFastMs(), 0), GameClient()->m_King.BestSmoothMs());
+			TextLine(Ui(), LeftView, aNow, 11.0f);
+		}
+		else
+		{
+			char aLabel[64];
+			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+			str_format(aLabel, sizeof(aLabel), "Offset %d.%02d ticks", g_Config.m_KgBestOffset / 100, g_Config.m_KgBestOffset % 100);
+			Ui()->DoScrollbarOption(&g_Config.m_KgBestOffset, &g_Config.m_KgBestOffset, &Button, aLabel, 0, 300, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
+			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+			Ui()->DoScrollbarOption(&g_Config.m_KgBestLatencyComp, &g_Config.m_KgBestLatencyComp, &Button, "Latency comp", 0, 50, &CUi::ms_LinearScrollbarScale, 0u, "% of ping");
+			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+			Ui()->DoScrollbarOption(&g_Config.m_KgBestSmoothing, &g_Config.m_KgBestSmoothing, &Button, "Smoothing", 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+			static std::vector<CButtonContainer> s_vCurve = {{}, {}, {}};
+			int Curve = g_Config.m_KgBestInterpolation;
+			if(DoLine_RadioMenu(LeftView, "Curve", s_vCurve, {"Linear", "Cubic", "Smooth"}, {0, 1, 2}, Curve))
+				g_Config.m_KgBestInterpolation = Curve;
+		}
+		break;
+	}
 	case CKing::INPUT_MODE_CLASSIC:
 		TextLine(Ui(), LeftView, "Classic fast input in whole ticks (1-5): your tee");
 		TextLine(Ui(), LeftView, "is shown whole ticks ahead with your newest input.");
@@ -162,7 +194,10 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	Headline(Ui(), LeftView, "Prediction Margin");
 
 	const bool ForcedAuto = CKing::ModeUsesAutoMargin(g_Config.m_KgInputMode);
-	if(ForcedAuto)
+	const bool ForcedManual = g_Config.m_KgInputMode == CKing::INPUT_MODE_CLASSIC;
+	if(ForcedManual)
+		TextLine(Ui(), LeftView, "Manual margin (Classic works exactly like TClient)");
+	else if(ForcedAuto)
 	{
 		char aForced[64];
 		str_format(aForced, sizeof(aForced), "Auto margin: on (%s mode)", CKing::InputModeName(g_Config.m_KgInputMode));
@@ -171,7 +206,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	else
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAutoMargin, "Auto margin (adapts to jitter)", &g_Config.m_KgAutoMargin, &LeftView, KING_LINE);
 
-	if(ForcedAuto || g_Config.m_KgAutoMargin)
+	if(!ForcedManual && (ForcedAuto || g_Config.m_KgAutoMargin))
 	{
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMin, &g_Config.m_KgAutoMarginMin, &Button, "Min", 1, 30, &CUi::ms_LinearScrollbarScale, 0u, " ms");

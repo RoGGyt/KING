@@ -233,7 +233,9 @@ public:
 	CTClient m_TClient;
 	CTrails m_Trails;
 	CKing m_King; // KING
-	vec2 m_KingSmoothOffset = vec2(0.0f, 0.0f); // KING Smooth input mode
+	vec2 m_KingSmoothOffset = vec2(0.0f, 0.0f); // KING Smooth/Best: current render offset of our tee
+	vec2 m_KingSmoothStart = vec2(0.0f, 0.0f); // offset when the current blend started
+	float m_KingSmoothElapsedMs = 0.0f;
 	int m_KingPrevFinalRegular = -1;
 	CTranslate m_Translate;
 	CPet m_Pet;

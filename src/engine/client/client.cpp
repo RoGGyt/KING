@@ -5540,12 +5540,28 @@ int CClient::MaxLatencyTicks() const
 	return GameTickSpeed() + (PredictionMargin() * GameTickSpeed()) / 1000;
 }
 
+// KING input modes (kg_input_mode): KING=2, Ping Comp=4, Smooth=5 and Best=6 always use
+// the auto margin; Classic=1 never does (works exactly like TClient); Custom=0 and
+// Delta=3 follow the kg_auto_margin checkbox.
+static bool KingAutoMarginActive()
+{
+	switch(g_Config.m_KgInputMode)
+	{
+	case 1: return false;
+	case 2:
+	case 4:
+	case 5:
+	case 6: return true;
+	default: return g_Config.m_KgAutoMargin != 0;
+	}
+}
+
 int CClient::PredictionMargin() const
 {
 	if(!m_ServerCapabilities.m_SyncWeaponInput)
 		return 10;
 	// KING: adaptive margin (forced on in KING input mode)
-	if((g_Config.m_KgAutoMargin || g_Config.m_KgInputMode == 2) && m_KingNet.Valid())
+	if(KingAutoMarginActive() && m_KingNet.Valid())
 		return m_KingNet.Margin(g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax);
 	return g_Config.m_ClPredictionMargin;
 }
@@ -5560,7 +5576,7 @@ SKingNetStats CClient::KingNetStats() const
 	Stats.m_TimeLeftMs = m_KingNet.TimeLeftMs();
 	Stats.m_MarginMs = PredictionMargin();
 	Stats.m_MarginLocked = !m_ServerCapabilities.m_SyncWeaponInput;
-	Stats.m_MarginAuto = !Stats.m_MarginLocked && (g_Config.m_KgAutoMargin || g_Config.m_KgInputMode == 2) && Stats.m_Valid;
+	Stats.m_MarginAuto = !Stats.m_MarginLocked && KingAutoMarginActive() && Stats.m_Valid;
 	Stats.m_LateInputs = m_KingNet.LateTotal();
 	Stats.m_RecentLate = m_KingNet.RecentLate(time_get());
 	return Stats;

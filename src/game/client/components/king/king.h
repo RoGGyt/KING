@@ -22,7 +22,15 @@ public:
 		INPUT_MODE_DELTA, // fixed sub-tick offset in 0.01 ticks
 		INPUT_MODE_PING_COMP, // offset follows a share of the measured ping
 		INPUT_MODE_SMOOTH, // KING + blend out server corrections of the own tee
+		INPUT_MODE_BEST, // offset + latency comp + smoothing + interpolation, auto or custom
 		NUM_INPUT_MODES,
+	};
+
+	enum ESmoothCurve
+	{
+		SMOOTH_CURVE_LINEAR = 0,
+		SMOOTH_CURVE_CUBIC,
+		SMOOTH_CURVE_SMOOTH,
 	};
 
 	enum EUpdateState
@@ -46,7 +54,13 @@ public:
 
 	static const char *InputModeName(int Mode);
 	static float AspectRatioValue(int Setting); // 0 = native
-	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH; }
+	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH || Mode == INPUT_MODE_BEST; }
+	// correction smoothing of our own tee (Smooth and Best modes); 0 = off
+	float SmoothDurationMs() const;
+	int SmoothCurve() const;
+	static float SmoothEase(float T, int Curve);
+	int BestFastMs() const { return m_BestFastMs; }
+	int BestSmoothMs() const { return m_BestSmoothMs; }
 	int PingCompAmount() const { return m_PingCompAmount; }
 
 	// Updates (GitHub releases of KING_UPDATE_REPO)
@@ -70,6 +84,7 @@ public:
 
 private:
 	void ApplyInputMode();
+	void UpdateBestInput();
 	void RenderNetHud();
 	void RenderMusicHud();
 	void FinishUpdateCheck();
@@ -79,6 +94,10 @@ private:
 
 	int m_PingCompAmount = 20;
 	int64_t m_PingCompChanged = 0;
+	int m_BestFastMs = -1;
+	int64_t m_BestChanged = 0;
+	int m_BestSmoothMs = 50;
+	int m_BestCurve = SMOOTH_CURVE_SMOOTH;
 	std::shared_ptr<IHttpRequest> m_pUpdateTask = nullptr;
 	EUpdateState m_UpdateState = UPDATE_IDLE;
 	char m_aLatestVersion[32] = "";
