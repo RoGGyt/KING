@@ -2493,7 +2493,7 @@ void CMenus::UpdateColors()
 
 void CMenus::RenderKingBackground()
 {
-	// quiet near-black background with a very soft warm light behind the wordmark
+	// quiet near-black background with a very soft warm light
 	const float ScreenHeight = 300.0f;
 	const float ScreenWidth = ScreenHeight * Graphics()->ScreenAspect();
 	Graphics()->MapScreenToSize(ScreenWidth, ScreenHeight);
@@ -2508,10 +2508,11 @@ void CMenus::RenderKingBackground()
 	Graphics()->QuadsEnd();
 
 	Graphics()->QuadsBegin();
+	// behind the player tee on the start screen
 	for(int Ring = 10; Ring >= 1; Ring--)
 	{
-		Graphics()->SetColor(1.0f, 0.75f, 0.35f, 0.006f);
-		Graphics()->DrawCircle(ScreenWidth / 2.0f, 62.0f, Ring * 16.0f, 64);
+		Graphics()->SetColor(1.0f, 0.75f, 0.35f, 0.007f);
+		Graphics()->DrawCircle(ScreenWidth * 0.7f, ScreenHeight * 0.53f, Ring * 14.0f, 64);
 	}
 	Graphics()->QuadsEnd();
 

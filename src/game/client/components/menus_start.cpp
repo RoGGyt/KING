@@ -12,7 +12,9 @@
 
 #include <generated/client_data.h>
 
+#include <game/client/animstate.h>
 #include <game/client/gameclient.h>
+#include <game/client/render.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
 #include <game/version.h>
@@ -24,6 +26,12 @@
 void CMenusStart::RenderStartMenu(CUIRect MainView)
 {
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_START);
+
+	if(g_Config.m_KgMenuStyle)
+	{
+		RenderKingStartMenu(MainView);
+		return;
+	}
 
 	// render logo
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
@@ -355,4 +363,244 @@ bool CMenusStart::DoKingButton(CButtonContainer *pButtonContainer, const char *p
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	return Ui()->DoButtonLogic(pButtonContainer, 0, pRect, BUTTONFLAG_LEFT);
+}
+
+// ***** KING start menu: text menu on the left, your tee on the right ***** //
+
+static const ColorRGBA gs_KingAccent(0.91f, 0.70f, 0.29f, 1.0f);
+
+bool CMenusStart::DoKingMenuItem(CButtonContainer *pButtonContainer, const char *pText, float X, float Y, float FontSize, int Style)
+{
+	const float TextW = TextRender()->TextWidth(FontSize, pText);
+	CUIRect Rect;
+	Rect.x = X - 14.0f;
+	Rect.y = Y - FontSize * 0.75f;
+	Rect.w = TextW + 28.0f;
+	Rect.h = FontSize * 1.5f;
+
+	const bool Hot = Ui()->HotItem() == pButtonContainer;
+	ColorRGBA TextColor;
+	switch(Style)
+	{
+	case KING_BUTTON_PRIMARY: TextColor = Hot ? ColorRGBA(1.0f, 0.82f, 0.45f, 1.0f) : gs_KingAccent; break;
+	case KING_BUTTON_DANGER: TextColor = Hot ? ColorRGBA(1.0f, 0.55f, 0.5f, 1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.45f); break;
+	case KING_BUTTON_ACTIVE: TextColor = Hot ? ColorRGBA(0.6f, 1.0f, 0.65f, 1.0f) : ColorRGBA(0.45f, 0.9f, 0.5f, 0.9f); break;
+	default: TextColor = Hot ? ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.65f); break;
+	}
+
+	if(Hot && Style != KING_BUTTON_PRIMARY)
+	{
+		CUIRect Bar;
+		Bar.x = X - 10.0f;
+		Bar.y = Y - FontSize * 0.42f;
+		Bar.w = 2.0f;
+		Bar.h = FontSize * 0.84f;
+		Bar.Draw(Style == KING_BUTTON_DANGER ? ColorRGBA(0.95f, 0.4f, 0.35f, 1.0f) : gs_KingAccent, IGraphics::CORNER_ALL, 1.0f);
+	}
+
+	CUIRect Label;
+	Label.x = X;
+	Label.y = Rect.y;
+	Label.w = TextW + 2.0f;
+	Label.h = Rect.h;
+	TextRender()->TextColor(TextColor);
+	Ui()->DoLabel(&Label, pText, FontSize, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	return Ui()->DoButtonLogic(pButtonContainer, 0, &Rect, BUTTONFLAG_LEFT);
+}
+
+void CMenusStart::RenderKingPlayer(CUIRect Area)
+{
+	const float Size = std::min(Area.h * 0.42f, Area.w * 0.45f);
+	const vec2 Center(Area.x + Area.w / 2.0f, Area.y + Area.h * 0.55f);
+
+	CTeeRenderInfo TeeInfo;
+	const CSkin *pSkin = GameClient()->m_Skins.Find(g_Config.m_ClPlayerSkin);
+	TeeInfo.m_OriginalRenderSkin = pSkin->m_OriginalSkin;
+	TeeInfo.m_ColorableRenderSkin = pSkin->m_ColorableSkin;
+	TeeInfo.m_SkinMetrics = pSkin->m_Metrics;
+	TeeInfo.m_CustomColoredSkin = g_Config.m_ClPlayerUseCustomColor;
+	if(TeeInfo.m_CustomColoredSkin)
+	{
+		TeeInfo.m_ColorBody = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClPlayerColorBody).UnclampLighting(ColorHSLA::DARKEST_LGT));
+		TeeInfo.m_ColorFeet = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClPlayerColorFeet).UnclampLighting(ColorHSLA::DARKEST_LGT));
+	}
+	else
+	{
+		TeeInfo.m_ColorBody = ColorRGBA(1.0f, 1.0f, 1.0f);
+		TeeInfo.m_ColorFeet = ColorRGBA(1.0f, 1.0f, 1.0f);
+	}
+	TeeInfo.m_Size = Size;
+
+	// soft shadow on the "floor"
+	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
+	for(int i = 6; i >= 1; i--)
+	{
+		Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.05f);
+		const float R = Size * 0.09f * i;
+		IGraphics::CQuadItem Shadow(Center.x - R, Center.y + Size * 0.42f - R * 0.12f, R * 2.0f, R * 0.24f);
+		Graphics()->QuadsDrawTL(&Shadow, 1);
+	}
+	Graphics()->QuadsEnd();
+
+	// tee looks at the mouse
+	const CAnimState *pIdle = CAnimState::GetIdle();
+	vec2 OffsetToMid;
+	CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdle, &TeeInfo, OffsetToMid);
+	const vec2 TeePos(Center.x, Center.y + OffsetToMid.y);
+	vec2 Dir = Ui()->MousePos() - TeePos;
+	const float Len = length(Dir);
+	Dir = Len > 0.001f ? Dir / Len : vec2(1.0f, 0.0f);
+	RenderTools()->RenderTee(pIdle, &TeeInfo, EMOTE_NORMAL, Dir, TeePos);
+
+	// name above the tee
+	CUIRect NameRect;
+	NameRect.x = Area.x;
+	NameRect.w = Area.w;
+	NameRect.h = 30.0f;
+	NameRect.y = Center.y - Size * 0.56f - NameRect.h;
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
+	Ui()->DoLabel(&NameRect, Client()->PlayerName(), 22.0f, TEXTALIGN_MC);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	// clicking the tee opens the tee settings
+	static CButtonContainer s_TeeButton;
+	CUIRect TeeRect;
+	TeeRect.x = Center.x - Size * 0.5f;
+	TeeRect.y = Center.y - Size * 0.5f;
+	TeeRect.w = Size;
+	TeeRect.h = Size;
+	if(Ui()->DoButtonLogic(&s_TeeButton, 0, &TeeRect, BUTTONFLAG_LEFT))
+	{
+		g_Config.m_UiSettingsPage = CMenus::SETTINGS_TEE;
+		GameClient()->m_Menus.SetShowStart(false);
+		GameClient()->m_Menus.SetMenuPage(CMenus::PAGE_SETTINGS);
+	}
+	if(Ui()->HotItem() == &s_TeeButton)
+		GameClient()->m_Tooltips.DoToolTip(&s_TeeButton, &TeeRect, "Change skin");
+}
+
+void CMenusStart::RenderKingStartMenu(CUIRect MainView)
+{
+	int NewPage = -1;
+	const float Left = MainView.x + MainView.w * 0.1f;
+
+	// wordmark (694x282), left aligned
+	const float LogoH = 52.0f;
+	const float LogoW = LogoH * (694.0f / 282.0f);
+	const float LogoY = MainView.y + MainView.h * 0.17f;
+	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1, 1, 1, 1);
+	IGraphics::CQuadItem LogoItem(Left, LogoY, LogoW, LogoH);
+	Graphics()->QuadsDrawTL(&LogoItem, 1);
+	Graphics()->QuadsEnd();
+
+	// menu
+	const float Row = 36.0f;
+	float Y = LogoY + LogoH + 58.0f;
+
+	static CButtonContainer s_PlayButton, s_DemoButton, s_EditorButton, s_ServerButton, s_SettingsButton, s_QuitButton;
+	if(DoKingMenuItem(&s_PlayButton, Localize("Play", "Start menu"), Left, Y, 24.0f, KING_BUTTON_PRIMARY) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) || CheckHotKey(KEY_P))
+		NewPage = g_Config.m_UiPage >= CMenus::PAGE_INTERNET && g_Config.m_UiPage <= CMenus::PAGE_FAVORITE_COMMUNITY_5 ? g_Config.m_UiPage : CMenus::PAGE_INTERNET;
+	Y += Row + 4.0f;
+
+	if(DoKingMenuItem(&s_DemoButton, Localize("Demos"), Left, Y, 20.0f, KING_BUTTON_NORMAL) || CheckHotKey(KEY_D))
+		NewPage = CMenus::PAGE_DEMOS;
+	Y += Row;
+
+	if(DoKingMenuItem(&s_EditorButton, Localize("Editor"), Left, Y, 20.0f, GameClient()->Editor()->HasUnsavedData() ? KING_BUTTON_ACTIVE : KING_BUTTON_NORMAL) || CheckHotKey(KEY_E))
+	{
+		g_Config.m_ClEditor = 1;
+		Input()->MouseModeRelative();
+	}
+	Y += Row;
+
+	const bool LocalServerRunning = GameClient()->m_LocalServer.IsServerRunning();
+	if(DoKingMenuItem(&s_ServerButton, LocalServerRunning ? Localize("Stop server") : Localize("Run server"), Left, Y, 20.0f, LocalServerRunning ? KING_BUTTON_ACTIVE : KING_BUTTON_NORMAL) || (CheckHotKey(KEY_R) && Input()->KeyPress(KEY_R)))
+	{
+		if(LocalServerRunning)
+			GameClient()->m_LocalServer.KillServer();
+		else
+			GameClient()->m_LocalServer.RunServer({});
+	}
+	Y += Row;
+
+	if(DoKingMenuItem(&s_SettingsButton, Localize("Settings"), Left, Y, 20.0f, KING_BUTTON_NORMAL) || CheckHotKey(KEY_S))
+		NewPage = CMenus::PAGE_SETTINGS;
+	Y += Row * 2.0f;
+
+	bool UsedEscape = false;
+	if(DoKingMenuItem(&s_QuitButton, Localize("Quit"), Left, Y, 20.0f, KING_BUTTON_DANGER) || (UsedEscape = Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE)) || CheckHotKey(KEY_Q))
+	{
+		if(UsedEscape || GameClient()->Editor()->HasUnsavedData() || (GameClient()->CurrentRaceTime() / 60 >= g_Config.m_ClConfirmQuitTime && g_Config.m_ClConfirmQuitTime >= 0))
+			GameClient()->m_Menus.ShowQuitPopup();
+		else
+			Client()->Quit();
+	}
+
+	// your tee on the right
+	CUIRect PlayerArea;
+	PlayerArea.x = MainView.x + MainView.w * 0.5f;
+	PlayerArea.y = MainView.y + MainView.h * 0.12f;
+	PlayerArea.w = MainView.w * 0.4f;
+	PlayerArea.h = MainView.h * 0.76f;
+	RenderKingPlayer(PlayerArea);
+
+	// version (muted) and console button, top right / bottom right
+	CUIRect Version;
+	MainView.VSplitRight(30.0f, &Version, nullptr);
+	Version.HSplitTop(30.0f, &Version, nullptr);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.4f);
+	Ui()->DoLabel(&Version, KING_VERSION, 12.0f, TEXTALIGN_MR);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	CUIRect ConsoleButton;
+	MainView.HSplitBottom(40.0f, nullptr, &ConsoleButton);
+	ConsoleButton.HSplitTop(20.0f, &ConsoleButton, nullptr);
+	ConsoleButton.VSplitRight(30.0f, &ConsoleButton, nullptr);
+	ConsoleButton.VSplitRight(30.0f, nullptr, &ConsoleButton);
+	static CButtonContainer s_ConsoleButton;
+	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+	if(GameClient()->m_Menus.DoButton_Menu(&s_ConsoleButton, FontIcon::TERMINAL, 0, &ConsoleButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.1f)))
+		GameClient()->m_GameConsole.Toggle(CGameConsole::CONSOLETYPE_LOCAL);
+	TextRender()->SetRenderFlags(0);
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+
+	// update notice, bottom left under the menu
+	CKing &King = GameClient()->m_King;
+	if(King.UpdateAvailable() || King.Installing() || King.InstallError()[0])
+	{
+		CUIRect Notice, NoticeButton;
+		Notice.x = Left;
+		Notice.y = MainView.y + MainView.h - 50.0f;
+		Notice.w = MainView.w * 0.4f;
+		Notice.h = 20.0f;
+		Notice.VSplitLeft(80.0f, &NoticeButton, &Notice);
+		Notice.VSplitLeft(10.0f, nullptr, &Notice);
+		static CButtonContainer s_KingUpdateButton;
+		if(King.Installing())
+			Ui()->RenderProgressBar(NoticeButton, King.DownloadProgress());
+		else if(King.UpdateAvailable() && GameClient()->m_Menus.DoButton_Menu(&s_KingUpdateButton, King.CanInstallUpdate() ? "Update" : "Download", 0, &NoticeButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 4.0f, 0.0f, ColorRGBA(0.91f, 0.70f, 0.29f, 0.85f)))
+			King.InstallUpdate();
+		char aBuf[160];
+		if(King.Installing())
+			str_format(aBuf, sizeof(aBuf), "Downloading %s... %d%%", King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
+		else if(King.InstallError()[0])
+			str_copy(aBuf, King.InstallError());
+		else
+			str_format(aBuf, sizeof(aBuf), "KING %s is out", King.LatestVersion());
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.7f);
+		Ui()->DoLabel(&Notice, aBuf, 12.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+
+	if(NewPage != -1)
+	{
+		GameClient()->m_Menus.SetShowStart(false);
+		GameClient()->m_Menus.SetMenuPage(NewPage);
+	}
 }
