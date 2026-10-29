@@ -19,12 +19,20 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+// the build defines WIN32_LEAN_AND_MEAN, so COM basics have to be pulled in by hand
+#include <objbase.h>
+#include <propidl.h>
 
 #include <unknwn.h> // before C++/WinRT: lets winrt::implements take classic COM interfaces
+
+#include <mmsystem.h>
 
 #include <audioclient.h>
 #include <mmdeviceapi.h>
 #include <mmreg.h>
+#ifndef WAVE_FORMAT_PCM
+#define WAVE_FORMAT_PCM 1
+#endif
 #if __has_include(<audioclientactivationparams.h>)
 #include <audioclientactivationparams.h>
 #define KING_PROCESS_LOOPBACK 1
