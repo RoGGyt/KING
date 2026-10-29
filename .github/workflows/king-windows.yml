@@ -60,7 +60,32 @@ jobs:
         name: KING-win64
         path: release/artifacts/*.zip
 
-    - name: Publish release
+    - name: Read KING version
+      id: ver
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VER=$(sed -n 's/^#define KING_VERSION "\(.*\)"/\1/p' src/game/version.h)
+        echo "version=$VER" >> "$GITHUB_OUTPUT"
+        if gh release view "v$VER" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          echo "exists=1" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=0" >> "$GITHUB_OUTPUT"
+        fi
+
+    # A push to main with a new KING_VERSION creates release vX.Y.Z automatically.
+    # Clients on older versions then see the update notice.
+    - name: Publish release (new version on main)
+      if: github.ref == 'refs/heads/main' && steps.ver.outputs.exists == '0'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VER="${{ steps.ver.outputs.version }}"
+        gh release create "v$VER" release/artifacts/*.zip -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "KING $VER" --notes "KING $VER. Скачай KING-…-win64.zip, распакуй и запусти KING.exe."
+
+    - name: Publish release (tag push)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:

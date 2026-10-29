@@ -16,9 +16,9 @@ KING is a DDNet client for KoG (King of Gores), based on [TClient](https://githu
 
 ## Releasing an update
 
-1. Bump `KING_VERSION` in `src/game/version.h`, for example to `"1.0.1"`.
-2. Commit, then push a tag with the same version: `git tag v1.0.1 && git push --tags`.
-3. The workflow builds `KING-…-win64.zip` and attaches it to the GitHub release. Clients on an older version get the notice.
+1. Bump `KING_VERSION` in `src/game/version.h`, for example to `"1.0.2"`.
+2. Push to `main`. The workflow builds the client and, if release `v1.0.2` does not exist yet, creates it with the `-win64.zip` attached.
+3. Clients on older versions show "KING v1.0.2 is out!" in the main menu.
 
 ## Build
 
