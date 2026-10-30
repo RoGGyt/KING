@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KING Client</title>
+<meta name="description" content="KING — клиент DDNet для King of Gores: fast input, умный маржин, журнал лагов, корона KING.">
+<meta property="og:title" content="KING — DDNet клиент для KoG">
+<meta property="og:description" content="Fast input, умный маржин, журнал лагов и корона для игроков KING.">
+<meta name="theme-color" content="#0d0e11">
+<link rel="icon" type="image/png" href="crown.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a dark game-map page on a 32px tile grid; one gold accent; sections stack, cards only where a thing is an object */
+:root {
+  color-scheme: dark;
+  --bg: #0d0e11;
+  --bg-2: #15171c;
+  --tile: #1a1d23;
+  --line: #262a32;
+  --fg: #ecebe6;
+  --muted: #9a9ca3;
+  --gold: #e7ad3f;
+  --gold-hi: #f6cd6b;
+  --gold-ink: #2a1c04;
+  --good: #7ed37a;
+  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --body: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 16px/1.65 var(--body);
+  background-image: radial-gradient(1100px 620px at 78% -8%, rgba(231,173,63,.07), transparent 70%);
+  background-repeat: no-repeat;
+}
+section:nth-of-type(even) { background: #0a0b0d; border-block: 1px solid #16181d; }
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--gold-hi); }
+:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; border-radius: 6px; }
+
+/* nav */
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 18px/1 var(--display); letter-spacing: .04em; color: var(--fg); text-decoration: none; }
+.brand img { width: 30px; height: 30px; }
+.nav-links { display: flex; gap: 22px; flex-wrap: wrap; }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+.nav-links a:hover { color: var(--fg); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 40px; align-items: center; padding-block: 48px 72px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.hero h1 { font: 900 clamp(64px, 12vw, 132px)/.9 var(--display); letter-spacing: -.02em; margin: 18px 0 8px; text-wrap: balance; }
+.hero h1 .k { color: var(--gold); }
+.lede { font-size: 19px; color: var(--muted); max-width: 33ch; margin: 18px 0 30px; }
+.lede strong { color: var(--fg); font-weight: 700; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 10px; font: 700 15px/1 var(--body); text-decoration: none; transition: transform .15s ease, background .15s ease; }
+.btn-gold { background: var(--gold); color: var(--gold-ink); }
+.btn-gold:hover { background: var(--gold-hi); transform: translateY(-1px); }
+.btn-ghost { color: var(--fg); border: 1px solid var(--line); background: var(--bg-2); }
+.btn-ghost:hover { border-color: var(--muted); }
+.meta { margin-top: 14px; font: 400 13px/1.5 var(--mono); color: var(--muted); }
+
+/* the TAB + timer mock in the hero */
+.scene { position: relative; display: grid; gap: 16px; }
+.pill { justify-self: center; display: flex; align-items: center; gap: 12px; padding: 7px 12px 7px 7px; border-radius: 14px; background: rgba(0,0,0,.55); border: 1px solid var(--line); }
+.cover { width: 38px; height: 38px; border-radius: 9px; background: conic-gradient(from 210deg, #c25b8f, #e7ad3f, #3d6fd9, #c25b8f); }
+.time { font: 700 26px/1 var(--display); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.bars { display: flex; align-items: center; gap: 3px; height: 30px; }
+.bars i { display: block; width: 4px; border-radius: 3px; background: var(--gold); height: 30%; animation: bar 1.1s ease-in-out infinite; }
+.bars i:nth-child(2) { animation-delay: -.3s; } .bars i:nth-child(3) { animation-delay: -.7s; } .bars i:nth-child(4) { animation-delay: -.15s; } .bars i:nth-child(5) { animation-delay: -.55s; }
+@keyframes bar { 0%, 100% { height: 25%; } 50% { height: 95%; } }
+.tab { background: rgba(21,23,28,.92); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.tab-head { display: grid; grid-template-columns: 76px 1fr 60px; gap: 10px; padding: 0 10px 8px; font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.row { display: grid; grid-template-columns: 76px 22px 30px 1fr 44px; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; font-weight: 700; }
+.row + .row { margin-top: 4px; }
+.row.me { background: #2a2e36; }
+.row .t { font: 600 13px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.row .crown { width: 22px; height: 22px; }
+.row .tee { width: 26px; height: 26px; border-radius: 50%; background: var(--c); box-shadow: inset -4px -5px 0 rgba(0,0,0,.25); }
+.row .p { text-align: right; font: 600 13px/1 var(--mono); color: var(--good); }
+.row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* sections */
+section { padding-block: 64px; }
+.sec-head { max-width: 640px; margin-bottom: 34px; }
+h2 { font: 700 clamp(28px, 4.5vw, 44px)/1.05 var(--display); letter-spacing: -.01em; margin: 12px 0 14px; text-wrap: balance; }
+.sec-head p { color: var(--muted); margin: 0; }
+
+/* input lab */
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 18px; padding: 28px; }
+.modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.mode { font: 600 13px/1 var(--body); padding: 9px 13px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.mode[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.mode-desc { min-height: 5.2em; color: var(--fg); margin: 0 0 18px; }
+.slider-row { display: flex; align-items: center; gap: 14px; }
+.slider-row label { font: 600 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+input[type=range] { flex: 1; min-width: 0; accent-color: var(--gold); }
+.readout { font: 600 15px/1 var(--mono); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.timeline { position: relative; height: 150px; margin-top: 8px; }
+.timeline canvas { width: 100%; height: 100%; display: block; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; background: var(--dot); }
+
+/* features */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.feat { background: var(--bg); padding: 26px; min-width: 0; }
+.feat h3 { font: 700 17px/1.25 var(--display); margin: 0 0 10px; }
+.feat p { margin: 0; color: var(--muted); font-size: 15px; }
+.feat code, .steps code { font: 400 13px/1 var(--mono); color: var(--gold-hi); background: #1d2027; padding: 2px 6px; border-radius: 5px; }
+
+/* install */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
+.step { border-top: 2px solid var(--gold); padding-top: 18px; min-width: 0; }
+.step::before { counter-increment: step; content: "Шаг " counter(step); font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.step h3 { font: 700 18px/1.3 var(--display); margin: 12px 0 8px; }
+.step p { margin: 0; color: var(--muted); font-size: 15px; }
+
+footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var(--muted); font-size: 14px; background: var(--bg); }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+
+@media (max-width: 860px) {
+  .hero, .lab { grid-template-columns: minmax(0, 1fr); }
+  .grid, .steps { grid-template-columns: minmax(0, 1fr); }
+  .nav-links { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bars i { animation: none; height: 60%; }
+  .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+
+<header class="wrap nav">
+  <a class="brand" href="#top"><img src="crown.png" alt="">KING</a>
+  <nav class="nav-links" aria-label="Разделы">
+    <a href="#input">Инпут</a>
+    <a href="#features">Возможности</a>
+    <a href="#install">Установка</a>
+    <a href="https://github.com/RoGGyt/KING" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <div class="eyebrow">DDNet клиент · King of Gores</div>
+      <h1><span class="k">K</span>ING</h1>
+      <p class="lede">Клиент для KoG, где <strong>инпут настроен под реальный пинг</strong>, а не под идеальную сеть. Fast input, умный маржин и журнал лагов.</p>
+      <div class="cta">
+        <a class="btn btn-gold" href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать для Windows</a>
+        <a class="btn btn-ghost" href="#input">Как работает инпут</a>
+      </div>
+      <div class="meta">Версия 1.0.16 · Windows 64-bit · обновляется сам кнопкой Update</div>
+    </div>
+
+    <div class="scene" aria-label="Пример: таймер с музыкой и таблица игроков с коронами">
+      <div class="pill">
+        <div class="cover" aria-hidden="true"></div>
+        <div class="time">06:53</div>
+        <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="tab">
+        <div class="tab-head"><span>Time</span><span>Name</span><span style="text-align:right">Ping</span></div>
+        <div class="row me"><span class="t">06:53</span><img class="crown" src="crown.png" alt="KING"><span class="tee" style="--c:#d9558f"></span><span class="nm">RoGGyt</span><span class="p">53</span></div>
+        <div class="row"><span class="t">07:12</span><img class="crown" src="crown.png" alt="KING"><span class="tee" style="--c:#4c7be0"></span><span class="nm">nameless tee</span><span class="p">41</span></div>
+        <div class="row"><span class="t"></span><span></span><span class="tee" style="--c:#d6a85a"></span><span class="nm">brainless tee</span><span class="p">21</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="input">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">Инпут</div>
+        <h2>Сервер считает 50 тиков в секунду. KING показывает тебя чуть впереди.</h2>
+        <p>Один тик длится 20 мс. Fast input рисует твою тишку на столько миллисекунд вперёд с твоим последним нажатием, чтобы игра отзывалась сразу. Выбери режим и подвигай ползунок.</p>
+      </div>
+      <div class="lab">
+        <div>
+          <div class="modes" role="group" aria-label="Режим инпута">
+            <button class="mode" id="m-king" data-mode="king" aria-pressed="true">KING</button>
+            <button class="mode" id="m-best" data-mode="best" aria-pressed="false">Best</button>
+            <button class="mode" id="m-classic" data-mode="classic" aria-pressed="false">Classic</button>
+            <button class="mode" id="m-delta" data-mode="delta" aria-pressed="false">Delta</button>
+            <button class="mode" id="m-ping" data-mode="ping" aria-pressed="false">Ping Comp</button>
+            <button class="mode" id="m-smooth" data-mode="smooth" aria-pressed="false">Smooth</button>
+          </div>
+          <p class="mode-desc" id="mode-desc"></p>
+          <div class="slider-row">
+            <label for="fast">Fast input</label>
+            <input type="range" id="fast" min="0" max="100" step="1" value="20">
+            <span class="readout" id="readout">20 мс</span>
+          </div>
+        </div>
+        <div>
+          <div class="timeline"><canvas id="tl" aria-label="Тики сервера и позиция тишки"></canvas></div>
+          <div class="legend">
+            <span style="--dot:#6b7080">тики сервера (20 мс)</span>
+            <span style="--dot:#9a9ca3">где ты на сервере</span>
+            <span style="--dot:#e7ad3f">что ты видишь</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">Возможности</div>
+        <h2>Всё, что нужно на KoG, и ничего лишнего</h2>
+      </div>
+      <div class="grid">
+        <div class="feat"><h3>Умный маржин</h3><p>Никогда не ниже стандартных 10 мс. Растёт, только когда сеть правда скачет, и меняется плавно, без рывков тишки.</p></div>
+        <div class="feat"><h3>Журнал лагов</h3><p>Каждый тэп пишется с причиной: опоздавший инпут, фриз кадра, дыра в пакетах или игрок рядом. Файл <code>king_lag.log</code>.</p></div>
+        <div class="feat"><h3>Корона KING</h3><p>Золотая корона слева от ника и в TAB у всех, кто играет в KING. Без серверов и регистрации.</p></div>
+        <div class="feat"><h3>Музыка у таймера</h3><p>Обложка трека, таймер и визуализатор, который слушает музыку, а не звуки игры. Текст песни по желанию.</p></div>
+        <div class="feat"><h3>Меню игрока в TAB</h3><p>Invite в тиму, Whisper, Copy Skin, /Swap, часы и поинты игрока, Team и War списки в один клик.</p></div>
+        <div class="feat"><h3>Optimizer</h3><p>Без частиц, квадов и деталей карты, FPS fog и высокий приоритет процесса. Физика и инпут не меняются.</p></div>
+        <div class="feat"><h3>Растянутое разрешение</h3><p>4:3, 5:4, 16:10 или своё, например 1440:1080. Растягивается весь экран или только мир.</p></div>
+        <div class="feat"><h3>Размер интерфейса</h3><p>Меню, TAB и чат настраиваются отдельно, как GUI Scale в Майнкрафте.</p></div>
+        <div class="feat"><h3>Обновление в один клик</h3><p>Кнопка Update в меню скачивает новую версию и перезапускает клиент. Настройки остаются на месте.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">Установка</div>
+        <h2>Три шага до первой карты</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><h3>Скачай архив</h3><p>Возьми <code>KING-1.0.16-win64.zip</code> со страницы релизов на GitHub.</p></div>
+        <div class="step"><h3>Распакуй</h3><p>В любую папку. Скины, бинды и ник подхватятся из <code>%APPDATA%\DDNet</code>, как в DDNet.</p></div>
+        <div class="step"><h3>Запусти KING.exe</h3><p>Пресет для KoG включится сам. Режим инпута меняется в Настройки → KING.</p></div>
+      </div>
+      <div class="cta" style="margin-top:34px">
+        <a class="btn btn-gold" href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать KING</a>
+        <a class="btn btn-ghost" href="https://github.com/RoGGyt/KING" target="_blank" rel="noopener">Исходный код</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>KING by RoGGyt</span>
+    <span>Основан на открытых DDNet и TClient · лицензия zlib</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var modes = {
+    king: { ms: 20, text: "Один тик fast input, умный маржин и мягкое сглаживание мелких поправок от сервера за 40 мс. Режим по умолчанию." },
+    best: { ms: 20, text: "Ровно один тик вперёд. Длительность сглаживания подстраивается под джиттер твоей сети, вручную можно задать offset и кривую." },
+    classic: { ms: 20, text: "Как старый TClient: fast input в миллисекундах и ручной маржин. Ничего не подстраивается само." },
+    delta: { ms: 15, text: "Смещение в сотых долях тика, можно встать между тиками: 0.75 тика = 15 мс." },
+    ping: { ms: 15, text: "Fast input следует за пингом: доля от пинга, меняется плавно, без скачков." },
+    smooth: { ms: 20, text: "Как KING, но поправки от сервера сглаживаются дольше, сколько выберешь, вместо резкого скачка." }
+  };
+  var fast = document.getElementById("fast");
+  var readout = document.getElementById("readout");
+  var desc = document.getElementById("mode-desc");
+  var canvas = document.getElementById("tl");
+  var ctx = canvas.getContext("2d");
+  var buttons = document.querySelectorAll(".mode");
+
+  function setMode(name) {
+    buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === name)); });
+    desc.textContent = modes[name].text;
+    fast.value = modes[name].ms;
+    update();
+  }
+  buttons.forEach(function (b) { b.addEventListener("click", function () { setMode(b.dataset.mode); }); });
+
+  function update() {
+    var ms = Number(fast.value);
+    readout.textContent = ms + " мс · " + (ms / 20).toFixed(2) + " т";
+    draw(ms);
+  }
+
+  function draw(ms) {
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    var left = 18, right = w - 18, span = 120;
+    var x = function (t) { return left + (right - left) * t / span; };
+    var base = h - 34;
+    ctx.strokeStyle = "#262a32"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(left, base); ctx.lineTo(right, base); ctx.stroke();
+    ctx.font = "600 11px 'JetBrains Mono', monospace"; ctx.textAlign = "center";
+    for (var t = 0; t <= span; t += 20) {
+      ctx.fillStyle = "#6b7080";
+      ctx.fillRect(x(t) - 1, base - 8, 2, 16);
+      if (w > 440 || t % 40 === 0) ctx.fillText(t + " мс", x(t), base + 24);
+    }
+    var server = 10, seen = server + ms;
+    ctx.strokeStyle = "#e7ad3f"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(x(server), base - 34); ctx.lineTo(x(seen), base - 34); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#9a9ca3"; ctx.beginPath(); ctx.arc(x(server), base - 34, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#e7ad3f"; ctx.beginPath(); ctx.arc(x(seen), base - 34, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2a1c04"; ctx.beginPath(); ctx.arc(x(seen) + 5, base - 38, 2.4, 0, Math.PI * 2); ctx.arc(x(seen) + 11, base - 38, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ecebe6"; ctx.font = "600 12px 'JetBrains Mono', monospace";
+    if (ms > 0) ctx.fillText("+" + ms + " мс", (x(server) + x(seen)) / 2, base - 58);
+  }
+
+  fast.addEventListener("input", update);
+  window.addEventListener("resize", update);
+  setMode("king");
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(update);
+})();
+</script>
+
+</body>
+</html>
