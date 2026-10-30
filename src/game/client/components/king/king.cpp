@@ -971,6 +971,18 @@ void CKing::OnLocalCorrection(float Distance, int Tick)
 		str_append(aCause, "hooking a player, ");
 	if(LocalId >= 0)
 	{
+		// someone hooking us from further away: the server knows their input, we don't
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(i != LocalId && GameClient()->m_Snap.m_aCharacters[i].m_Active && GameClient()->m_Snap.m_aCharacters[i].m_Cur.m_HookedPlayer == LocalId)
+			{
+				str_append(aCause, "hooked by a player, ");
+				break;
+			}
+		}
+	}
+	if(LocalId >= 0)
+	{
 		const vec2 LocalPos = GameClient()->m_LocalCharacterPos;
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
