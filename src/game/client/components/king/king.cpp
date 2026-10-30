@@ -110,6 +110,13 @@ void CKing::OnInit()
 		}
 		g_Config.m_KgDefaultsVersion = 3;
 	}
+	if(g_Config.m_KgDefaultsVersion < 4)
+	{
+		// 1.0.13: automatic chat translation is off by default now; switch it off once
+		// (another client sharing %APPDATA%\DDNet could have turned it back on)
+		g_Config.m_TcTranslateAuto = 0;
+		g_Config.m_KgDefaultsVersion = 4;
+	}
 	m_Media.Start();
 	ReadLastInstallResult();
 	if(g_Config.m_KgUpdateCheck)
