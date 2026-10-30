@@ -160,10 +160,10 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
       <h1><span class="k">K</span>ING</h1>
       <p class="lede">Клиент для KoG, где <strong>инпут настроен под реальный пинг</strong>, а не под идеальную сеть. Fast input, умный маржин и журнал лагов.</p>
       <div class="cta">
-        <a class="btn btn-gold" href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать для Windows</a>
+        <a class="btn btn-gold" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать для Windows</a>
         <a class="btn btn-ghost" href="#input">Как работает инпут</a>
       </div>
-      <div class="meta">Версия 1.0.16 · Windows 64-bit · обновляется сам кнопкой Update</div>
+      <div class="meta">Версия <span data-ver>1.0.16</span> · Windows 64-bit · обновляется сам кнопкой Update</div>
     </div>
 
     <div class="scene" aria-label="Пример: таймер с музыкой и таблица игроков с коронами">
@@ -244,12 +244,12 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
         <h2>Три шага до первой карты</h2>
       </div>
       <div class="steps">
-        <div class="step"><h3>Скачай архив</h3><p>Возьми <code>KING-1.0.16-win64.zip</code> со страницы релизов на GitHub.</p></div>
+        <div class="step"><h3>Скачай архив</h3><p>Возьми <code data-zip>KING-1.0.16-win64.zip</code> со страницы релизов на GitHub.</p></div>
         <div class="step"><h3>Распакуй</h3><p>В любую папку. Скины, бинды и ник подхватятся из <code>%APPDATA%\DDNet</code>, как в DDNet.</p></div>
         <div class="step"><h3>Запусти KING.exe</h3><p>Пресет для KoG включится сам. Режим инпута меняется в Настройки → KING.</p></div>
       </div>
       <div class="cta" style="margin-top:34px">
-        <a class="btn btn-gold" href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать KING</a>
+        <a class="btn btn-gold" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать KING</a>
         <a class="btn btn-ghost" href="https://github.com/RoGGyt/KING" target="_blank" rel="noopener">Исходный код</a>
       </div>
     </div>
@@ -325,6 +325,21 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
   fast.addEventListener("input", update);
   window.addEventListener("resize", update);
   setMode("king");
+
+  // version and download link come from the latest GitHub release
+  fetch("https://api.github.com/repos/RoGGyt/KING/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rel) {
+      if (!rel || !rel.tag_name) return;
+      var ver = rel.tag_name.replace(/^v/i, "");
+      document.querySelectorAll("[data-ver]").forEach(function (el) { el.textContent = ver; });
+      var zip = (rel.assets || []).find(function (a) { return /win64\.zip$/i.test(a.name); });
+      if (zip) {
+        document.querySelectorAll("[data-zip]").forEach(function (el) { el.textContent = zip.name; });
+        document.querySelectorAll("[data-dl]").forEach(function (el) { el.href = zip.browser_download_url; el.removeAttribute("target"); });
+      }
+    })
+    .catch(function () {});
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(update);
 })();
 </script>
