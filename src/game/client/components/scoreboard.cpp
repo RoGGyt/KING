@@ -549,7 +549,14 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 
 	const float ScoreOffset = Scoreboard.x + MARGIN;
 	const float ScoreLength = TextRender()->TextWidth(FontSize, UseTime ? "00:00:00" : "99999");
-	const float TeeOffset = ScoreOffset + ScoreLength + MARGIN;
+	// KING: a slot for the crown between the time and the tee (only if someone has one)
+	bool KingAnyCrown = false;
+	if(g_Config.m_KgBadgeShow)
+		for(int i = 0; i < MAX_CLIENTS && !KingAnyCrown; i++)
+			KingAnyCrown = GameClient()->m_King.IsKingPlayer(i);
+	const float KingCrownSize = FontSize * 1.25f;
+	const float KingCrownSlot = KingAnyCrown ? KingCrownSize + 2.0f : 0.0f;
+	const float TeeOffset = ScoreOffset + ScoreLength + MARGIN + KingCrownSlot;
 	const float TeeLength = 60.0f * TeeSizeMod;
 	const float NameOffset = TeeOffset + TeeLength;
 	const float CountryLength = (LineHeight - Spacing - TeeSizeMod * 5.0f) * 2.0f;
@@ -730,25 +737,18 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 			ScorePosition.y = Row.y;
 			ScorePosition.h = Row.h;
 
-			bool KingHasScore = true; // KING: where the score text starts, so the crown can sit left of it
-			bool KingMillis = false;
 			if(Race7)
 			{
-				KingHasScore = pInfo->m_Score != protocol7::FinishTime::NOT_FINISHED;
-				KingMillis = pInfo->m_Score / 1000 < 60 * 60;
 				Ui()->RenderTime(ScorePosition, FontSize, pInfo->m_Score / 1000, pInfo->m_Score == protocol7::FinishTime::NOT_FINISHED, pInfo->m_Score % 1000, true,
 					Player.m_Score, Player.m_ScoreMillis, TextColor);
 			}
 			else if(MillisecondScore)
 			{
-				KingHasScore = ClientData.m_FinishTimeSeconds != FinishTime::NOT_FINISHED_MILLIS;
-				KingMillis = ClientData.m_FinishTimeSeconds < 60 * 60;
 				Ui()->RenderTime(ScorePosition, FontSize, ClientData.m_FinishTimeSeconds, ClientData.m_FinishTimeSeconds == FinishTime::NOT_FINISHED_MILLIS, ClientData.m_FinishTimeMillis, TrueMilliseconds,
 					Player.m_Score, Player.m_ScoreMillis, TextColor);
 			}
 			else if(TimeScore)
 			{
-				KingHasScore = pInfo->m_Score != FinishTime::NOT_FINISHED_TIMESCORE;
 				Ui()->RenderTime(ScorePosition, FontSize, pInfo->m_Score, pInfo->m_Score == FinishTime::NOT_FINISHED_TIMESCORE, -1, false,
 					Player.m_Score, Player.m_ScoreMillis, TextColor);
 			}
@@ -758,7 +758,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				Player.m_Score.Update(TextRender(), aBuf, FontSize);
 				Player.m_Score.Render(TextRender(), vec2(ScoreOffset + ScoreLength - Player.m_Score.Width(), ScorePosition.y + (Row.h - FontSize) / 2.0f), TextColor);
 			}
-			const float KingScoreLeft = ScoreOffset + ScoreLength - std::min(Player.m_Score.Width(), ScoreLength) - (KingMillis ? Player.m_ScoreMillis.Width() : 0.0f);
+
 
 			// CTF flag
 			if(pGameInfoObj && (pGameInfoObj->m_GameFlags & GAMEFLAG_FLAGS) &&
@@ -799,13 +799,12 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				// KING: crown left of the tee of KING players
 				if(GameClient()->m_King.ShowBadge(pInfo->m_ClientId))
 				{
-					const float CrownSize = std::min(FontSize * 1.25f, Row.h * 0.9f);
+					// in its own slot between the time and the tee, so it never covers either
+					const float CrownSize = std::min(KingCrownSize, Row.h * 0.9f);
+					const float SlotX = TeeOffset - KingCrownSlot;
 					const float TeeLeft = TeeOffset + TeeLength / 2.0f - TeeInfo.m_Size / 2.0f;
-					float CrownX = TeeLeft - CrownSize - 1.0f;
-					if(KingHasScore) // a finish time is shown: the crown goes left of it
-						CrownX = std::min(CrownX, KingScoreLeft - CrownSize - 2.0f);
-					CrownX = std::max(CrownX, Scoreboard.x + 1.0f);
-					GameClient()->m_King.RenderCrown(CrownX, Row.y + Row.h / 2.0f, CrownSize, TextColor.a);
+					const float CrownX = std::min(SlotX + (KingCrownSlot - CrownSize) / 2.0f, TeeLeft - CrownSize - 1.0f);
+					GameClient()->m_King.RenderCrown(std::max(CrownX, ScoreOffset + ScoreLength + 1.0f), Row.y + Row.h / 2.0f, CrownSize, TextColor.a);
 				}
 
 				if(m_MouseUnlocked)
