@@ -121,7 +121,7 @@ public:
 	bool IsKingPlayer(int ClientId) const;
 	bool ShowBadge(int ClientId) const { return g_Config.m_KgBadgeShow && IsKingPlayer(ClientId); }
 	IGraphics::CTextureHandle CrownTexture() const { return m_CrownTexture; }
-	static ColorRGBA CrownColor() { return ColorRGBA(0.95f, 0.75f, 0.30f, 1.0f); }
+	static ColorRGBA CrownColor() { return ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f); } // the texture has its own colors
 	// draws the crown in a Size x Size square whose left edge is X, vertically centered on CenterY
 	void RenderCrown(float X, float CenterY, float Size, float Alpha) const;
 
