@@ -788,6 +788,14 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				const vec2 TeeRenderPos = vec2(TeeOffset + TeeLength / 2, Row.y + Row.h / 2.0f + OffsetToMid.y);
 				RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
 
+				// KING: crown left of the tee of KING players
+				if(GameClient()->m_King.ShowBadge(pInfo->m_ClientId))
+				{
+					const float CrownSize = std::min(FontSize * 1.25f, Row.h * 0.9f);
+					const float TeeLeft = TeeOffset + TeeLength / 2.0f - TeeInfo.m_Size / 2.0f;
+					GameClient()->m_King.RenderCrown(TeeLeft - CrownSize - 1.0f, Row.y + Row.h / 2.0f, CrownSize, TextColor.a);
+				}
+
 				if(m_MouseUnlocked)
 				{
 					const CUIRect SkinRect = {TeeOffset, Row.y, TeeLength, Row.h};
@@ -822,13 +830,6 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				}
 
 				float NameTextOffset = NameOffset;
-				// KING: crown left of the name of KING players
-				if(GameClient()->m_King.ShowBadge(pInfo->m_ClientId))
-				{
-					const float CrownSize = FontSize * 1.15f;
-					GameClient()->m_King.RenderCrown(NameTextOffset - FontSize * 0.08f, TextY + FontSize * 0.62f, CrownSize, TextColor.a);
-					NameTextOffset += CrownSize * 0.95f;
-				}
 				const bool Muted = pInfo->m_ClientId >= 0 && (GameClient()->m_aClients[pInfo->m_ClientId].m_Foe || GameClient()->m_aClients[pInfo->m_ClientId].m_ChatIgnore);
 				if(Muted)
 				{
