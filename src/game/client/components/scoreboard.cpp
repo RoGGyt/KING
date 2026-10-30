@@ -730,18 +730,25 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 			ScorePosition.y = Row.y;
 			ScorePosition.h = Row.h;
 
+			bool KingHasScore = true; // KING: where the score text starts, so the crown can sit left of it
+			bool KingMillis = false;
 			if(Race7)
 			{
+				KingHasScore = pInfo->m_Score != protocol7::FinishTime::NOT_FINISHED;
+				KingMillis = pInfo->m_Score / 1000 < 60 * 60;
 				Ui()->RenderTime(ScorePosition, FontSize, pInfo->m_Score / 1000, pInfo->m_Score == protocol7::FinishTime::NOT_FINISHED, pInfo->m_Score % 1000, true,
 					Player.m_Score, Player.m_ScoreMillis, TextColor);
 			}
 			else if(MillisecondScore)
 			{
+				KingHasScore = ClientData.m_FinishTimeSeconds != FinishTime::NOT_FINISHED_MILLIS;
+				KingMillis = ClientData.m_FinishTimeSeconds < 60 * 60;
 				Ui()->RenderTime(ScorePosition, FontSize, ClientData.m_FinishTimeSeconds, ClientData.m_FinishTimeSeconds == FinishTime::NOT_FINISHED_MILLIS, ClientData.m_FinishTimeMillis, TrueMilliseconds,
 					Player.m_Score, Player.m_ScoreMillis, TextColor);
 			}
 			else if(TimeScore)
 			{
+				KingHasScore = pInfo->m_Score != FinishTime::NOT_FINISHED_TIMESCORE;
 				Ui()->RenderTime(ScorePosition, FontSize, pInfo->m_Score, pInfo->m_Score == FinishTime::NOT_FINISHED_TIMESCORE, -1, false,
 					Player.m_Score, Player.m_ScoreMillis, TextColor);
 			}
@@ -751,6 +758,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				Player.m_Score.Update(TextRender(), aBuf, FontSize);
 				Player.m_Score.Render(TextRender(), vec2(ScoreOffset + ScoreLength - Player.m_Score.Width(), ScorePosition.y + (Row.h - FontSize) / 2.0f), TextColor);
 			}
+			const float KingScoreLeft = ScoreOffset + ScoreLength - std::min(Player.m_Score.Width(), ScoreLength) - (KingMillis ? Player.m_ScoreMillis.Width() : 0.0f);
 
 			// CTF flag
 			if(pGameInfoObj && (pGameInfoObj->m_GameFlags & GAMEFLAG_FLAGS) &&
@@ -793,7 +801,11 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				{
 					const float CrownSize = std::min(FontSize * 1.25f, Row.h * 0.9f);
 					const float TeeLeft = TeeOffset + TeeLength / 2.0f - TeeInfo.m_Size / 2.0f;
-					GameClient()->m_King.RenderCrown(TeeLeft - CrownSize - 1.0f, Row.y + Row.h / 2.0f, CrownSize, TextColor.a);
+					float CrownX = TeeLeft - CrownSize - 1.0f;
+					if(KingHasScore) // a finish time is shown: the crown goes left of it
+						CrownX = std::min(CrownX, KingScoreLeft - CrownSize - 2.0f);
+					CrownX = std::max(CrownX, Scoreboard.x + 1.0f);
+					GameClient()->m_King.RenderCrown(CrownX, Row.y + Row.h / 2.0f, CrownSize, TextColor.a);
 				}
 
 				if(m_MouseUnlocked)
