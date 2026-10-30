@@ -290,6 +290,7 @@ MACRO_CONFIG_INT(TcShowhudDummyAngle, tc_showhud_dummy_angle, 0, 0, 1, CFGFLAG_C
 MACRO_CONFIG_INT(KgInputMode, kg_input_mode, 2, 0, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "KING input mode (0 = custom, 1 = Classic (whole ticks), 2 = KING (fast input + safe auto margin + light smoothing), 3 = Delta (sub-tick offset), 4 = Ping Comp (offset follows ping), 5 = Smooth (KING + adjustable correction smoothing), 6 = Best (offset + latency comp + smoothing + interpolation))")
 MACRO_CONFIG_INT(KgKingSmooth, kg_king_smooth, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "KING mode: blend small server corrections of your tee out over 40 ms instead of jumping")
 MACRO_CONFIG_INT(KgClassicTicks, kg_classic_ticks, 1, 1, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Classic TClient mode: how many whole ticks (20 ms each) fast input predicts ahead, like old tc_fast_input 1-5")
+MACRO_CONFIG_INT(KgClassicMs, kg_classic_ms, 20, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Classic TClient mode: fast input in ms (20 ms = one tick)")
 MACRO_CONFIG_INT(KgFastInputAmount, kg_fast_input_amount, 20, 1, 40, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input amount in ms used by KING mode (20 = exactly one tick, same as classic TClient)")
 MACRO_CONFIG_INT(KgDeltaAmount, kg_delta_amount, 100, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delta mode: prediction offset in 0.01 ticks (100 = 1 tick = 20 ms)")
 MACRO_CONFIG_INT(KgDeltaOthers, kg_delta_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delta mode: also shift other tees by the offset")

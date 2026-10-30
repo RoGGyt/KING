@@ -115,15 +115,15 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		break;
 	}
 	case CKing::INPUT_MODE_CLASSIC:
-		TextLine(Ui(), LeftView, "Classic fast input in whole ticks (1-5): your tee");
-		TextLine(Ui(), LeftView, "is shown whole ticks ahead with your newest input.");
+		TextLine(Ui(), LeftView, "Classic TClient fast input: your tee is shown this");
+		TextLine(Ui(), LeftView, "far ahead with your newest input. Margin stays manual.");
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgClassicTicks, &g_Config.m_KgClassicTicks, &Button, "Ticks", 1, 5, &CUi::ms_LinearScrollbarScale, 0u, "");
+		DoSliderWithScaledValue(&g_Config.m_KgClassicMs, &g_Config.m_KgClassicMs, &Button, "Fast input", 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 		{
-			char aTicks[96];
-			str_format(aTicks, sizeof(aTicks), "= %d ms ahead. 1 tick feels most honest, more = earlier", g_Config.m_KgClassicTicks * 20);
-			TextLine(Ui(), LeftView, aTicks, 11.0f);
+			char aInfo[96];
+			str_format(aInfo, sizeof(aInfo), "= %d.%02d ticks ahead (20 ms = 1 tick). More = earlier,", g_Config.m_KgClassicMs / 20, (g_Config.m_KgClassicMs % 20) * 5);
+			TextLine(Ui(), LeftView, aInfo, 11.0f);
 			TextLine(Ui(), LeftView, "but bigger corrections when you change direction.", 11.0f);
 		}
 		break;

@@ -110,6 +110,12 @@ void CKing::OnInit()
 		}
 		g_Config.m_KgDefaultsVersion = 3;
 	}
+	if(g_Config.m_KgDefaultsVersion < 5)
+	{
+		// 1.0.16: Classic is set in ms instead of whole ticks
+		if(g_Config.m_KgClassicTicks != 1)
+			g_Config.m_KgClassicMs = std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20;
+	}
 	if(g_Config.m_KgDefaultsVersion < 4)
 	{
 		// 1.0.13: automatic chat translation is off by default now; switch it off once
@@ -117,6 +123,7 @@ void CKing::OnInit()
 		g_Config.m_TcTranslateAuto = 0;
 		g_Config.m_KgDefaultsVersion = 4;
 	}
+	g_Config.m_KgDefaultsVersion = std::max(g_Config.m_KgDefaultsVersion, 5);
 	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
@@ -549,7 +556,7 @@ void CKing::ApplyInputMode()
 		// rewrite: old tc_fast_input 1-5 = whole ticks ahead. A multiple of 20 ms
 		// makes the new code take the exact same whole-tick path (no sub-tick part).
 		// Prediction margin stays manual (cl_prediction_margin), exactly like TClient.
-		SetFastInput((float)(std::clamp(g_Config.m_KgClassicTicks, 1, 5) * 20), false, false);
+		SetFastInput((float)std::clamp(g_Config.m_KgClassicMs, 1, 100), false, false);
 		break;
 	case INPUT_MODE_KING:
 	case INPUT_MODE_SMOOTH: // smoothing itself is applied when rendering our tee (gameclient.cpp)
@@ -713,7 +720,7 @@ void CKing::RenderNetHud()
 		str_format(aLine2, sizeof(aLine2), "margin %d ms %s", Stats.m_MarginMs, Stats.m_MarginAuto ? "auto" : "fixed");
 
 	if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_CLASSIC)
-		str_format(aLine3, sizeof(aLine3), "%s input   %d tick%s (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgClassicTicks, g_Config.m_KgClassicTicks == 1 ? "" : "s", g_Config.m_TcFastInputAmount);
+		str_format(aLine3, sizeof(aLine3), "%s input   fast %d ms", InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInputAmount);
 	else if(g_Config.m_TcFastInput && g_Config.m_KgInputMode == INPUT_MODE_DELTA)
 		str_format(aLine3, sizeof(aLine3), "%s input   %d.%02d ticks (%d ms)", InputModeName(g_Config.m_KgInputMode), g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100, g_Config.m_TcFastInputAmount);
 	else if(SmoothDurationMs() > 0.0f)
