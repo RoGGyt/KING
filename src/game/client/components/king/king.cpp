@@ -819,8 +819,8 @@ void CKing::OnStateChange(int NewState, int OldState)
 	}
 	else if(NewState != IClient::STATE_ONLINE && OldState == IClient::STATE_ONLINE)
 	{
-		LagLog("left the server: late %d, corrections %d (big %d, max %.0f units), stutters %d, snapshot gaps %d, prediction resets %d",
-			m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_BigCorrections, m_LagStats.m_MaxCorrection, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps, m_LagStats.m_PredResets);
+		LagLog("left the server: late %d, corrections %d (big %d, max %.0f units), stutters %d, snapshot gaps %d, prediction resets %d, teleports %d",
+			m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_BigCorrections, m_LagStats.m_MaxCorrection, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps, m_LagStats.m_PredResets, m_LagStats.m_Teleports);
 		LagLogClose();
 		m_OnlineSince = 0;
 	}
@@ -854,11 +854,9 @@ void CKing::LagLogOpen()
 	char aLine[512];
 	str_format(aLine, sizeof(aLine), "\n==== %s | KING %s | server %s | map %s\n", aDate, KING_VERSION, aAddr, GameClient()->Map()->IsLoaded() ? GameClient()->Map()->BaseName() : "?");
 	io_write(m_LagLogFile, aLine, str_length(aLine));
-	LagLog("settings: mode %s, fast input %s %d ms, smoothing %d ms, margin %s (min %d max %d safety %d, manual %d), antiping %d players %d, fps cap %d, vsync %d, refresh %d",
-		InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? "on" : "off", g_Config.m_TcFastInputAmount, round_to_int(SmoothDurationMs()),
-		ModeUsesAutoMargin(g_Config.m_KgInputMode) || (g_Config.m_KgAutoMargin && g_Config.m_KgInputMode != INPUT_MODE_CLASSIC) ? "auto" : "manual",
-		g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety, g_Config.m_ClPredictionMargin,
-		g_Config.m_ClAntiPing, g_Config.m_ClAntiPingPlayers, g_Config.m_GfxRefreshRate, g_Config.m_GfxVsync, g_Config.m_ClRefreshRate);
+	LagLogSettings("settings");
+	m_LoggedSettings = SettingsSignature();
+	m_SettingsChangedSince = 0;
 }
 
 void CKing::LagLogClose()
@@ -906,10 +904,37 @@ void CKing::OnNewSnapshot()
 	m_LastSnapshotTime = Now;
 }
 
+// the input settings that matter for lag, to notice when they change during a session
+std::string CKing::SettingsSignature() const
+{
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "%d %d %d %d %d %d %d %d %d %d %d %d %d %d", g_Config.m_KgInputMode, g_Config.m_TcFastInput, g_Config.m_TcFastInputAmount, g_Config.m_KgClassicMs,
+		g_Config.m_KgKingSmooth, g_Config.m_KgSmoothMs, g_Config.m_KgAutoMargin, g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety,
+		g_Config.m_ClPredictionMargin, g_Config.m_ClAntiPing, g_Config.m_ClAntiPingPlayers, g_Config.m_KgFastInputAmount);
+	return aBuf;
+}
+
+void CKing::LagLogSettings(const char *pPrefix)
+{
+	LagLog("%s: mode %s, fast input %s %d ms, smoothing %d ms, margin %s (min %d max %d safety %d, manual %d), antiping %d players %d, fps cap %d, vsync %d, refresh %d",
+		pPrefix, InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? "on" : "off", g_Config.m_TcFastInputAmount, round_to_int(SmoothDurationMs()),
+		ModeUsesAutoMargin(g_Config.m_KgInputMode) || (g_Config.m_KgAutoMargin && g_Config.m_KgInputMode != INPUT_MODE_CLASSIC) ? "auto" : "manual",
+		g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety, g_Config.m_ClPredictionMargin,
+		g_Config.m_ClAntiPing, g_Config.m_ClAntiPingPlayers, g_Config.m_GfxRefreshRate, g_Config.m_GfxVsync, g_Config.m_ClRefreshRate);
+}
+
 void CKing::OnLocalCorrection(float Distance, int Tick)
 {
 	if(Client()->State() != IClient::STATE_ONLINE || Distance < 4.0f)
 		return;
+	if(Distance >= TELEPORT_DISTANCE)
+	{
+		// tele tiles, kill, spawn, rescue: the server moved you on purpose, not lag
+		m_LagStats.m_Teleports++;
+		if(m_LagLogFile)
+			LagLog("teleport: %.0f units (tele, kill or spawn, not lag)", Distance);
+		return;
+	}
 	m_LagStats.m_Corrections++;
 	if(Distance >= 24.0f)
 		m_LagStats.m_BigCorrections++;
@@ -974,6 +999,22 @@ void CKing::UpdateLagMonitor()
 	const bool Settled = m_OnlineSince && Now - m_OnlineSince > 3 * Freq;
 	const SKingNetStats Stats = Client()->KingNetStats();
 
+	// input settings changed while playing: log them once they stop changing (sliders)
+	if(m_LagLogFile)
+	{
+		const std::string Signature = SettingsSignature();
+		if(Signature == m_LoggedSettings)
+			m_SettingsChangedSince = 0;
+		else if(!m_SettingsChangedSince)
+			m_SettingsChangedSince = Now;
+		else if(Now - m_SettingsChangedSince > 2 * Freq)
+		{
+			LagLogSettings("settings changed");
+			m_LoggedSettings = Signature;
+			m_SettingsChangedSince = 0;
+		}
+	}
+
 	const float FrameMs = Client()->RenderFrameTime() * 1000.0f;
 	if(FrameMs > 0.0f)
 	{
@@ -1022,8 +1063,8 @@ void CKing::UpdateLagMonitor()
 	if(Now - m_LastSummary > 60 * Freq)
 	{
 		m_LastSummary = Now;
-		LagLog("minute: ping %.0f ms, jitter %.1f ms, margin %.1f ms (target %.0f) | late %d, corrections %d (max %.0f units), stutters %d, gaps %d | lowest fps %.0f",
-			Stats.m_RttMs, Stats.m_JitterMs, Stats.m_MarginExactMs, Stats.m_MarginTargetMs, m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_MaxCorrection, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps, m_MinFrameFps);
+		LagLog("minute: ping %.0f ms, jitter %.1f ms, margin %.1f ms (target %.0f) | %s | late %d, corrections %d (max %.0f units), stutters %d, gaps %d | lowest fps %.0f",
+			Stats.m_RttMs, Stats.m_JitterMs, Stats.m_MarginExactMs, Stats.m_MarginTargetMs, InputModeName(g_Config.m_KgInputMode), m_LagStats.m_LateInputs, m_LagStats.m_Corrections, m_LagStats.m_MaxCorrection, m_LagStats.m_Stutters, m_LagStats.m_SnapGaps, m_MinFrameFps);
 		m_MinFrameFps = 0.0f;
 	}
 }

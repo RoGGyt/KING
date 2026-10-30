@@ -74,6 +74,8 @@ public:
 	// corrections bigger than this are real teleports (tele tiles, rescue, spawn): never smoothed
 	static constexpr float SMOOTH_SNAP_DISTANCE = 64.0f;
 	static constexpr float KING_SMOOTH_MS = 40.0f;
+	// a jump this far is a tele, kill or spawn, not a misprediction
+	static constexpr float TELEPORT_DISTANCE = 400.0f;
 
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;
@@ -109,6 +111,7 @@ public:
 		int m_SnapGaps = 0; // no snapshot for > 150 ms
 		int m_LateInputs = 0;
 		int m_PredResets = 0;
+		int m_Teleports = 0; // >= TELEPORT_DISTANCE, not counted as corrections
 	};
 	const SLagStats &LagStats() const { return m_LagStats; }
 
@@ -186,6 +189,10 @@ private:
 #endif
 		;
 	void UpdateLagMonitor();
+	void LagLogSettings(const char *pPrefix);
+	std::string SettingsSignature() const;
+	std::string m_LoggedSettings;
+	int64_t m_SettingsChangedSince = 0;
 
 	// music
 	void UpdateCoverTexture();
