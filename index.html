@@ -97,20 +97,19 @@ section { padding-block: 64px; }
 h2 { font: 700 clamp(28px, 4.5vw, 44px)/1.05 var(--display); letter-spacing: -.01em; margin: 12px 0 14px; text-wrap: balance; }
 .sec-head p { color: var(--muted); margin: 0; }
 
-/* input lab */
-.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 18px; padding: 28px; }
-.modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
-.mode { font: 600 13px/1 var(--body); padding: 9px 13px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
-.mode[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
-.mode-desc { min-height: 5.2em; color: var(--fg); margin: 0 0 18px; }
-.slider-row { display: flex; align-items: center; gap: 14px; }
-.slider-row label { font: 600 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-input[type=range] { flex: 1; min-width: 0; accent-color: var(--gold); }
-.readout { font: 600 15px/1 var(--mono); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
-.timeline { position: relative; height: 150px; margin-top: 8px; }
-.timeline canvas { width: 100%; height: 100%; display: block; }
-.legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--muted); }
-.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; background: var(--dot); }
+/* input modes */
+.modes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.mcard { background: var(--bg-2); border: 1px solid var(--line); border-radius: 16px; padding: 22px; min-width: 0; display: flex; flex-direction: column; }
+.mcard.main { border-color: rgba(231,173,63,.55); background: linear-gradient(180deg, rgba(231,173,63,.08), var(--bg-2) 60%); }
+.mcard-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.mcard h3 { font: 700 20px/1.2 var(--display); margin: 0; }
+.tag { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 8px; border-radius: 6px; background: var(--gold); color: var(--gold-ink); white-space: nowrap; }
+.tag.dim { background: #23262d; color: var(--muted); }
+.mcard p { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+.specs { margin: auto 0 0; display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+.specs div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
+.specs dt { color: var(--muted); }
+.specs dd { margin: 0; font: 600 13px/1.5 var(--mono); text-align: right; color: var(--fg); }
 
 /* features */
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
@@ -130,7 +129,8 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
 .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
 
 @media (max-width: 860px) {
-  .hero, .lab { grid-template-columns: minmax(0, 1fr); }
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .modes-grid { grid-template-columns: minmax(0, 1fr); }
   .grid, .steps { grid-template-columns: minmax(0, 1fr); }
   .nav-links { display: none; }
 }
@@ -161,9 +161,9 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
       <p class="lede">Клиент для KoG, где <strong>инпут настроен под реальный пинг</strong>, а не под идеальную сеть. Fast input, умный маржин и журнал лагов.</p>
       <div class="cta">
         <a class="btn btn-gold" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать для Windows</a>
-        <a class="btn btn-ghost" href="#input">Как работает инпут</a>
+        <a class="btn btn-ghost" href="#input">Режимы инпута</a>
       </div>
-      <div class="meta">Версия <span data-ver>1.0.16</span> · Windows 64-bit · обновляется сам кнопкой Update</div>
+      <div class="meta">Версия <span data-ver>1.0.18</span> · Windows 64-bit · обновляется сам кнопкой Update</div>
     </div>
 
     <div class="scene" aria-label="Пример: таймер с музыкой и таблица игроков с коронами">
@@ -185,34 +185,64 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
     <div class="wrap">
       <div class="sec-head">
         <div class="eyebrow">Инпут</div>
-        <h2>Сервер считает 50 тиков в секунду. KING показывает тебя чуть впереди.</h2>
-        <p>Один тик длится 20 мс. Fast input рисует твою тишку на столько миллисекунд вперёд с твоим последним нажатием, чтобы игра отзывалась сразу. Выбери режим и подвигай ползунок.</p>
+        <h2>Шесть режимов инпута под любой пинг</h2>
+        <p>Переключаются в Настройки → KING прямо в игре. Не знаешь, что выбрать, оставь KING.</p>
       </div>
-      <div class="lab">
-        <div>
-          <div class="modes" role="group" aria-label="Режим инпута">
-            <button class="mode" id="m-king" data-mode="king" aria-pressed="true">KING</button>
-            <button class="mode" id="m-best" data-mode="best" aria-pressed="false">Best</button>
-            <button class="mode" id="m-classic" data-mode="classic" aria-pressed="false">Classic</button>
-            <button class="mode" id="m-delta" data-mode="delta" aria-pressed="false">Delta</button>
-            <button class="mode" id="m-ping" data-mode="ping" aria-pressed="false">Ping Comp</button>
-            <button class="mode" id="m-smooth" data-mode="smooth" aria-pressed="false">Smooth</button>
-          </div>
-          <p class="mode-desc" id="mode-desc"></p>
-          <div class="slider-row">
-            <label for="fast">Fast input</label>
-            <input type="range" id="fast" min="0" max="100" step="1" value="20">
-            <span class="readout" id="readout">20 мс</span>
-          </div>
-        </div>
-        <div>
-          <div class="timeline"><canvas id="tl" aria-label="Тики сервера и позиция тишки"></canvas></div>
-          <div class="legend">
-            <span style="--dot:#6b7080">тики сервера (20 мс)</span>
-            <span style="--dot:#9a9ca3">где ты на сервере</span>
-            <span style="--dot:#e7ad3f">что ты видишь</span>
-          </div>
-        </div>
+      <div class="modes-grid">
+        <article class="mcard main">
+          <div class="mcard-top"><h3>KING</h3><span class="tag">по умолчанию</span></div>
+          <p>Один тик вперёд, умный маржин и мягкая склейка мелких поправок от сервера. Подходит почти всем.</p>
+          <dl class="specs">
+            <div><dt>Fast input</dt><dd>20 мс · 1 тик</dd></div>
+            <div><dt>Маржин</dt><dd>авто 10–40 мс</dd></div>
+            <div><dt>Сглаживание</dt><dd>40 мс</dd></div>
+          </dl>
+        </article>
+        <article class="mcard">
+          <div class="mcard-top"><h3>Best</h3><span class="tag">авто</span></div>
+          <p>Подстраивается под твою сеть: чем сильнее скачет пинг, тем дольше сглаживает. Можно настроить вручную.</p>
+          <dl class="specs">
+            <div><dt>Fast input</dt><dd>≈ 1 тик</dd></div>
+            <div><dt>Маржин</dt><dd>авто</dd></div>
+            <div><dt>Сглаживание</dt><dd>50–100 мс</dd></div>
+          </dl>
+        </article>
+        <article class="mcard">
+          <div class="mcard-top"><h3>Classic</h3><span class="tag dim">как TClient</span></div>
+          <p>Всё руками и ничего само не меняется. Для тех, кто привык к старому TClient.</p>
+          <dl class="specs">
+            <div><dt>Fast input</dt><dd>1–100 мс</dd></div>
+            <div><dt>Маржин</dt><dd>вручную</dd></div>
+            <div><dt>Сглаживание</dt><dd>нет</dd></div>
+          </dl>
+        </article>
+        <article class="mcard">
+          <div class="mcard-top"><h3>Delta</h3></div>
+          <p>Точное смещение в сотых долях тика, можно встать между тиками.</p>
+          <dl class="specs">
+            <div><dt>Fast input</dt><dd>0.01 тика шаг</dd></div>
+            <div><dt>Маржин</dt><dd>авто или вручную</dd></div>
+            <div><dt>Сглаживание</dt><dd>нет</dd></div>
+          </dl>
+        </article>
+        <article class="mcard">
+          <div class="mcard-top"><h3>Ping Comp</h3></div>
+          <p>Насколько вперёд показывать тишку, решает твой пинг. Меняется плавно, без рывков.</p>
+          <dl class="specs">
+            <div><dt>Fast input</dt><dd>доля от пинга</dd></div>
+            <div><dt>Маржин</dt><dd>авто</dd></div>
+            <div><dt>Сглаживание</dt><dd>нет</dd></div>
+          </dl>
+        </article>
+        <article class="mcard">
+          <div class="mcard-top"><h3>Smooth</h3></div>
+          <p>Как KING, но поправки от сервера растягиваются на столько, сколько выберешь.</p>
+          <dl class="specs">
+            <div><dt>Fast input</dt><dd>20 мс · 1 тик</dd></div>
+            <div><dt>Маржин</dt><dd>авто</dd></div>
+            <div><dt>Сглаживание</dt><dd>своё, мс</dd></div>
+          </dl>
+        </article>
       </div>
     </div>
   </section>
@@ -244,7 +274,7 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
         <h2>Три шага до первой карты</h2>
       </div>
       <div class="steps">
-        <div class="step"><h3>Скачай архив</h3><p>Возьми <code data-zip>KING-1.0.16-win64.zip</code> со страницы релизов на GitHub.</p></div>
+        <div class="step"><h3>Скачай архив</h3><p>Возьми <code data-zip>KING-1.0.18-win64.zip</code> со страницы релизов на GitHub.</p></div>
         <div class="step"><h3>Распакуй</h3><p>В любую папку. Скины, бинды и ник подхватятся из <code>%APPDATA%\DDNet</code>, как в DDNet.</p></div>
         <div class="step"><h3>Запусти KING.exe</h3><p>Пресет для KoG включится сам. Режим инпута меняется в Настройки → KING.</p></div>
       </div>
@@ -265,67 +295,6 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
 
 <script>
 (function () {
-  var modes = {
-    king: { ms: 20, text: "Один тик fast input, умный маржин и мягкое сглаживание мелких поправок от сервера за 40 мс. Режим по умолчанию." },
-    best: { ms: 20, text: "Ровно один тик вперёд. Длительность сглаживания подстраивается под джиттер твоей сети, вручную можно задать offset и кривую." },
-    classic: { ms: 20, text: "Как старый TClient: fast input в миллисекундах и ручной маржин. Ничего не подстраивается само." },
-    delta: { ms: 15, text: "Смещение в сотых долях тика, можно встать между тиками: 0.75 тика = 15 мс." },
-    ping: { ms: 15, text: "Fast input следует за пингом: доля от пинга, меняется плавно, без скачков." },
-    smooth: { ms: 20, text: "Как KING, но поправки от сервера сглаживаются дольше, сколько выберешь, вместо резкого скачка." }
-  };
-  var fast = document.getElementById("fast");
-  var readout = document.getElementById("readout");
-  var desc = document.getElementById("mode-desc");
-  var canvas = document.getElementById("tl");
-  var ctx = canvas.getContext("2d");
-  var buttons = document.querySelectorAll(".mode");
-
-  function setMode(name) {
-    buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === name)); });
-    desc.textContent = modes[name].text;
-    fast.value = modes[name].ms;
-    update();
-  }
-  buttons.forEach(function (b) { b.addEventListener("click", function () { setMode(b.dataset.mode); }); });
-
-  function update() {
-    var ms = Number(fast.value);
-    readout.textContent = ms + " мс · " + (ms / 20).toFixed(2) + " т";
-    draw(ms);
-  }
-
-  function draw(ms) {
-    var dpr = window.devicePixelRatio || 1;
-    var w = canvas.clientWidth, h = canvas.clientHeight;
-    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    var left = 18, right = w - 18, span = 120;
-    var x = function (t) { return left + (right - left) * t / span; };
-    var base = h - 34;
-    ctx.strokeStyle = "#262a32"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(left, base); ctx.lineTo(right, base); ctx.stroke();
-    ctx.font = "600 11px 'JetBrains Mono', monospace"; ctx.textAlign = "center";
-    for (var t = 0; t <= span; t += 20) {
-      ctx.fillStyle = "#6b7080";
-      ctx.fillRect(x(t) - 1, base - 8, 2, 16);
-      if (w > 440 || t % 40 === 0) ctx.fillText(t + " мс", x(t), base + 24);
-    }
-    var server = 10, seen = server + ms;
-    ctx.strokeStyle = "#e7ad3f"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(x(server), base - 34); ctx.lineTo(x(seen), base - 34); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = "#9a9ca3"; ctx.beginPath(); ctx.arc(x(server), base - 34, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#e7ad3f"; ctx.beginPath(); ctx.arc(x(seen), base - 34, 15, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#2a1c04"; ctx.beginPath(); ctx.arc(x(seen) + 5, base - 38, 2.4, 0, Math.PI * 2); ctx.arc(x(seen) + 11, base - 38, 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ecebe6"; ctx.font = "600 12px 'JetBrains Mono', monospace";
-    if (ms > 0) ctx.fillText("+" + ms + " мс", (x(server) + x(seen)) / 2, base - 58);
-  }
-
-  fast.addEventListener("input", update);
-  window.addEventListener("resize", update);
-  setMode("king");
-
   // version and download link come from the latest GitHub release
   fetch("https://api.github.com/repos/RoGGyt/KING/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
     .then(function (r) { return r.ok ? r.json() : null; })
@@ -340,7 +309,6 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
       }
     })
     .catch(function () {});
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(update);
 })();
 </script>
 
