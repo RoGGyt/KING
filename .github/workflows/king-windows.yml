@@ -61,32 +61,18 @@ jobs:
         mkdir artifacts
         mv *-win64.zip artifacts
 
-    - name: Test in-client updater script
+    - name: Check release package
       shell: pwsh
       run: |
-        $src = Get-Content -Raw src/game/client/components/king/king.cpp
-        $m = [regex]::Match($src, 'R"PS\((.*?)\)PS"', 'Singleline')
-        if (-not $m.Success) { throw 'update script not found in king.cpp' }
-        $work = Join-Path $env:RUNNER_TEMP 'king-update-test'
-        $dest = Join-Path $work 'install'
-        New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        Set-Content -Path (Join-Path $dest 'KING.exe') -Value 'old'
-        Set-Content -Path (Join-Path $dest 'keep-me.txt') -Value 'user file'
-        $script = Join-Path $work 'update.ps1'
-        Set-Content -Path $script -Value $m.Groups[1].Value -Encoding ASCII -NoNewline
-        $zip = Join-Path $work 'KING-update.zip'
-        Copy-Item (Get-ChildItem release/artifacts/*-win64.zip | Select-Object -First 1).FullName $zip
-        $log = Join-Path $work 'update.log'
-        # Windows PowerShell 5.1 like on players' PCs; whoami.exe stands in for the relaunch
-        powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -ProcId 999999 -Zip $zip -Dest $dest -Exe "$env:WINDIR\System32\whoami.exe" -Log $log
-        Get-Content $log
-        if (-not (Get-Content $log | Select-String '^ok')) { throw 'updater reported failure' }
-        if ((Get-Item (Join-Path $dest 'KING.exe')).Length -lt 100000) { throw 'KING.exe was not replaced' }
-        if (-not (Test-Path (Join-Path $dest 'data'))) { throw 'data folder missing after update' }
-        if (-not (Test-Path (Join-Path $dest 'KING-Server.exe'))) { throw 'KING-Server.exe missing from the package (local server would not start)' }
-        if (-not (Test-Path (Join-Path $dest 'keep-me.txt'))) { throw 'existing files were removed' }
-        if (Test-Path $zip) { throw 'zip was not cleaned up' }
-        Write-Host 'updater script OK'
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = (Get-ChildItem release/artifacts/*-win64.zip | Select-Object -First 1).FullName
+        $names = [IO.Compression.ZipFile]::OpenRead($zip).Entries | ForEach-Object { $_.FullName -replace '^[^/]+/', '' }
+        foreach ($need in 'KING.exe', 'KING-Server.exe', 'data/tclient/king_crown.png') {
+          if ($names -notcontains $need) { throw "$need missing from the package" }
+        }
+        # the in-client updater (king_install.cpp) does not support these
+        if ([IO.Compression.ZipFile]::OpenRead($zip).Entries | Where-Object { $_.FullName -match '\.\.' }) { throw 'unsafe path in package' }
+        Write-Host "package OK: $($names.Count) entries"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

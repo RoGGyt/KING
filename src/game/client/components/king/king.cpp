@@ -1,5 +1,6 @@
 /* KING client: input modes, KoG preset, network HUD, lag log, music player and update check. */
 #include "king.h"
+#include "king_install.h"
 #include "king_system.h"
 
 #include <base/color.h>
@@ -31,6 +32,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <tuple>
+
+static constexpr const char *KING_EXE_NAME = "KING.exe";
 
 const char *CKing::InputModeName(int Mode)
 {
@@ -127,6 +130,13 @@ void CKing::OnInit()
 	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
+	{
+		// files the last update moved out of the way (they were in use)
+		char aExe[IO_MAX_PATH_LENGTH];
+		Storage()->GetBinaryPathAbsolute(KING_EXE_NAME, aExe, sizeof(aExe));
+		if(fs_parent_dir(aExe) == 0)
+			KingCleanupOldFiles(aExe);
+	}
 	if(g_Config.m_KgUpdateCheck)
 		CheckForUpdates();
 }
@@ -302,37 +312,7 @@ void CKing::OpenUpdatePage()
 
 static constexpr const char *KING_UPDATE_DIR = "king_update";
 static constexpr const char *KING_UPDATE_ZIP = "king_update/KING-update.zip";
-static constexpr const char *KING_UPDATE_SCRIPT = "king_update/update.ps1";
-static constexpr const char *KING_UPDATE_LOG = "king_update/update.log";
-static constexpr const char *KING_EXE_NAME = "KING.exe";
-
-// Runs after KING has quit: waits for the process to exit, unpacks the release
-// zip over the install folder (robocopy retries locked files), starts KING again.
-// Config, binds and skins live in %APPDATA%\DDNet and are not touched.
-static const char gs_aUpdateScript[] = R"PS(param([int]$ProcId, [string]$Zip, [string]$Dest, [string]$Exe, [string]$Log)
-$ErrorActionPreference = 'Stop'
-$ok = $false
-try {
-    Wait-Process -Id $ProcId -Timeout 60 -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
-    $tmp = Join-Path (Split-Path -Parent $Zip) 'extract'
-    if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
-    Expand-Archive -LiteralPath $Zip -DestinationPath $tmp -Force
-    $src = $tmp
-    $items = @(Get-ChildItem -LiteralPath $tmp)
-    if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $src = $items[0].FullName }
-    if (-not (Test-Path -LiteralPath (Join-Path $src 'KING.exe'))) { throw 'KING.exe not found in update zip' }
-    & robocopy.exe $src $Dest /E /R:30 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-    if ($LASTEXITCODE -ge 8) { throw "copy failed (robocopy $LASTEXITCODE), is the folder write protected?" }
-    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $Zip -Force -ErrorAction SilentlyContinue
-    $ok = $true
-    Set-Content -LiteralPath $Log -Value ('ok ' + (Get-Date -Format s)) -Encoding ASCII
-} catch {
-    Set-Content -LiteralPath $Log -Value ('fail ' + $_.Exception.Message) -Encoding ASCII
-}
-Start-Process -FilePath $Exe -WorkingDirectory $Dest
-)PS";
+static constexpr const char *KING_UPDATE_LOG = "king_update/update.log"; // written by the old (script) updater
 
 bool CKing::CanInstallUpdate() const
 {
@@ -393,26 +373,16 @@ void CKing::FinishDownload()
 	Client()->Quit();
 }
 
+// Unpacks the release zip over the install folder right here (no scripts or helper
+// programs: those look like malware to antivirus heuristics), starts the new KING
+// and quits. Config, binds and skins live in %APPDATA%\DDNet and are not touched.
 bool CKing::LaunchInstaller()
 {
 #if defined(CONF_FAMILY_WINDOWS)
-	IOHANDLE File = Storage()->OpenFile(KING_UPDATE_SCRIPT, IOFLAG_WRITE, IStorage::TYPE_SAVE);
-	if(!File)
-	{
-		str_copy(m_aInstallError, "Could not write the update script.");
-		return false;
-	}
-	io_write(File, gs_aUpdateScript, sizeof(gs_aUpdateScript) - 1);
-	io_close(File);
-
-	char aScript[IO_MAX_PATH_LENGTH];
 	char aZip[IO_MAX_PATH_LENGTH];
-	char aLog[IO_MAX_PATH_LENGTH];
 	char aExe[IO_MAX_PATH_LENGTH];
 	char aDest[IO_MAX_PATH_LENGTH];
-	Storage()->GetCompletePath(IStorage::TYPE_SAVE, KING_UPDATE_SCRIPT, aScript, sizeof(aScript));
 	Storage()->GetCompletePath(IStorage::TYPE_SAVE, KING_UPDATE_ZIP, aZip, sizeof(aZip));
-	Storage()->GetCompletePath(IStorage::TYPE_SAVE, KING_UPDATE_LOG, aLog, sizeof(aLog));
 	Storage()->GetBinaryPathAbsolute(KING_EXE_NAME, aExe, sizeof(aExe));
 	str_copy(aDest, aExe);
 	if(fs_parent_dir(aDest) != 0)
@@ -420,24 +390,15 @@ bool CKing::LaunchInstaller()
 		str_copy(m_aInstallError, "Could not find the KING install folder.");
 		return false;
 	}
-
-	char aPid[16];
-	str_format(aPid, sizeof(aPid), "%d", process_id());
-	const char *apArgs[] = {
-		"-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
-		"-File", aScript,
-		"-ProcId", aPid,
-		"-Zip", aZip,
-		"-Dest", aDest,
-		"-Exe", aExe,
-		"-Log", aLog};
-	PROCESS Process = process_execute("powershell.exe", EShellExecuteWindowState::BACKGROUND, apArgs, std::size(apArgs));
-	if(Process == INVALID_PROCESS)
+	if(!KingInstallZip(aZip, aDest, m_aInstallError, sizeof(m_aInstallError)))
+		return false;
+	Storage()->RemoveFile(KING_UPDATE_ZIP, IStorage::TYPE_SAVE);
+	if(process_execute(aExe, EShellExecuteWindowState::FOREGROUND) == INVALID_PROCESS)
 	{
-		str_copy(m_aInstallError, "Could not start PowerShell for the update.");
+		str_copy(m_aInstallError, "Updated. Restart KING to use the new version.");
 		return false;
 	}
-	log_info("king", "update downloaded, installing into %s", aDest);
+	log_info("king", "update installed into %s, restarting", aDest);
 	return true;
 #else
 	str_copy(m_aInstallError, "Automatic install is only supported on Windows.");
