@@ -882,8 +882,8 @@ void CGameClient::OnRender()
 					m_aClients[m_aLocalIds[0]].m_Country != g_Config.m_PlayerCountry ||
 					str_comp(m_aClients[m_aLocalIds[0]].m_aSkinName, g_Config.m_ClPlayerSkin) ||
 					m_aClients[m_aLocalIds[0]].m_UseCustomColor != g_Config.m_ClPlayerUseCustomColor ||
-					m_aClients[m_aLocalIds[0]].m_ColorBody != CKing::MarkColorBody(g_Config.m_ClPlayerColorBody) ||
-					m_aClients[m_aLocalIds[0]].m_ColorFeet != CKing::MarkColorFeet(g_Config.m_ClPlayerColorFeet))
+					m_aClients[m_aLocalIds[0]].m_ColorBody != CKing::MarkColorBody(g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, Client()->PlayerName()) ||
+					m_aClients[m_aLocalIds[0]].m_ColorFeet != CKing::MarkColorFeet(g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, Client()->PlayerName()))
 					SendInfo(false);
 				else
 					m_aCheckInfo[0] = -1;
@@ -914,8 +914,8 @@ void CGameClient::OnRender()
 						m_aClients[m_aLocalIds[1]].m_Country != g_Config.m_ClDummyCountry ||
 						str_comp(m_aClients[m_aLocalIds[1]].m_aSkinName, g_Config.m_ClDummySkin) ||
 						m_aClients[m_aLocalIds[1]].m_UseCustomColor != g_Config.m_ClDummyUseCustomColor ||
-						m_aClients[m_aLocalIds[1]].m_ColorBody != CKing::MarkColorBody(g_Config.m_ClDummyColorBody) ||
-						m_aClients[m_aLocalIds[1]].m_ColorFeet != CKing::MarkColorFeet(g_Config.m_ClDummyColorFeet))
+						m_aClients[m_aLocalIds[1]].m_ColorBody != CKing::MarkColorBody(g_Config.m_ClDummyColorBody, g_Config.m_ClDummyColorFeet, Client()->DummyName()) ||
+						m_aClients[m_aLocalIds[1]].m_ColorFeet != CKing::MarkColorFeet(g_Config.m_ClDummyColorBody, g_Config.m_ClDummyColorFeet, Client()->DummyName()))
 						SendDummyInfo(false);
 					else
 						m_aCheckInfo[1] = -1;
@@ -3708,8 +3708,8 @@ void CGameClient::SendInfo(bool Start)
 		Msg.m_Country = g_Config.m_PlayerCountry;
 		Msg.m_pSkin = g_Config.m_ClPlayerSkin;
 		Msg.m_UseCustomColor = g_Config.m_ClPlayerUseCustomColor;
-		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClPlayerColorBody); // KING crown mark
-		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClPlayerColorFeet);
+		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, Client()->PlayerName()); // KING crown mark
+		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, Client()->PlayerName());
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_MAIN, &Packer, MSGFLAG_VITAL | MSGFLAG_FLUSH);
@@ -3723,8 +3723,8 @@ void CGameClient::SendInfo(bool Start)
 		Msg.m_Country = g_Config.m_PlayerCountry;
 		Msg.m_pSkin = g_Config.m_ClPlayerSkin;
 		Msg.m_UseCustomColor = g_Config.m_ClPlayerUseCustomColor;
-		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClPlayerColorBody); // KING crown mark
-		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClPlayerColorFeet);
+		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, Client()->PlayerName()); // KING crown mark
+		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, Client()->PlayerName());
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_MAIN, &Packer, MSGFLAG_VITAL);
@@ -3750,8 +3750,8 @@ void CGameClient::SendDummyInfo(bool Start)
 		Msg.m_Country = g_Config.m_ClDummyCountry;
 		Msg.m_pSkin = g_Config.m_ClDummySkin;
 		Msg.m_UseCustomColor = g_Config.m_ClDummyUseCustomColor;
-		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClDummyColorBody); // KING crown mark
-		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClDummyColorFeet);
+		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClDummyColorBody, g_Config.m_ClDummyColorFeet, Client()->DummyName()); // KING crown mark
+		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClDummyColorBody, g_Config.m_ClDummyColorFeet, Client()->DummyName());
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_DUMMY, &Packer, MSGFLAG_VITAL);
@@ -3765,8 +3765,8 @@ void CGameClient::SendDummyInfo(bool Start)
 		Msg.m_Country = g_Config.m_ClDummyCountry;
 		Msg.m_pSkin = g_Config.m_ClDummySkin;
 		Msg.m_UseCustomColor = g_Config.m_ClDummyUseCustomColor;
-		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClDummyColorBody); // KING crown mark
-		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClDummyColorFeet);
+		Msg.m_ColorBody = CKing::MarkColorBody(g_Config.m_ClDummyColorBody, g_Config.m_ClDummyColorFeet, Client()->DummyName()); // KING crown mark
+		Msg.m_ColorFeet = CKing::MarkColorFeet(g_Config.m_ClDummyColorBody, g_Config.m_ClDummyColorFeet, Client()->DummyName());
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_DUMMY, &Packer, MSGFLAG_VITAL);

@@ -115,12 +115,15 @@ public:
 	};
 	const SLagStats &LagStats() const { return m_LagStats; }
 
-	// KING crown next to the names of KING players. KING marks the colors it sends
-	// with an invisible pattern in the lowest lightness bits; other KING clients see it.
-	static constexpr int BADGE_MARK_BODY = 5;
-	static constexpr int BADGE_MARK_FEET = 3;
-	static int MarkColorBody(int Color);
-	static int MarkColorFeet(int Color);
+	// KING crown next to the names of KING players. KING hides a 16 bit signature in the
+	// lowest bits of the colors it sends (hue 2, saturation 3, lightness 3 bits of body
+	// and feet, invisible). The signature is a hash of the player's name and the rest
+	// of the colors, so a random color matches 1 in 65536 times and a copied skin
+	// (other client, other name) does not carry the crown.
+	static constexpr int BADGE_COLOR_MASK = 0x030707;
+	static uint32_t BadgeSignature(const char *pName, int Body, int Feet);
+	static int MarkColorBody(int Color, int Feet, const char *pName);
+	static int MarkColorFeet(int Body, int Color, const char *pName);
 	bool IsKingPlayer(int ClientId) const;
 	bool ShowBadge(int ClientId) const { return g_Config.m_KgBadgeShow && IsKingPlayer(ClientId); }
 	IGraphics::CTextureHandle CrownTexture() const { return m_CrownTexture; }
