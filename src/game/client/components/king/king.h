@@ -7,6 +7,7 @@
 
 #include <engine/console.h>
 #include <engine/graphics.h>
+#include <engine/shared/config.h>
 #include <engine/http.h>
 
 #include "king_media.h"
@@ -111,6 +112,19 @@ public:
 	};
 	const SLagStats &LagStats() const { return m_LagStats; }
 
+	// KING crown next to the names of KING players. KING marks the colors it sends
+	// with an invisible pattern in the lowest lightness bits; other KING clients see it.
+	static constexpr int BADGE_MARK_BODY = 5;
+	static constexpr int BADGE_MARK_FEET = 3;
+	static int MarkColorBody(int Color);
+	static int MarkColorFeet(int Color);
+	bool IsKingPlayer(int ClientId) const;
+	bool ShowBadge(int ClientId) const { return g_Config.m_KgBadgeShow && IsKingPlayer(ClientId); }
+	IGraphics::CTextureHandle CrownTexture() const { return m_CrownTexture; }
+	static ColorRGBA CrownColor() { return ColorRGBA(0.95f, 0.75f, 0.30f, 1.0f); }
+	// draws the crown in a Size x Size square whose left edge is X, vertically centered on CenterY
+	void RenderCrown(float X, float CenterY, float Size, float Alpha) const;
+
 	// Optimizer FPS fog: darkens everything beyond the culled area (called before the HUD)
 	void RenderFpsFog();
 
@@ -212,6 +226,8 @@ private:
 	int m_SeenPredResets = 0;
 	int64_t m_LastSummary = 0;
 	float m_MinFrameFps = 0.0f;
+
+	IGraphics::CTextureHandle m_CrownTexture;
 
 	// music pill
 	IGraphics::CTextureHandle m_CoverTexture;

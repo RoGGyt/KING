@@ -33,6 +33,7 @@ public:
 	bool m_ShowName;
 	char m_aName[std::max((size_t)MAX_NAME_LENGTH, (size_t)protocol7::MAX_NAME_ARRAY_SIZE)];
 	bool m_ShowFriendMark;
+	bool m_ShowKingBadge = false; // KING crown
 	bool m_ShowClientId;
 	int m_ClientId;
 	float m_FontSizeClientId;
@@ -336,6 +337,27 @@ public:
 		CNamePlatePartText(This)
 	{
 		m_Color = ColorRGBA(1.0f, 0.0f, 0.0f);
+	}
+};
+
+// KING: crown left of the name of KING players
+class CNamePlatePartKingBadge : public CNamePlatePartIcon
+{
+public:
+	CNamePlatePartKingBadge(CGameClient &This) :
+		CNamePlatePartIcon(This)
+	{
+		m_Color = CKing::CrownColor();
+	}
+	void Update(CGameClient &This, const CNamePlateData &Data) override
+	{
+		m_Texture = This.m_King.CrownTexture();
+		m_Visible = Data.m_ShowKingBadge && m_Texture.IsValid();
+		if(!m_Visible)
+			return;
+		const float Size = Data.m_FontSize * 1.2f;
+		m_Size = vec2(Size, Size);
+		m_Color.a = Data.m_Color.a;
 	}
 };
 
@@ -727,6 +749,7 @@ private:
 		AddPart<CNamePlatePartIgnoreMark>(This); // TClient
 		AddPart<CNamePlatePartFriendMark>(This);
 		AddPart<CNamePlatePartClientId>(This, false);
+		AddPart<CNamePlatePartKingBadge>(This); // KING
 		AddPart<CNamePlatePartName>(This);
 		AddPart<CNamePlatePartNewLine>(This);
 
@@ -863,6 +886,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_ShowName = pPlayerInfo->m_Local ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates;
 	str_copy(Data.m_aName, GameClient()->m_aClients[pPlayerInfo->m_ClientId].m_aName);
 	Data.m_ShowFriendMark = Data.m_ShowName && g_Config.m_ClNamePlatesFriendMark && GameClient()->m_aClients[pPlayerInfo->m_ClientId].m_Friend;
+	Data.m_ShowKingBadge = Data.m_ShowName && GameClient()->m_King.ShowBadge(pPlayerInfo->m_ClientId); // KING
 	Data.m_ShowClientId = Data.m_ShowName && (g_Config.m_Debug || g_Config.m_ClNamePlatesIds);
 	Data.m_FontSize = 18.0f + 20.0f * g_Config.m_ClNamePlatesSize / 100.0f;
 
@@ -1011,6 +1035,7 @@ void CNamePlates::RenderNamePlatePreview(vec2 Position, int Dummy)
 	Data.m_FontSize = FontSize;
 
 	Data.m_ShowFriendMark = Data.m_ShowName && g_Config.m_ClNamePlatesFriendMark;
+	Data.m_ShowKingBadge = Data.m_ShowName && g_Config.m_KgBadgeShow && g_Config.m_KgBadgeShare; // KING: preview of your own crown
 
 	Data.m_ShowClientId = Data.m_ShowName && (g_Config.m_Debug || g_Config.m_ClNamePlatesIds);
 	Data.m_ClientId = Dummy;

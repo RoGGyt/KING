@@ -321,6 +321,8 @@ MACRO_CONFIG_INT(KgAspectCustomH, kg_aspect_custom_h, 3, 1, 10000, CFGFLAG_CLIEN
 MACRO_CONFIG_INT(KgAspectApply, kg_aspect_apply, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "What the aspect ratio stretches in game (0 = full: world, HUD and menus, 1 = only the game world)")
 MACRO_CONFIG_INT(KgUiScale, kg_ui_scale, 100, 50, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of all menus in percent, like the GUI scale in Minecraft (100 = default)")
 MACRO_CONFIG_INT(KgScoreboardScale, kg_scoreboard_scale, 100, 50, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of the scoreboard (TAB) in percent")
+MACRO_CONFIG_INT(KgBadgeShow, kg_badge_show, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the KING crown left of the names of KING players (in game and in TAB)")
+MACRO_CONFIG_INT(KgBadgeShare, kg_badge_share, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Let other KING players see your crown (adds an invisible mark to your skin colors)")
 MACRO_CONFIG_INT(KgOptimizer, kg_optimizer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Optimizer: turn on the kg_opt_* options below for more FPS")
 MACRO_CONFIG_INT(KgOptNoParticles, kg_opt_no_particles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Optimizer: do not create or render any particles")
 MACRO_CONFIG_INT(KgOptNoQuads, kg_opt_no_quads, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Optimizer: do not render map quads (backgrounds, decorations)")

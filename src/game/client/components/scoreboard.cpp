@@ -822,6 +822,13 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				}
 
 				float NameTextOffset = NameOffset;
+				// KING: crown left of the name of KING players
+				if(GameClient()->m_King.ShowBadge(pInfo->m_ClientId))
+				{
+					const float CrownSize = FontSize * 1.15f;
+					GameClient()->m_King.RenderCrown(NameTextOffset - FontSize * 0.08f, TextY + FontSize * 0.62f, CrownSize, TextColor.a);
+					NameTextOffset += CrownSize * 0.95f;
+				}
 				const bool Muted = pInfo->m_ClientId >= 0 && (GameClient()->m_aClients[pInfo->m_ClientId].m_Foe || GameClient()->m_aClients[pInfo->m_ClientId].m_ChatIgnore);
 				if(Muted)
 				{

@@ -117,6 +117,7 @@ void CKing::OnInit()
 		g_Config.m_TcTranslateAuto = 0;
 		g_Config.m_KgDefaultsVersion = 4;
 	}
+	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
 	if(g_Config.m_KgUpdateCheck)
@@ -1778,4 +1779,39 @@ void CKing::RenderFpsFog()
 	Graphics()->DrawRect4(L, B - Band, R - L, Band, Clear, Clear, Fog, Fog, None, 0.0f);
 	Graphics()->DrawRect4(L, T, Band, B - T, Fog, Clear, Fog, Clear, None, 0.0f);
 	Graphics()->DrawRect4(R - Band, T, Band, B - T, Clear, Fog, Clear, Fog, None, 0.0f);
+}
+
+// ***** KING crown ***** //
+
+int CKing::MarkColorBody(int Color)
+{
+	return g_Config.m_KgBadgeShare ? ((Color & ~7) | BADGE_MARK_BODY) : Color;
+}
+
+int CKing::MarkColorFeet(int Color)
+{
+	return g_Config.m_KgBadgeShare ? ((Color & ~7) | BADGE_MARK_FEET) : Color;
+}
+
+bool CKing::IsKingPlayer(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return false;
+	const CGameClient::CClientData &Client = GameClient()->m_aClients[ClientId];
+	if(!Client.m_Active)
+		return false;
+	return (Client.m_ColorBody & 7) == BADGE_MARK_BODY && (Client.m_ColorFeet & 7) == BADGE_MARK_FEET;
+}
+
+void CKing::RenderCrown(float X, float CenterY, float Size, float Alpha) const
+{
+	if(!m_CrownTexture.IsValid())
+		return;
+	Graphics()->TextureSet(m_CrownTexture);
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(CrownColor().WithAlpha(Alpha));
+	const IGraphics::CQuadItem Item(X, CenterY - Size / 2.0f, Size, Size);
+	Graphics()->QuadsDrawTL(&Item, 1);
+	Graphics()->QuadsEnd();
+	Graphics()->TextureClear();
 }

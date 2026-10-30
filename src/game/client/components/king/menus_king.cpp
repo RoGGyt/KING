@@ -494,6 +494,8 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	Headline(Ui(), LeftView, "Interface");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Network HUD in game", &g_Config.m_KgNetHud, &LeftView, KING_LINE);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLagLog, "Lag log (king_lag.log: every lag and its cause)", &g_Config.m_KgLagLog, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShow, "Crown next to KING players (game and TAB)", &g_Config.m_KgBadgeShow, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShare, "Show my crown to other KING players", &g_Config.m_KgBadgeShare, &LeftView, KING_LINE);
 	s_Sections.End(LeftView);
 
 	// ***** Music player ***** //
