@@ -3,12 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>KING Client</title>
-<meta name="description" content="KING — клиент DDNet для King of Gores: fast input, умный маржин, журнал лагов, корона KING.">
-<meta property="og:title" content="KING — DDNet клиент для KoG">
-<meta property="og:description" content="Fast input, умный маржин, журнал лагов и корона для игроков KING.">
-<meta name="theme-color" content="#0d0e11">
-<link rel="icon" type="image/png" href="crown.png">
+<title>KING Client — клиент DDNet для King of Gores</title>
+<meta name="description" content="KING Client — бесплатный клиент DDNet для King of Gores (KoG): умный маржин и fast input без потерь нажатий, корона для игроков KING, музыка у таймера, журнал лагов. Скачать для Windows.">
+<link rel="canonical" href="https://roggyt.github.io/KING/">
+<meta name="robots" content="index, follow">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KING Client">
+<meta property="og:url" content="https://roggyt.github.io/KING/">
+<meta property="og:title" content="KING Client — клиент DDNet для King of Gores">
+<meta property="og:description" content="Fast input без потерь нажатий, умный маржин, корона для игроков KING и музыка у таймера.">
+<meta property="og:image" content="https://roggyt.github.io/KING/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0d0e19">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "KING Client", "alternateName": ["KING", "KING DDNet client", "KING клиент"], "description": "KING Client — бесплатный клиент DDNet для King of Gores (KoG): умный маржин и fast input без потерь нажатий, корона для игроков KING, музыка у таймера, журнал лагов. Скачать для Windows.", "applicationCategory": "GameApplication", "operatingSystem": "Windows 10, Windows 11", "url": "https://roggyt.github.io/KING/", "downloadUrl": "https://github.com/RoGGyt/KING/releases/latest", "image": "https://roggyt.github.io/KING/og.png", "author": {"@type": "Person", "name": "RoGGyt", "url": "https://github.com/RoGGyt"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isBasedOn": "https://ddnet.org"}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap">
@@ -63,7 +75,7 @@ main { overflow-x: clip; }
 
 /* hero */
 .hero { text-align: center; padding: 40px 0 96px; position: relative; }
-.halo { position: relative; width: min(340px, 78vw); margin: 0 auto; }
+.halo { position: relative; width: min(360px, 80vw); margin: 0 auto; }
 .halo::before {
   content: ""; position: absolute; inset: -38% -45%; z-index: 0;
   background: radial-gradient(closest-side, rgba(243, 183, 70, 0.34), rgba(243, 183, 70, 0.10) 55%, transparent 100%);
@@ -76,7 +88,7 @@ main { overflow-x: clip; }
   background: linear-gradient(180deg, #fff6df 0%, #f6cf7c 55%, #d99a2b 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.hero p { margin: 22px auto 0; max-width: 30ch; font-size: clamp(19px, 2.4vw, 23px); line-height: 1.45; color: var(--soft); }
+.hero p { margin: 22px auto 0; max-width: 32ch; font-size: clamp(19px, 2.4vw, 23px); line-height: 1.45; color: var(--soft); }
 .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -182,9 +194,9 @@ footer a { color: var(--soft); }
 
 <main id="top">
   <section class="hero wrap">
-    <div class="halo"><img src="crown.png" alt="Корона KING" width="448" height="311"></div>
+    <div class="halo"><img src="crown.png" alt="Корона KING" width="480" height="346"></div>
     <h1>KING</h1>
-    <p>Клиент DDNet для King of Gores, настроенный под живой пинг</p>
+    <p>KING Client: клиент DDNet для King of Gores, настроенный под живой пинг</p>
     <div class="actions">
       <a class="btn btn-main" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
