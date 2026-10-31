@@ -11,142 +11,169 @@
 <link rel="icon" type="image/png" href="crown.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap">
 <style>
-/* Layout: a dark game-map page on a 32px tile grid; one gold accent; sections stack, cards only where a thing is an object */
+/* KING: a dark, soft night-blue page. One loud thing: the crown on a pool of warm light.
+   Everything else is quiet: one rounded family (Rubik), soft surfaces, generous radii. */
 :root {
   color-scheme: dark;
-  --bg: #0d0e11;
-  --bg-2: #15171c;
-  --tile: #1a1d23;
-  --line: #262a32;
-  --fg: #ecebe6;
-  --muted: #9a9ca3;
-  --gold: #e7ad3f;
-  --gold-hi: #f6cd6b;
-  --gold-ink: #2a1c04;
-  --good: #7ed37a;
-  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
-  --body: "Manrope", "Segoe UI", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --ink: #0d0e19;
+  --night: #131528;
+  --surface: #1a1d33;
+  --raised: #232741;
+  --edge: rgba(255, 255, 255, 0.07);
+  --text: #ecebf5;
+  --soft: #a3a5c2;
+  --faint: #6f7193;
+  --gold: #f3b746;
+  --gold-deep: #c98a1c;
+  --font: "Rubik", "Segoe UI", system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
-  background: var(--bg);
-  color: var(--fg);
-  font: 400 16px/1.65 var(--body);
-  background-image: radial-gradient(1100px 620px at 78% -8%, rgba(231,173,63,.07), transparent 70%);
+  margin: 0;
+  background: var(--ink);
+  background-image:
+    radial-gradient(900px 600px at 50% -120px, #23213f 0%, transparent 70%),
+    linear-gradient(180deg, #0f1020 0%, var(--ink) 900px);
   background-repeat: no-repeat;
+  color: var(--text);
+  font: 400 17px/1.6 var(--font);
+  -webkit-font-smoothing: antialiased;
 }
-section:nth-of-type(even) { background: #0a0b0d; border-block: 1px solid #16181d; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 12px; }
 .wrap {
   max-width: 1080px;
   margin: 0 auto;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
 }
-a { color: var(--gold-hi); }
-:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; border-radius: 6px; }
 
-/* nav */
-.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
-.brand { display: flex; align-items: center; gap: 10px; font: 700 18px/1 var(--display); letter-spacing: .04em; color: var(--fg); text-decoration: none; }
-.brand img { width: 30px; height: 30px; }
-.nav-links { display: flex; gap: 22px; flex-wrap: wrap; }
-.nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }
-.nav-links a:hover { color: var(--fg); }
+main { overflow-x: clip; }
+
+/* top bar */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; font-size: 19px; letter-spacing: 0.02em; }
+.logo img { width: 34px; height: auto; }
+.bar nav { display: flex; gap: 6px; }
+.bar nav a { text-decoration: none; color: var(--soft); font-size: 15px; padding: 8px 14px; border-radius: 999px; transition: background .2s, color .2s; }
+.bar nav a:hover { background: var(--surface); color: var(--text); }
 
 /* hero */
-.hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 40px; align-items: center; padding-block: 48px 72px; }
-.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
-.hero h1 { font: 900 clamp(64px, 12vw, 132px)/.9 var(--display); letter-spacing: -.02em; margin: 18px 0 8px; text-wrap: balance; }
-.hero h1 .k { color: var(--gold); }
-.lede { font-size: 19px; color: var(--muted); max-width: 33ch; margin: 18px 0 30px; }
-.lede strong { color: var(--fg); font-weight: 700; }
-.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 10px; font: 700 15px/1 var(--body); text-decoration: none; transition: transform .15s ease, background .15s ease; }
-.btn-gold { background: var(--gold); color: var(--gold-ink); }
-.btn-gold:hover { background: var(--gold-hi); transform: translateY(-1px); }
-.btn-ghost { color: var(--fg); border: 1px solid var(--line); background: var(--bg-2); }
-.btn-ghost:hover { border-color: var(--muted); }
-.meta { margin-top: 14px; font: 400 13px/1.5 var(--mono); color: var(--muted); }
+.hero { text-align: center; padding: 40px 0 96px; position: relative; }
+.halo { position: relative; width: min(340px, 78vw); margin: 0 auto; }
+.halo::before {
+  content: ""; position: absolute; inset: -38% -45%; z-index: 0;
+  background: radial-gradient(closest-side, rgba(243, 183, 70, 0.34), rgba(243, 183, 70, 0.10) 55%, transparent 100%);
+  filter: blur(12px);
+}
+.halo img { position: relative; z-index: 1; width: 100%; height: auto; display: block; filter: drop-shadow(0 18px 40px rgba(201, 138, 28, 0.35)); }
+.hero h1 {
+  margin: 34px 0 0; font-weight: 800; letter-spacing: 0.06em; line-height: 0.9;
+  font-size: clamp(76px, 15vw, 168px);
+  background: linear-gradient(180deg, #fff6df 0%, #f6cf7c 55%, #d99a2b 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero p { margin: 22px auto 0; max-width: 30ch; font-size: clamp(19px, 2.4vw, 23px); line-height: 1.45; color: var(--soft); }
+.actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 54px; padding: 0 28px; border-radius: 999px;
+  font: 500 17px/1 var(--font); text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.btn-main { background: linear-gradient(180deg, #f8c661, var(--gold) 60%, #e9a531); color: #2b1a00; box-shadow: 0 10px 30px -8px rgba(243, 183, 70, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.btn-main:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -8px rgba(243, 183, 70, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.btn-soft { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--edge); }
+.btn-soft:hover { background: var(--raised); }
+.btn svg { width: 20px; height: 20px; }
+.note { margin-top: 16px; font-size: 14px; color: var(--faint); }
 
-/* the TAB + timer mock in the hero */
-.scene { position: relative; display: grid; gap: 16px; }
-.pill { justify-self: center; display: flex; align-items: center; gap: 12px; padding: 7px 12px 7px 7px; border-radius: 14px; background: rgba(0,0,0,.55); border: 1px solid var(--line); }
-.cover { width: 38px; height: 38px; border-radius: 9px; background: conic-gradient(from 210deg, #c25b8f, #e7ad3f, #3d6fd9, #c25b8f); }
-.time { font: 700 26px/1 var(--display); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
-.bars { display: flex; align-items: center; gap: 3px; height: 30px; }
-.bars i { display: block; width: 4px; border-radius: 3px; background: var(--gold); height: 30%; animation: bar 1.1s ease-in-out infinite; }
-.bars i:nth-child(2) { animation-delay: -.3s; } .bars i:nth-child(3) { animation-delay: -.7s; } .bars i:nth-child(4) { animation-delay: -.15s; } .bars i:nth-child(5) { animation-delay: -.55s; }
-@keyframes bar { 0%, 100% { height: 25%; } 50% { height: 95%; } }
-.tab { background: rgba(21,23,28,.92); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
-.tab-head { display: grid; grid-template-columns: 76px 1fr 60px; gap: 10px; padding: 0 10px 8px; font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.row { display: grid; grid-template-columns: 76px 22px 30px 1fr 44px; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; font-weight: 700; }
-.row + .row { margin-top: 4px; }
-.row.me { background: #2a2e36; }
-.row .t { font: 600 13px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.row .crown { width: 22px; height: 22px; }
-.row .tee { width: 26px; height: 26px; border-radius: 50%; background: var(--c); box-shadow: inset -4px -5px 0 rgba(0,0,0,.25); }
-.row .p { text-align: right; font: 600 13px/1 var(--mono); color: var(--good); }
-.row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* features: alternating text + picture */
+.feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 64px; align-items: center; padding-block: 56px; }
+.feature.flip .text { order: 2; }
+.feature h2 { margin: 0 0 16px; font-weight: 700; font-size: clamp(30px, 4vw, 42px); line-height: 1.12; letter-spacing: -0.01em; max-width: 16ch; }
+.feature .text p { margin: 0 0 14px; color: var(--soft); max-width: 44ch; }
+.feature .text p:last-child { margin-bottom: 0; }
 
-/* sections */
-section { padding-block: 64px; }
-.sec-head { max-width: 640px; margin-bottom: 34px; }
-h2 { font: 700 clamp(28px, 4.5vw, 44px)/1.05 var(--display); letter-spacing: -.01em; margin: 12px 0 14px; text-wrap: balance; }
-.sec-head p { color: var(--muted); margin: 0; }
+.panel {
+  border-radius: 28px; padding: 26px;
+  background: linear-gradient(180deg, var(--surface), var(--night));
+  box-shadow: inset 0 0 0 1px var(--edge), 0 30px 60px -30px rgba(0, 0, 0, 0.8);
+}
 
-/* input modes */
-.modes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.mcard { background: var(--bg-2); border: 1px solid var(--line); border-radius: 16px; padding: 22px; min-width: 0; display: flex; flex-direction: column; }
-.mcard.main { border-color: rgba(231,173,63,.55); background: linear-gradient(180deg, rgba(231,173,63,.08), var(--bg-2) 60%); }
-.mcard-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.mcard h3 { font: 700 20px/1.2 var(--display); margin: 0; }
-.tag { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 8px; border-radius: 6px; background: var(--gold); color: var(--gold-ink); white-space: nowrap; }
-.tag.dim { background: #23262d; color: var(--muted); }
-.mcard p { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
-.specs { margin: auto 0 0; display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
-.specs div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
-.specs dt { color: var(--muted); }
-.specs dd { margin: 0; font: 600 13px/1.5 var(--mono); text-align: right; color: var(--fg); }
+/* input modes picture: looks like the in-game picker */
+.modes { display: grid; gap: 8px; }
+.mode { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 16px; color: var(--soft); }
+.mode .dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--faint); }
+.mode b { font-weight: 500; color: var(--text); }
+.mode span:last-child { font-size: 14px; color: var(--faint); text-align: right; }
+.mode.on { background: var(--raised); }
+.mode.on .dot { box-shadow: inset 0 0 0 5px var(--gold); }
+.mode.on span:last-child { color: var(--gold); }
 
-/* features */
-.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
-.feat { background: var(--bg); padding: 26px; min-width: 0; }
-.feat h3 { font: 700 17px/1.25 var(--display); margin: 0 0 10px; }
-.feat p { margin: 0; color: var(--muted); font-size: 15px; }
-.feat code, .steps code { font: 400 13px/1 var(--mono); color: var(--gold-hi); background: #1d2027; padding: 2px 6px; border-radius: 5px; }
+/* TAB picture */
+.tab-row { display: grid; grid-template-columns: 30px 34px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 16px; }
+.tab-row + .tab-row { margin-top: 4px; }
+.tab-row.me { background: var(--raised); }
+.tab-row img { width: 30px; height: auto; }
+.tee { width: 32px; height: 32px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 70%, white), var(--c) 60%, color-mix(in srgb, var(--c) 70%, black)); }
+.tab-row .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-row .time { font-size: 15px; color: var(--soft); font-variant-numeric: tabular-nums; }
+
+/* music pill picture */
+.stage { display: grid; place-items: center; min-height: 260px; border-radius: 28px; background: radial-gradient(420px 220px at 50% 40%, #2a2d4d, var(--night)); box-shadow: inset 0 0 0 1px var(--edge); }
+.pill { display: flex; align-items: center; gap: 16px; padding: 10px 18px 10px 10px; border-radius: 22px; background: rgba(8, 9, 18, 0.72); box-shadow: inset 0 0 0 1px var(--edge), 0 20px 40px -16px rgba(0, 0, 0, 0.9); }
+.cover { width: 56px; height: 56px; border-radius: 14px; background: radial-gradient(circle at 30% 25%, #ffb3c9, #c2477d 45%, #4b2a8a); }
+.clock { font-weight: 700; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+.eq { display: flex; align-items: center; gap: 4px; height: 40px; }
+.eq i { width: 5px; border-radius: 4px; background: linear-gradient(180deg, #ffd27e, var(--gold-deep)); }
+
+/* the rest, as a plain list */
+.more { padding-block: 72px 40px; }
+.more h2 { margin: 0 0 30px; font-weight: 700; font-size: clamp(28px, 3.6vw, 38px); }
+.list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px 64px; margin: 0; padding: 0; list-style: none; }
+.list li { padding-left: 22px; position: relative; }
+.list li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 12px rgba(243, 183, 70, 0.7); }
+.list h3 { margin: 0 0 4px; font-weight: 500; font-size: 19px; }
+.list p { margin: 0; color: var(--soft); font-size: 16px; max-width: 46ch; }
 
 /* install */
-.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
-.step { border-top: 2px solid var(--gold); padding-top: 18px; min-width: 0; }
-.step::before { counter-increment: step; content: "Шаг " counter(step); font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
-.step h3 { font: 700 18px/1.3 var(--display); margin: 12px 0 8px; }
-.step p { margin: 0; color: var(--muted); font-size: 15px; }
+.install { margin-block: 56px 96px; padding: 44px; border-radius: 32px; background: linear-gradient(180deg, var(--surface), var(--night)); box-shadow: inset 0 0 0 1px var(--edge); }
+.install h2 { margin: 0 0 28px; font-weight: 700; font-size: clamp(28px, 3.6vw, 38px); }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 0 0 34px; padding: 0; list-style: none; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; color: var(--soft); }
+.steps li::before { content: counter(s); display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--raised); color: var(--gold); font-weight: 700; }
+.steps b { display: block; color: var(--text); font-weight: 500; margin-bottom: 2px; }
+.path { font-size: 15px; padding: 1px 8px; border-radius: 8px; background: var(--raised); color: var(--text); white-space: nowrap; }
 
-footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var(--muted); font-size: 14px; background: var(--bg); }
-.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+footer { padding-block: 0 48px; color: var(--faint); font-size: 15px; text-align: center; }
+footer a { color: var(--soft); }
 
-@media (max-width: 860px) {
-  .hero { grid-template-columns: minmax(0, 1fr); }
-  .modes-grid { grid-template-columns: minmax(0, 1fr); }
-  .grid, .steps { grid-template-columns: minmax(0, 1fr); }
-  .nav-links { display: none; }
+/* one moment on load: the crown rises into its light */
+@media (prefers-reduced-motion: no-preference) {
+  .halo img { animation: rise 1.1s cubic-bezier(.2, .8, .2, 1) both; }
+  .halo::before { animation: glow 1.6s ease-out both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(22px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes glow { from { opacity: 0; } to { opacity: 1; } }
 }
-@media (prefers-reduced-motion: reduce) {
-  .bars i { animation: none; height: 60%; }
-  .btn { transition: none; }
+
+@media (max-width: 880px) {
+  .feature, .feature.flip { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-block: 40px; }
+  .feature.flip .text { order: 0; }
+  .list, .steps { grid-template-columns: minmax(0, 1fr); }
+  .install { padding: 28px 22px; }
+  .bar nav a:not(:last-child) { display: none; }
 }
 </style>
 </head>
 <body>
 
 
-<header class="wrap nav">
-  <a class="brand" href="#top"><img src="crown.png" alt="">KING</a>
-  <nav class="nav-links" aria-label="Разделы">
-    <a href="#input">Инпут</a>
+<header class="wrap bar">
+  <a class="logo" href="#top"><img src="crown.png" alt="">KING</a>
+  <nav aria-label="Разделы">
     <a href="#features">Возможности</a>
     <a href="#install">Установка</a>
     <a href="https://github.com/RoGGyt/KING" target="_blank" rel="noopener">GitHub</a>
@@ -154,162 +181,109 @@ footer { border-top: 1px solid var(--line); padding-block: 34px 48px; color: var
 </header>
 
 <main id="top">
-  <div class="wrap hero">
-    <div>
-      <div class="eyebrow">DDNet клиент · King of Gores</div>
-      <h1><span class="k">K</span>ING</h1>
-      <p class="lede">Клиент для KoG, где <strong>инпут настроен под реальный пинг</strong>, а не под идеальную сеть. Fast input, умный маржин и журнал лагов.</p>
-      <div class="cta">
-        <a class="btn btn-gold" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать для Windows</a>
-        <a class="btn btn-ghost" href="#input">Режимы инпута</a>
-      </div>
-      <div class="meta">Версия <span data-ver>1.0.18</span> · Windows 64-bit · обновляется сам кнопкой Update</div>
+  <section class="hero wrap">
+    <div class="halo"><img src="crown.png" alt="Корона KING" width="448" height="311"></div>
+    <h1>KING</h1>
+    <p>Клиент DDNet для King of Gores, настроенный под живой пинг</p>
+    <div class="actions">
+      <a class="btn btn-main" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+        Скачать для Windows
+      </a>
+      <a class="btn btn-soft" href="#features">Что внутри</a>
     </div>
+    <div class="note">Версия <span data-ver>1.0.18</span>, бесплатно и с открытым кодом</div>
+  </section>
 
-    <div class="scene" aria-label="Пример: таймер с музыкой и таблица игроков с коронами">
-      <div class="pill">
-        <div class="cover" aria-hidden="true"></div>
-        <div class="time">06:53</div>
-        <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div id="features" class="wrap">
+    <section class="feature">
+      <div class="text">
+        <h2>Инпут, который не теряет нажатия</h2>
+        <p>KING следит, когда твои нажатия опаздывают к серверу, и сам поднимает запас времени на скачках пинга. Когда сеть спокойная, запас плавно уходит обратно, без рывков тишки.</p>
+        <p>Шесть режимов инпута, от привычного Classic до автоматического Best. Если не знаешь, что выбрать, оставь KING.</p>
       </div>
-      <div class="tab">
-        <div class="tab-head"><span>Time</span><span>Name</span><span style="text-align:right">Ping</span></div>
-        <div class="row me"><span class="t">06:53</span><img class="crown" src="crown.png" alt="KING"><span class="tee" style="--c:#d9558f"></span><span class="nm">RoGGyt</span><span class="p">53</span></div>
-        <div class="row"><span class="t">07:12</span><img class="crown" src="crown.png" alt="KING"><span class="tee" style="--c:#4c7be0"></span><span class="nm">nameless tee</span><span class="p">41</span></div>
-        <div class="row"><span class="t"></span><span></span><span class="tee" style="--c:#d6a85a"></span><span class="nm">brainless tee</span><span class="p">21</span></div>
+      <div class="panel modes" aria-label="Пример: выбор режима инпута">
+        <div class="mode on"><span class="dot"></span><b>KING</b><span>1 тик, авто маржин</span></div>
+        <div class="mode"><span class="dot"></span><b>Best</b><span>подстраивается сам</span></div>
+        <div class="mode"><span class="dot"></span><b>Classic</b><span>как TClient</span></div>
+        <div class="mode"><span class="dot"></span><b>Smooth</b><span>мягкие поправки</span></div>
+        <div class="mode"><span class="dot"></span><b>Ping Comp</b><span>от пинга</span></div>
+        <div class="mode"><span class="dot"></span><b>Delta</b><span>доли тика</span></div>
       </div>
-    </div>
+    </section>
+
+    <section class="feature flip">
+      <div class="text">
+        <h2>Корона для своих</h2>
+        <p>Все, кто играет в KING, видят друг у друга золотую корону: слева от ника в игре и рядом с тишкой в TAB.</p>
+        <p>Никаких серверов и регистрации. Метка спрятана в цветах скина и привязана к нику, поэтому скопировать её нельзя.</p>
+      </div>
+      <div class="panel" aria-label="Пример: таблица игроков с коронами">
+        <div class="tab-row me"><img src="crown.png" alt="KING"><span class="tee" style="--c:#e0679b"></span><span class="name">RoGGyt</span><span class="time">06:53.12</span></div>
+        <div class="tab-row"><img src="crown.png" alt="KING"><span class="tee" style="--c:#5d86e6"></span><span class="name">nameless tee</span><span class="time">07:12.40</span></div>
+        <div class="tab-row"><span></span><span class="tee" style="--c:#d8ae62"></span><span class="name">brainless tee</span><span class="time">08:01.05</span></div>
+        <div class="tab-row"><span></span><span class="tee" style="--c:#73c08a"></span><span class="name">tee</span><span class="time"></span></div>
+      </div>
+    </section>
+
+    <section class="feature">
+      <div class="text">
+        <h2>Твоя музыка прямо у таймера</h2>
+        <p>Таймер забега становится плеером: обложка трека слева, визуализатор справа. Работает со Spotify, Яндекс Музыкой и браузером.</p>
+        <p>Визуализатор слушает только музыку, а не звуки игры. Текст песни можно включить по желанию.</p>
+      </div>
+      <div class="stage" aria-label="Пример: таймер с музыкой">
+        <div class="pill">
+          <div class="cover"></div>
+          <div class="clock">06:53</div>
+          <div class="eq" aria-hidden="true"><i style="height:38%"></i><i style="height:72%"></i><i style="height:100%"></i><i style="height:58%"></i><i style="height:84%"></i><i style="height:44%"></i><i style="height:66%"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="more">
+      <h2>И ещё</h2>
+      <ul class="list">
+        <li><h3>Журнал лагов</h3><p>Если тишку дёрнуло, в журнале видно почему: опоздавшее нажатие, фриз кадра, потеря пакетов или игрок рядом.</p></li>
+        <li><h3>Меню игрока в TAB</h3><p>Позвать в тиму, шепнуть, скопировать скин, /swap и часы с поинтами игрока в один клик.</p></li>
+        <li><h3>Оптимизация</h3><p>Без частиц, квадов и лишних деталей карты, плюс высокий приоритет процесса. Физика и инпут не меняются.</p></li>
+        <li><h3>Растянутое разрешение</h3><p>4:3, 16:10 или своё. Растягивается весь экран или только игровой мир.</p></li>
+        <li><h3>Размер интерфейса</h3><p>Меню, TAB и чат настраиваются отдельно, как масштаб интерфейса в Майнкрафте.</p></li>
+        <li><h3>Статус в Discord</h3><p>Друзья видят, что ты играешь в KING, на каком сервере и карте и сколько ты уже там.</p></li>
+      </ul>
+    </section>
+
+    <section id="install" class="install">
+      <h2>Как установить</h2>
+      <ol class="steps">
+        <li><span><b>Скачай архив</b>Последняя версия всегда по кнопке ниже.</span></li>
+        <li><span><b>Распакуй в любую папку</b>Скины, бинды и ник подхватятся из <span class="path">%APPDATA%\DDNet</span>.</span></li>
+        <li><span><b>Запусти KING.exe</b>Дальше клиент обновляется сам кнопкой Update в меню.</span></li>
+      </ol>
+      <a class="btn btn-main" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+        Скачать KING <span data-ver>1.0.18</span>
+      </a>
+    </section>
   </div>
-
-  <section id="input">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="eyebrow">Инпут</div>
-        <h2>Шесть режимов инпута под любой пинг</h2>
-        <p>Переключаются в Настройки → KING прямо в игре. Не знаешь, что выбрать, оставь KING.</p>
-      </div>
-      <div class="modes-grid">
-        <article class="mcard main">
-          <div class="mcard-top"><h3>KING</h3><span class="tag">по умолчанию</span></div>
-          <p>Один тик вперёд, умный маржин и мягкая склейка мелких поправок от сервера. Подходит почти всем.</p>
-          <dl class="specs">
-            <div><dt>Fast input</dt><dd>20 мс · 1 тик</dd></div>
-            <div><dt>Маржин</dt><dd>авто 10–40 мс</dd></div>
-            <div><dt>Сглаживание</dt><dd>40 мс</dd></div>
-          </dl>
-        </article>
-        <article class="mcard">
-          <div class="mcard-top"><h3>Best</h3><span class="tag">авто</span></div>
-          <p>Подстраивается под твою сеть: чем сильнее скачет пинг, тем дольше сглаживает. Можно настроить вручную.</p>
-          <dl class="specs">
-            <div><dt>Fast input</dt><dd>≈ 1 тик</dd></div>
-            <div><dt>Маржин</dt><dd>авто</dd></div>
-            <div><dt>Сглаживание</dt><dd>50–100 мс</dd></div>
-          </dl>
-        </article>
-        <article class="mcard">
-          <div class="mcard-top"><h3>Classic</h3><span class="tag dim">как TClient</span></div>
-          <p>Всё руками и ничего само не меняется. Для тех, кто привык к старому TClient.</p>
-          <dl class="specs">
-            <div><dt>Fast input</dt><dd>1–100 мс</dd></div>
-            <div><dt>Маржин</dt><dd>вручную</dd></div>
-            <div><dt>Сглаживание</dt><dd>нет</dd></div>
-          </dl>
-        </article>
-        <article class="mcard">
-          <div class="mcard-top"><h3>Delta</h3></div>
-          <p>Точное смещение в сотых долях тика, можно встать между тиками.</p>
-          <dl class="specs">
-            <div><dt>Fast input</dt><dd>0.01 тика шаг</dd></div>
-            <div><dt>Маржин</dt><dd>авто или вручную</dd></div>
-            <div><dt>Сглаживание</dt><dd>нет</dd></div>
-          </dl>
-        </article>
-        <article class="mcard">
-          <div class="mcard-top"><h3>Ping Comp</h3></div>
-          <p>Насколько вперёд показывать тишку, решает твой пинг. Меняется плавно, без рывков.</p>
-          <dl class="specs">
-            <div><dt>Fast input</dt><dd>доля от пинга</dd></div>
-            <div><dt>Маржин</dt><dd>авто</dd></div>
-            <div><dt>Сглаживание</dt><dd>нет</dd></div>
-          </dl>
-        </article>
-        <article class="mcard">
-          <div class="mcard-top"><h3>Smooth</h3></div>
-          <p>Как KING, но поправки от сервера растягиваются на столько, сколько выберешь.</p>
-          <dl class="specs">
-            <div><dt>Fast input</dt><dd>20 мс · 1 тик</dd></div>
-            <div><dt>Маржин</dt><dd>авто</dd></div>
-            <div><dt>Сглаживание</dt><dd>своё, мс</dd></div>
-          </dl>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section id="features">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="eyebrow">Возможности</div>
-        <h2>Всё, что нужно на KoG, и ничего лишнего</h2>
-      </div>
-      <div class="grid">
-        <div class="feat"><h3>Умный маржин</h3><p>Никогда не ниже стандартных 10 мс. Растёт, только когда сеть правда скачет, и меняется плавно, без рывков тишки.</p></div>
-        <div class="feat"><h3>Журнал лагов</h3><p>Каждый тэп пишется с причиной: опоздавший инпут, фриз кадра, дыра в пакетах или игрок рядом. Файл <code>king_lag.log</code>.</p></div>
-        <div class="feat"><h3>Корона KING</h3><p>Золотая корона слева от ника и в TAB у всех, кто играет в KING. Без серверов и регистрации.</p></div>
-        <div class="feat"><h3>Музыка у таймера</h3><p>Обложка трека, таймер и визуализатор, который слушает музыку, а не звуки игры. Текст песни по желанию.</p></div>
-        <div class="feat"><h3>Меню игрока в TAB</h3><p>Invite в тиму, Whisper, Copy Skin, /Swap, часы и поинты игрока, Team и War списки в один клик.</p></div>
-        <div class="feat"><h3>Optimizer</h3><p>Без частиц, квадов и деталей карты, FPS fog и высокий приоритет процесса. Физика и инпут не меняются.</p></div>
-        <div class="feat"><h3>Растянутое разрешение</h3><p>4:3, 5:4, 16:10 или своё, например 1440:1080. Растягивается весь экран или только мир.</p></div>
-        <div class="feat"><h3>Размер интерфейса</h3><p>Меню, TAB и чат настраиваются отдельно, как GUI Scale в Майнкрафте.</p></div>
-        <div class="feat"><h3>Обновление в один клик</h3><p>Кнопка Update в меню скачивает новую версию и перезапускает клиент. Настройки остаются на месте.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="install">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="eyebrow">Установка</div>
-        <h2>Три шага до первой карты</h2>
-      </div>
-      <div class="steps">
-        <div class="step"><h3>Скачай архив</h3><p>Возьми <code data-zip>KING-1.0.18-win64.zip</code> со страницы релизов на GitHub.</p></div>
-        <div class="step"><h3>Распакуй</h3><p>В любую папку. Скины, бинды и ник подхватятся из <code>%APPDATA%\DDNet</code>, как в DDNet.</p></div>
-        <div class="step"><h3>Запусти KING.exe</h3><p>Пресет для KoG включится сам. Режим инпута меняется в Настройки → KING.</p></div>
-      </div>
-      <div class="cta" style="margin-top:34px">
-        <a class="btn btn-gold" data-dl href="https://github.com/RoGGyt/KING/releases/latest" target="_blank" rel="noopener">Скачать KING</a>
-        <a class="btn btn-ghost" href="https://github.com/RoGGyt/KING" target="_blank" rel="noopener">Исходный код</a>
-      </div>
-    </div>
-  </section>
 </main>
 
-<footer>
-  <div class="wrap foot">
-    <span>KING by RoGGyt</span>
-    <span>Основан на открытых DDNet и TClient · лицензия zlib</span>
-  </div>
+<footer class="wrap">
+  KING сделан RoGGyt на основе открытых DDNet и TClient. <a href="https://github.com/RoGGyt/KING" target="_blank" rel="noopener">Исходный код на GitHub</a>
 </footer>
 
 <script>
-(function () {
-  // version and download link come from the latest GitHub release
-  fetch("https://api.github.com/repos/RoGGyt/KING/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (rel) {
-      if (!rel || !rel.tag_name) return;
-      var ver = rel.tag_name.replace(/^v/i, "");
-      document.querySelectorAll("[data-ver]").forEach(function (el) { el.textContent = ver; });
-      var zip = (rel.assets || []).find(function (a) { return /win64\.zip$/i.test(a.name); });
-      if (zip) {
-        document.querySelectorAll("[data-zip]").forEach(function (el) { el.textContent = zip.name; });
-        document.querySelectorAll("[data-dl]").forEach(function (el) { el.href = zip.browser_download_url; el.removeAttribute("target"); });
-      }
-    })
-    .catch(function () {});
-})();
+// version and download link come from the latest GitHub release
+fetch("https://api.github.com/repos/RoGGyt/KING/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (rel) {
+    if (!rel || !rel.tag_name) return;
+    var ver = rel.tag_name.replace(/^v/i, "");
+    document.querySelectorAll("[data-ver]").forEach(function (el) { el.textContent = ver; });
+    var zip = (rel.assets || []).find(function (a) { return /win64\.zip$/i.test(a.name); });
+    if (zip) document.querySelectorAll("[data-dl]").forEach(function (el) { el.href = zip.browser_download_url; el.removeAttribute("target"); });
+  })
+  .catch(function () {});
 </script>
 
 </body>
