@@ -66,7 +66,7 @@ a { color: inherit; }
 main { overflow-x: clip; }
 
 /* top bar */
-.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; }
+.bar { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; }
 .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; font-size: 19px; letter-spacing: 0.02em; }
 .logo img { width: 34px; height: auto; }
 .bar nav { display: flex; gap: 6px; }
@@ -77,7 +77,7 @@ main { overflow-x: clip; }
 .hero { text-align: center; padding: 40px 0 96px; position: relative; }
 .halo { position: relative; width: min(360px, 80vw); margin: 0 auto; }
 .halo::before {
-  content: ""; position: absolute; inset: -38% -45%; z-index: 0;
+  content: ""; position: absolute; inset: -38% -45%; z-index: 0; pointer-events: none;
   background: radial-gradient(closest-side, rgba(243, 183, 70, 0.34), rgba(243, 183, 70, 0.10) 55%, transparent 100%);
   filter: blur(12px);
 }
@@ -124,23 +124,6 @@ main { overflow-x: clip; }
 .mode.on { background: var(--raised); }
 .mode.on .dot { box-shadow: inset 0 0 0 5px var(--gold); }
 .mode.on span:last-child { color: var(--gold); }
-
-/* TAB picture */
-.tab-row { display: grid; grid-template-columns: 30px 34px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 16px; }
-.tab-row + .tab-row { margin-top: 4px; }
-.tab-row.me { background: var(--raised); }
-.tab-row img { width: 30px; height: auto; }
-.tee { width: 32px; height: 32px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 70%, white), var(--c) 60%, color-mix(in srgb, var(--c) 70%, black)); }
-.tab-row .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tab-row .time { font-size: 15px; color: var(--soft); font-variant-numeric: tabular-nums; }
-
-/* music pill picture */
-.stage { display: grid; place-items: center; min-height: 260px; border-radius: 28px; background: radial-gradient(420px 220px at 50% 40%, #2a2d4d, var(--night)); box-shadow: inset 0 0 0 1px var(--edge); }
-.pill { display: flex; align-items: center; gap: 16px; padding: 10px 18px 10px 10px; border-radius: 22px; background: rgba(8, 9, 18, 0.72); box-shadow: inset 0 0 0 1px var(--edge), 0 20px 40px -16px rgba(0, 0, 0, 0.9); }
-.cover { width: 56px; height: 56px; border-radius: 14px; background: radial-gradient(circle at 30% 25%, #ffb3c9, #c2477d 45%, #4b2a8a); }
-.clock { font-weight: 700; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
-.eq { display: flex; align-items: center; gap: 4px; height: 40px; }
-.eq i { width: 5px; border-radius: 4px; background: linear-gradient(180deg, #ffd27e, var(--gold-deep)); }
 
 /* the rest, as a plain list */
 .more { padding-block: 72px 40px; }
@@ -224,38 +207,11 @@ footer a { color: var(--soft); }
       </div>
     </section>
 
-    <section class="feature flip">
-      <div class="text">
-        <h2>Корона для своих</h2>
-        <p>Все, кто играет в KING, видят друг у друга золотую корону: слева от ника в игре и рядом с тишкой в TAB.</p>
-        <p>Никаких серверов и регистрации. Метка спрятана в цветах скина и привязана к нику, поэтому скопировать её нельзя.</p>
-      </div>
-      <div class="panel" aria-label="Пример: таблица игроков с коронами">
-        <div class="tab-row me"><img src="crown.png" alt="KING"><span class="tee" style="--c:#e0679b"></span><span class="name">RoGGyt</span><span class="time">06:53.12</span></div>
-        <div class="tab-row"><img src="crown.png" alt="KING"><span class="tee" style="--c:#5d86e6"></span><span class="name">nameless tee</span><span class="time">07:12.40</span></div>
-        <div class="tab-row"><span></span><span class="tee" style="--c:#d8ae62"></span><span class="name">brainless tee</span><span class="time">08:01.05</span></div>
-        <div class="tab-row"><span></span><span class="tee" style="--c:#73c08a"></span><span class="name">tee</span><span class="time"></span></div>
-      </div>
-    </section>
-
-    <section class="feature">
-      <div class="text">
-        <h2>Твоя музыка прямо у таймера</h2>
-        <p>Таймер забега становится плеером: обложка трека слева, визуализатор справа. Работает со Spotify, Яндекс Музыкой и браузером.</p>
-        <p>Визуализатор слушает только музыку, а не звуки игры. Текст песни можно включить по желанию.</p>
-      </div>
-      <div class="stage" aria-label="Пример: таймер с музыкой">
-        <div class="pill">
-          <div class="cover"></div>
-          <div class="clock">06:53</div>
-          <div class="eq" aria-hidden="true"><i style="height:38%"></i><i style="height:72%"></i><i style="height:100%"></i><i style="height:58%"></i><i style="height:84%"></i><i style="height:44%"></i><i style="height:66%"></i></div>
-        </div>
-      </div>
-    </section>
-
     <section class="more">
       <h2>И ещё</h2>
       <ul class="list">
+        <li><h3>Корона KING</h3><p>Игроки KING видят друг у друга золотую корону рядом с ником.</p></li>
+        <li><h3>Музыка у таймера</h3><p>Обложка трека и визуализатор прямо рядом с таймером забега.</p></li>
         <li><h3>Журнал лагов</h3><p>Если тишку дёрнуло, в журнале видно почему: опоздавшее нажатие, фриз кадра, потеря пакетов или игрок рядом.</p></li>
         <li><h3>Меню игрока в TAB</h3><p>Позвать в тиму, шепнуть, скопировать скин, /swap и часы с поинтами игрока в один клик.</p></li>
         <li><h3>Оптимизация</h3><p>Без частиц, квадов и лишних деталей карты, плюс высокий приоритет процесса. Физика и инпут не меняются.</p></li>
