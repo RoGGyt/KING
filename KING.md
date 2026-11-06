@@ -46,3 +46,19 @@ KING is a DDNet client for KoG (King of Gores), based on [TClient](https://githu
 The Windows build runs on GitHub Actions (`.github/workflows/king-windows.yml`). Push to the repository, then download `KING-win64` from the run's artifacts. Pushing a tag `v*` also attaches the zip to a release.
 
 To build locally, follow DDNet's normal build steps (see README.md). The executable is called `KING`.
+
+### KING players in the server browser
+
+The server list already contains every player's name and skin colors, and the
+KING crown signature lives in those colors (see `src/engine/shared/king_badge.h`).
+So KING finds KING players on every server by itself, without a server of its own:
+
+- a crown column in the server list, with the number of KING players when there is more than one;
+- a crown tab next to Filters / Info / Friends: total KING players, the list for all servers
+  (grouped by server; click selects the server, double click joins) or for the selected server
+  (tee, name, clan);
+- `kg_browser_filter_king`: only show servers with KING players.
+
+Limits: only players with custom skin colors are visible in the list (servers send no colors
+otherwise; in game the crown works either way), KING 1.0.17 or newer, and the server has to
+report skins in its info (DDNet based servers do).

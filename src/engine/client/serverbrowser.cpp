@@ -2,6 +2,8 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "serverbrowser.h"
 
+#include <engine/shared/king_badge.h>
+
 #include "serverbrowser_http.h"
 #include "serverbrowser_ping_cache.h"
 
@@ -606,10 +608,11 @@ void CServerBrowser::Filter()
 		}
 
 		UpdateServerFriends(&Info);
+		UpdateServerKing(&Info);
 
 		if(!Filtered)
 		{
-			if(!g_Config.m_BrFilterFriends || Info.m_FriendState != IFriends::FRIEND_NO)
+			if((!g_Config.m_BrFilterFriends || Info.m_FriendState != IFriends::FRIEND_NO) && (!g_Config.m_KgBrowserFilterKing || Info.m_NumKingPlayers > 0))
 			{
 				m_NumSortedPlayers += Info.m_NumFilteredPlayers;
 				m_vSortedServerlist.push_back(ServerIndex);
@@ -647,6 +650,7 @@ int CServerBrowser::SortHash() const
 	i |= g_Config.m_BrFilterCountry << 14;
 	i |= g_Config.m_BrFilterConnectingPlayers << 15;
 	i |= g_Config.m_BrFilterLogin << 16;
+	i |= g_Config.m_KgBrowserFilterKing << 17;
 	return i;
 }
 
@@ -1675,6 +1679,17 @@ void CServerBrowser::UpdateServerFriends(CServerInfo *pInfo) const
 		pInfo->m_FriendState = std::max(pInfo->m_FriendState, Client.m_FriendState);
 		if(Client.m_FriendState != IFriends::FRIEND_NO)
 			pInfo->m_FriendNum++;
+	}
+}
+
+void CServerBrowser::UpdateServerKing(CServerInfo *pInfo) const
+{
+	pInfo->m_NumKingPlayers = 0;
+	for(auto &Client : pInfo->m_vClients)
+	{
+		Client.m_King = Client.m_CustomSkinColors && KingBadgeMarked(Client.m_aName, Client.m_CustomSkinColorBody, Client.m_CustomSkinColorFeet);
+		if(Client.m_King)
+			pInfo->m_NumKingPlayers++;
 	}
 }
 

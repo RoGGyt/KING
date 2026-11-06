@@ -96,6 +96,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		COL_GAMETYPE,
 		COL_MAP,
 		COL_FRIENDS,
+		COL_KING,
 		COL_PLAYERS,
 		COL_PING,
 	};
@@ -130,6 +131,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		{COL_GAMETYPE, IServerBrowser::SORT_GAMETYPE, Localizable("Type"), 1, 50.0f, {0}},
 		{COL_MAP, IServerBrowser::SORT_MAP, Localizable("Map"), 1, 120.0f + (Headers.w - 480) / 8, {0}},
 		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, ClickableIconSpace, {0}},
+		{COL_KING, -1, "", 1, ClickableIconSpace, {0}},
 		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 60.0f, {0}},
 		{-1, -1, "", 1, 4.0f, {0}},
 		{COL_PING, IServerBrowser::SORT_PING, Localizable("Ping"), 1, 40.0f, {0}},
@@ -194,6 +196,10 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			Ui()->DoLabel(&Col.m_Rect, FontIcon::HEART, 14.0f, TEXTALIGN_MC);
 			TextRender()->SetRenderFlags(0);
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+		else if(Col.m_Id == COL_KING)
+		{
+			KingDrawCrownIcon(Col.m_Rect, 13.0f, 1.0f);
 		}
 		else if(Col.m_Id == COL_FLAG_FAV)
 		{
@@ -432,6 +438,23 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 						str_format(aTemp, sizeof(aTemp), "%d", pItem->m_FriendNum);
 						TextRender()->TextColor(0.94f, 0.8f, 0.8f, 1.0f);
 						Ui()->DoLabel(&Button, aTemp, 9.0f, TEXTALIGN_MC);
+						TextRender()->TextColor(TextRender()->DefaultTextColor());
+					}
+				}
+			}
+			else if(Id == COL_KING)
+			{
+				if(pItem->m_NumKingPlayers > 0)
+				{
+					KingDrawCrownIcon(Button, 13.0f, 1.0f);
+					if(pItem->m_NumKingPlayers > 1)
+					{
+						str_format(aTemp, sizeof(aTemp), "%d", pItem->m_NumKingPlayers);
+						CUIRect Count = Button;
+						Count.HSplitBottom(9.0f, nullptr, &Count);
+						Count.VSplitRight(1.0f, &Count, nullptr);
+						TextRender()->TextColor(1.0f, 0.86f, 0.5f, 1.0f);
+						Ui()->DoLabel(&Count, aTemp, 8.0f, TEXTALIGN_BR);
 						TextRender()->TextColor(TextRender()->DefaultTextColor());
 					}
 				}
@@ -1770,14 +1793,16 @@ enum
 	UI_TOOLBOX_PAGE_FILTERS = 0,
 	UI_TOOLBOX_PAGE_INFO,
 	UI_TOOLBOX_PAGE_FRIENDS,
+	UI_TOOLBOX_PAGE_KING,
 	NUM_UI_TOOLBOX_PAGES,
 };
 
 void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 {
-	CUIRect FilterTabButton, InfoTabButton, FriendsTabButton;
-	TabBar.VSplitLeft(TabBar.w / 3.0f, &FilterTabButton, &TabBar);
-	TabBar.VSplitMid(&InfoTabButton, &FriendsTabButton);
+	CUIRect FilterTabButton, InfoTabButton, FriendsTabButton, KingTabButton;
+	TabBar.VSplitLeft(TabBar.w / 4.0f, &FilterTabButton, &TabBar);
+	TabBar.VSplitLeft(TabBar.w / 3.0f, &InfoTabButton, &TabBar);
+	TabBar.VSplitMid(&FriendsTabButton, &KingTabButton);
 
 	const ColorRGBA ColorActive = ColorRGBA(0.0f, 0.0f, 0.0f, 0.3f);
 	const ColorRGBA ColorInactive = ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f);
@@ -1812,8 +1837,181 @@ void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_FriendsTabButton, &FriendsTabButton, Localize("Friends"));
 
+	static CButtonContainer s_KingTabButton;
+	if(DoButton_MenuTab(&s_KingTabButton, "", g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_KING, &KingTabButton, IGraphics::CORNER_T, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_KING], &ColorInactive, &ColorActive))
+	{
+		g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_KING;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_KingTabButton, &KingTabButton, "KING players");
+
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+	KingDrawCrownIcon(KingTabButton, 16.0f, g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_KING ? 1.0f : 0.7f);
+}
+
+void CMenus::KingDrawCrownIcon(const CUIRect &Rect, float Size, float Alpha)
+{
+	GameClient()->m_King.RenderCrown(Rect.x + (Rect.w - Size) / 2.0f, Rect.y + Rect.h / 2.0f, Size, Alpha);
+}
+
+// KING players found in the server list (crown signature in the skin colors).
+// Same idea as BestClient's player tab, but needs no server of our own.
+void CMenus::RenderServerbrowserKing(CUIRect View)
+{
+	const float FontSize = 10.0f;
+	const float RowHeight = 18.0f;
+	View.Margin(5.0f, &View);
+
+	struct SKingEntry
+	{
+		const CServerInfo *m_pServer;
+		const CServerInfo::CClient *m_pClient; // nullptr: header row of a server
+	};
+	static bool s_AllServers = true;
+
+	int Total = 0;
+	int ServersWithKing = 0;
+	for(int i = 0; i < ServerBrowser()->NumSortedServers(); i++)
+	{
+		const int Num = ServerBrowser()->SortedGet(i)->m_NumKingPlayers;
+		Total += Num;
+		ServersWithKing += Num > 0;
+	}
+
+	CUIRect Row, Button;
+	View.HSplitTop(RowHeight, &Row, &View);
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "KING players: %d", Total);
+	Row.VSplitLeft(RowHeight, &Button, &Row);
+	KingDrawCrownIcon(Button, 14.0f, 1.0f);
+	Row.VSplitLeft(4.0f, nullptr, &Row);
+	Ui()->DoLabel(&Row, aBuf, FontSize + 2.0f, TEXTALIGN_ML);
+
+	View.HSplitTop(4.0f, nullptr, &View);
+	View.HSplitTop(RowHeight, &Row, &View);
+	{
+		CUIRect AllButton, SelectedButton;
+		Row.VSplitMid(&AllButton, &SelectedButton, 2.0f);
+		static CButtonContainer s_AllButton, s_SelectedButton;
+		if(DoButton_Menu(&s_AllButton, "All servers", s_AllServers, &AllButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+			s_AllServers = true;
+		if(DoButton_Menu(&s_SelectedButton, "Selected server", !s_AllServers, &SelectedButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+			s_AllServers = false;
+	}
+
+	View.HSplitBottom(RowHeight, &View, &Row);
+	View.HSplitBottom(4.0f, &View, nullptr);
+	if(DoButton_CheckBox(&g_Config.m_KgBrowserFilterKing, "Only servers with KING players", g_Config.m_KgBrowserFilterKing, &Row))
+		g_Config.m_KgBrowserFilterKing ^= 1;
+	View.HSplitTop(6.0f, nullptr, &View);
+
+	std::vector<SKingEntry> vEntries;
+	const CServerInfo *pSelected = nullptr;
+	for(int i = 0; i < ServerBrowser()->NumSortedServers(); i++)
+	{
+		const CServerInfo *pInfo = ServerBrowser()->SortedGet(i);
+		if(str_comp(pInfo->m_aAddress, g_Config.m_UiServerAddress) == 0)
+			pSelected = pInfo;
+	}
+	if(s_AllServers)
+	{
+		for(int i = 0; i < ServerBrowser()->NumSortedServers(); i++)
+		{
+			const CServerInfo *pInfo = ServerBrowser()->SortedGet(i);
+			if(pInfo->m_NumKingPlayers <= 0)
+				continue;
+			vEntries.push_back({pInfo, nullptr});
+			for(const auto &Client : pInfo->m_vClients)
+				if(Client.m_King)
+					vEntries.push_back({pInfo, &Client});
+		}
+	}
+	else if(pSelected)
+	{
+		for(const auto &Client : pSelected->m_vClients)
+			if(Client.m_King)
+				vEntries.push_back({pSelected, &Client});
+	}
+
+	if(vEntries.empty())
+	{
+		const char *pText = s_AllServers ? "No KING players in the server list" : (pSelected ? "No KING players on this server" : "No server selected");
+		Ui()->DoLabel(&View, pText, FontSize, TEXTALIGN_MC);
+		return;
+	}
+
+	static CListBox s_ListBox;
+	s_ListBox.DoAutoSpacing(2.0f);
+	s_ListBox.SetScrollbarWidth(14.0f);
+	s_ListBox.SetScrollbarMargin(4.0f);
+	s_ListBox.DoStart(24.0f, (int)vEntries.size(), 1, 1, -1, &View, false, IGraphics::CORNER_NONE, true);
+	static std::vector<char> s_vIds;
+	s_vIds.resize(std::max(s_vIds.size(), vEntries.size()));
+	for(size_t i = 0; i < vEntries.size(); i++)
+	{
+		const SKingEntry &Entry = vEntries[i];
+		const bool Selected = str_comp(Entry.m_pServer->m_aAddress, g_Config.m_UiServerAddress) == 0;
+		const CListboxItem Item = s_ListBox.DoNextItem(&s_vIds[i], Selected && Entry.m_pClient == nullptr);
+		if(!Item.m_Visible)
+			continue;
+
+		if(!Entry.m_pClient)
+		{
+			// server header: name and how many KING players are there
+			Item.m_Rect.Draw(Selected ? ColorRGBA(0.95f, 0.72f, 0.27f, 0.28f) : ColorRGBA(0.95f, 0.72f, 0.27f, 0.12f), IGraphics::CORNER_ALL, 4.0f);
+			CUIRect Label = Item.m_Rect, Count;
+			Label.VMargin(6.0f, &Label);
+			Label.VSplitRight(40.0f, &Label, &Count);
+			SLabelProperties Props;
+			Props.m_MaxWidth = Label.w;
+			Props.m_EllipsisAtEnd = true;
+			Ui()->DoLabel(&Label, Entry.m_pServer->m_aName, FontSize, TEXTALIGN_ML, Props);
+			str_format(aBuf, sizeof(aBuf), "%d", Entry.m_pServer->m_NumKingPlayers);
+			TextRender()->TextColor(1.0f, 0.86f, 0.5f, 1.0f);
+			Ui()->DoLabel(&Count, aBuf, FontSize, TEXTALIGN_MR);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			continue;
+		}
+
+		const CServerInfo::CClient &Client = *Entry.m_pClient;
+		Item.m_Rect.Draw(PlayerBackgroundColor(Client.m_FriendState == IFriends::FRIEND_PLAYER, Client.m_FriendState == IFriends::FRIEND_CLAN, Client.m_Afk, false, false), IGraphics::CORNER_ALL, 4.0f);
+		CUIRect Rect = Item.m_Rect, Skin, Name, Clan, Crown;
+		Rect.VMargin(s_AllServers ? 10.0f : 3.0f, &Rect);
+		Rect.VSplitLeft(Rect.h, &Skin, &Rect);
+		Rect.VSplitLeft(5.0f, nullptr, &Rect);
+		Rect.VSplitRight(Rect.h * 0.8f, &Rect, &Crown);
+		Rect.HSplitMid(&Name, &Clan);
+		if(Client.m_aSkin[0] != '\0')
+		{
+			const CTeeRenderInfo TeeInfo = GetTeeRenderInfo(vec2(Skin.w, Skin.h), Client.m_aSkin, Client.m_CustomSkinColors, Client.m_CustomSkinColorBody, Client.m_CustomSkinColorFeet);
+			const CAnimState *pIdleState = CAnimState::GetIdle();
+			vec2 OffsetToMid;
+			CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
+			RenderTools()->RenderTee(pIdleState, &TeeInfo, Client.m_Afk ? EMOTE_BLINK : EMOTE_NORMAL, vec2(1.0f, 0.0f), vec2(Skin.x + TeeInfo.m_Size / 2.0f, Skin.y + Skin.h / 2.0f + OffsetToMid.y));
+		}
+		SLabelProperties Props;
+		Props.m_MaxWidth = Name.w;
+		Props.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&Name, Client.m_aName, FontSize, TEXTALIGN_ML, Props);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
+		Props.m_MaxWidth = Clan.w;
+		Ui()->DoLabel(&Clan, Client.m_aClan, FontSize - 2.0f, TEXTALIGN_ML, Props);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		KingDrawCrownIcon(Crown, Crown.w, 1.0f);
+	}
+
+	const int Clicked = s_ListBox.DoEnd();
+	if(Clicked >= 0 && Clicked < (int)vEntries.size())
+	{
+		const CServerInfo *pServer = vEntries[Clicked].m_pServer;
+		if(s_ListBox.WasItemSelected() || s_ListBox.WasItemActivated())
+		{
+			str_copy(g_Config.m_UiServerAddress, pServer->m_aAddress);
+			m_ServerBrowserShouldRevealSelection = true;
+		}
+		if(s_ListBox.WasItemActivated())
+			Connect(pServer->m_aAddress);
+	}
 }
 
 void CMenus::RenderServerbrowserToolBox(CUIRect ToolBox)
@@ -1830,6 +2028,9 @@ void CMenus::RenderServerbrowserToolBox(CUIRect ToolBox)
 		return;
 	case UI_TOOLBOX_PAGE_FRIENDS:
 		RenderServerbrowserFriends(ToolBox);
+		return;
+	case UI_TOOLBOX_PAGE_KING:
+		RenderServerbrowserKing(ToolBox);
 		return;
 	default:
 		dbg_assert_failed("ui_toolbox_page invalid");

@@ -120,7 +120,6 @@ public:
 	// and feet, invisible). The signature is a hash of the player's name and the rest
 	// of the colors, so a random color matches 1 in 65536 times and a copied skin
 	// (other client, other name) does not carry the crown.
-	static constexpr int BADGE_COLOR_MASK = 0x030707;
 	static uint32_t BadgeSignature(const char *pName, int Body, int Feet);
 	static int MarkColorBody(int Color, int Feet, const char *pName);
 	static int MarkColorFeet(int Body, int Color, const char *pName);

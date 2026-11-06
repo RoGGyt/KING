@@ -276,6 +276,7 @@ public:
 	void LoadDDNetServers();
 	void UpdateServerFilteredPlayers(CServerInfo *pInfo) const;
 	void UpdateServerFriends(CServerInfo *pInfo) const;
+	void UpdateServerKing(CServerInfo *pInfo) const;
 	void UpdateServerCommunity(CServerInfo *pInfo) const;
 	void UpdateServerRank(CServerInfo *pInfo) const;
 	void UpdateServerLatency(CServerInfo *pInfo, int OwnLocation) const;

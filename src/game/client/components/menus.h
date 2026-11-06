@@ -547,6 +547,8 @@ protected:
 	void RenderServerbrowserInfo(CUIRect View);
 	void RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *pSelectedServer);
 	void RenderServerbrowserFriends(CUIRect View);
+	void RenderServerbrowserKing(CUIRect View);
+	void KingDrawCrownIcon(const CUIRect &Rect, float Size, float Alpha);
 	void FriendlistOnUpdate();
 	void PopupConfirmRemoveFriend();
 	void RenderServerbrowserTabBar(CUIRect TabBar);
@@ -752,6 +754,7 @@ public:
 		SMALL_TAB_BROWSER_FILTER,
 		SMALL_TAB_BROWSER_INFO,
 		SMALL_TAB_BROWSER_FRIENDS,
+		SMALL_TAB_BROWSER_KING,
 
 		SMALL_TAB_LENGTH,
 	};

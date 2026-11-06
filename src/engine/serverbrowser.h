@@ -78,6 +78,7 @@ public:
 		bool m_Player;
 		bool m_Afk;
 		int m_FriendState;
+		bool m_King = false; // plays KING (crown signature in the skin colors)
 		// skin info 0.6
 		char m_aSkin[MAX_SKIN_LENGTH];
 		bool m_CustomSkinColors;
@@ -100,6 +101,7 @@ public:
 	int m_QuickSearchHit;
 	int m_FriendState;
 	int m_FriendNum;
+	int m_NumKingPlayers = 0;
 
 	int m_MaxClients;
 	int m_NumClients;

@@ -1,6 +1,7 @@
 /* KING client: input modes, KoG preset, network HUD, lag log, music player and update check. */
 #include "king.h"
 #include "king_install.h"
+#include <engine/shared/king_badge.h>
 #include "king_system.h"
 
 #include <base/color.h>
@@ -1804,33 +1805,9 @@ void CKing::RenderFpsFog()
 
 // ***** KING crown ***** //
 
-static int KingBadgeApply(int Color, uint32_t Bits)
-{
-	return (Color & ~CKing::BADGE_COLOR_MASK) | (int)((Bits & 3) << 16) | (int)(((Bits >> 2) & 7) << 8) | (int)((Bits >> 5) & 7);
-}
-
-static uint32_t KingBadgeRead(int Color)
-{
-	return (uint32_t)((Color >> 16) & 3) | (uint32_t)(((Color >> 8) & 7) << 2) | (uint32_t)((Color & 7) << 5);
-}
-
 uint32_t CKing::BadgeSignature(const char *pName, int Body, int Feet)
 {
-	// FNV-1a; the name without whitespace/control bytes (servers clean those up)
-	uint32_t Hash = 2166136261u;
-	auto Add = [&Hash](uint8_t Byte) {
-		Hash ^= Byte;
-		Hash *= 16777619u;
-	};
-	for(const char *p = "KING-crown-1"; *p; p++)
-		Add((uint8_t)*p);
-	for(const char *p = pName; *p; p++)
-		if((uint8_t)*p > 32)
-			Add((uint8_t)*p);
-	for(int Color : {Body & ~BADGE_COLOR_MASK, Feet & ~BADGE_COLOR_MASK})
-		for(int i = 0; i < 4; i++)
-			Add((uint8_t)(Color >> (i * 8)));
-	return (Hash ^ (Hash >> 16)) & 0xFFFF;
+	return KingBadgeSignature(pName, Body, Feet);
 }
 
 int CKing::MarkColorBody(int Color, int Feet, const char *pName)
@@ -1852,10 +1829,7 @@ bool CKing::IsKingPlayer(int ClientId) const
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
 		return false;
 	const CGameClient::CClientData &Client = GameClient()->m_aClients[ClientId];
-	if(!Client.m_Active || !Client.m_aName[0])
-		return false;
-	const uint32_t Signature = BadgeSignature(Client.m_aName, Client.m_ColorBody, Client.m_ColorFeet);
-	return KingBadgeRead(Client.m_ColorBody) == (Signature & 0xFF) && KingBadgeRead(Client.m_ColorFeet) == (Signature >> 8);
+	return Client.m_Active && KingBadgeMarked(Client.m_aName, Client.m_ColorBody, Client.m_ColorFeet);
 }
 
 void CKing::RenderCrown(float X, float CenterY, float Size, float Alpha) const
