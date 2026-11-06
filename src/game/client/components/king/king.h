@@ -223,6 +223,7 @@ private:
 	// lag monitor
 	SLagStats m_LagStats;
 	IOHANDLE m_LagLogFile = nullptr;
+	ASYNCIO *m_pLagLogAio = nullptr;
 	int64_t m_OnlineSince = 0;
 	int64_t m_LastSnapshotTime = 0;
 	int64_t m_LastStutterTime = 0;

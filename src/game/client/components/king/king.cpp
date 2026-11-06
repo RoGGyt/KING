@@ -1,6 +1,7 @@
 /* KING client: input modes, KoG preset, network HUD, lag log, music player and update check. */
 #include "king.h"
 #include "king_install.h"
+#include <base/aio.h>
 #include <engine/shared/king_badge.h>
 #include "king_system.h"
 
@@ -808,6 +809,9 @@ void CKing::LagLogOpen()
 	m_LagLogFile = Storage()->OpenFile(KING_LAG_LOG, IOFLAG_APPEND, IStorage::TYPE_SAVE);
 	if(!m_LagLogFile)
 		return;
+	// all writes go through a background thread: a slow disk or an antivirus scan
+	// must never hold up a frame
+	m_pLagLogAio = aio_new(m_LagLogFile);
 
 	char aAddr[NETADDR_MAXSTRSIZE];
 	net_addr_str(&Client()->ServerAddress(), aAddr, sizeof(aAddr), true);
@@ -815,7 +819,7 @@ void CKing::LagLogOpen()
 	str_timestamp_format(aDate, sizeof(aDate), TimestampFormat::SPACE);
 	char aLine[512];
 	str_format(aLine, sizeof(aLine), "\n==== %s | KING %s | server %s | map %s\n", aDate, KING_VERSION, aAddr, GameClient()->Map()->IsLoaded() ? GameClient()->Map()->BaseName() : "?");
-	io_write(m_LagLogFile, aLine, str_length(aLine));
+	aio_write(m_pLagLogAio, aLine, str_length(aLine));
 	LagLogSettings("settings");
 	m_LoggedSettings = SettingsSignature();
 	m_SettingsChangedSince = 0;
@@ -823,9 +827,12 @@ void CKing::LagLogOpen()
 
 void CKing::LagLogClose()
 {
-	if(m_LagLogFile)
+	if(m_pLagLogAio)
 	{
-		io_close(m_LagLogFile);
+		aio_close(m_pLagLogAio); // also closes m_LagLogFile
+		aio_wait(m_pLagLogAio);
+		aio_free(m_pLagLogAio);
+		m_pLagLogAio = nullptr;
 		m_LagLogFile = nullptr;
 	}
 }
@@ -843,7 +850,7 @@ void CKing::LagLog(const char *pFormat, ...)
 	str_timestamp_format(aTime, sizeof(aTime), TimestampFormat::TIME);
 	char aLine[832];
 	str_format(aLine, sizeof(aLine), "%s  %s\n", aTime, aMsg);
-	io_write(m_LagLogFile, aLine, str_length(aLine)); // buffered, flushed every few seconds
+	aio_write(m_pLagLogAio, aLine, str_length(aLine)); // written by a background thread
 }
 
 void CKing::OnNewSnapshot()
@@ -1026,12 +1033,6 @@ void CKing::UpdateLagMonitor()
 		m_SeenPredResets = Stats.m_PredictionResets;
 		if(Settled)
 			LagLog("prediction time reset (connection hiccup, the client resynced its clock)");
-	}
-
-	if(m_LagLogFile && Now - m_LastLogFlush > 5 * Freq)
-	{
-		io_flush(m_LagLogFile);
-		m_LastLogFlush = Now;
 	}
 
 	if(Now - m_LastSummary > 60 * Freq)
@@ -1720,6 +1721,12 @@ void CKing::AutoSaveConfig()
 		return;
 	m_LastConfigCheck = Now;
 
+	// while you play nothing is hashed or saved at all (hashing every setting
+	// costs about a millisecond); changes are picked up once the menu opens
+	const bool Playing = Client()->State() == IClient::STATE_ONLINE && !GameClient()->m_Menus.IsActive();
+	if(Playing && m_ConfigHashValid)
+		return;
+
 	const uint64_t Hash = ConfigHash();
 	if(!m_ConfigHashValid)
 	{
@@ -1733,8 +1740,7 @@ void CKing::AutoSaveConfig()
 		m_ConfigDirty = true;
 		m_ConfigDirtySince = Now;
 	}
-	const bool Playing = Client()->State() == IClient::STATE_ONLINE && !GameClient()->m_Menus.IsActive();
-	if(m_ConfigDirty && !Playing && Now - m_ConfigDirtySince > 2 * Freq && Now - m_LastConfigSave > 10 * Freq)
+	if(m_ConfigDirty && Now - m_ConfigDirtySince > 2 * Freq && Now - m_LastConfigSave > 10 * Freq)
 	{
 		m_ConfigDirty = false;
 		m_LastConfigSave = Now;
