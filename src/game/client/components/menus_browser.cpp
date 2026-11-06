@@ -674,6 +674,7 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 
 			SMenuButtonProperties Props;
 			Props.m_HintRequiresStringCheck = true;
+			Props.m_HintCanChangePositionOrSize = true; // the layout follows menu size and aspect ratio
 			Props.m_UseIconFont = true;
 
 			static CButtonContainer s_RefreshButton;
@@ -688,6 +689,7 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 			const auto &&ConnectLabelFunc = []() { return FontIcon::RIGHT_TO_BRACKET; };
 
 			SMenuButtonProperties Props;
+			Props.m_HintCanChangePositionOrSize = true;
 			Props.m_UseIconFont = true;
 			Props.m_Color = ColorRGBA(0.5f, 1.0f, 0.5f, 0.5f);
 

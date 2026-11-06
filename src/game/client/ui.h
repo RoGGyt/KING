@@ -454,6 +454,8 @@ private:
 
 	CUIRect m_Screen;
 	float m_ScreenScaleOverride = 0.0f; // KING
+	float m_LayoutScreenW = 0.0f; // virtual screen the cached UI elements were built for
+	float m_LayoutScreenH = 0.0f;
 
 	std::vector<CUIRect> m_vClips;
 	void UpdateClipping();

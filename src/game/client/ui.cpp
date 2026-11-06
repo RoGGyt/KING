@@ -474,6 +474,19 @@ const CUIRect *CUi::Screen()
 	// KING: a smaller virtual screen makes every menu element bigger (GUI scale)
 	m_Screen.h = 600.0f / ScreenScale();
 	m_Screen.w = Graphics()->ScreenAspect() * m_Screen.h;
+
+	// Some buttons (server browser refresh/connect, ...) cache their quads at the
+	// position of their first frame. Stock DDNet only changes the virtual screen on
+	// a window resize and resets them there; KING also changes it with the menu size
+	// and the aspect ratio option, so reset them whenever the layout screen changes.
+	// (The temporary scoreboard/chat size override is not a layout change.)
+	if(m_ScreenScaleOverride <= 0.0f)
+	{
+		if(m_LayoutScreenW > 0.0f && (m_LayoutScreenW != m_Screen.w || m_LayoutScreenH != m_Screen.h))
+			OnElementsReset();
+		m_LayoutScreenW = m_Screen.w;
+		m_LayoutScreenH = m_Screen.h;
+	}
 	return &m_Screen;
 }
 
