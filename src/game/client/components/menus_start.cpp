@@ -23,6 +23,13 @@
 #include <android/android_main.h>
 #endif
 
+// The wordmark texture (tclient/gui_logo.png) is 694x282 of artwork inside a
+// KING_LOGO_PAD transparent border: without the border, texture filtering pulled
+// pixels from the opposite edge in and drew thin lines above and below the letters.
+static constexpr float KING_LOGO_W = 694.0f;
+static constexpr float KING_LOGO_H = 282.0f;
+static constexpr float KING_LOGO_PAD = 16.0f;
+
 void CMenusStart::RenderStartMenu(CUIRect MainView)
 {
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_START);
@@ -34,15 +41,9 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	}
 
 	// render logo
-	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
-	Graphics()->QuadsBegin();
-	Graphics()->SetColor(1, 1, 1, 1);
-	// KING wordmark is 1043x385
-	const float LogoH = 100.0f;
-	const float LogoW = LogoH * (1043.0f / 385.0f);
-	IGraphics::CQuadItem QuadItem(MainView.w / 2 - LogoW / 2, 70, LogoW, LogoH);
-	Graphics()->QuadsDrawTL(&QuadItem, 1);
-	Graphics()->QuadsEnd();
+	const float LogoH = 70.0f;
+	const float LogoW = LogoH * (KING_LOGO_W / KING_LOGO_H);
+	RenderKingLogo(MainView.w / 2 - LogoW / 2, 85, LogoH);
 
 	const float Rounding = 10.0f;
 	const float VMargin = MainView.w / 2 - (g_Config.m_KgMenuStyle ? 150.0f : 190.0f);
@@ -492,21 +493,30 @@ void CMenusStart::RenderKingPlayer(CUIRect Area)
 		GameClient()->m_Tooltips.DoToolTip(&s_TeeButton, &TeeRect, "Change skin");
 }
 
+// draws the artwork with its top left corner at X, Y and the artwork H high
+void CMenusStart::RenderKingLogo(float X, float Y, float H)
+{
+	const float Scale = H / KING_LOGO_H;
+	const float Pad = KING_LOGO_PAD * Scale;
+	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
+	Graphics()->WrapClamp();
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1, 1, 1, 1);
+	IGraphics::CQuadItem Item(X - Pad, Y - Pad, KING_LOGO_W * Scale + 2 * Pad, H + 2 * Pad);
+	Graphics()->QuadsDrawTL(&Item, 1);
+	Graphics()->QuadsEnd();
+	Graphics()->WrapNormal();
+}
+
 void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 {
 	int NewPage = -1;
 	const float Left = MainView.x + MainView.w * 0.1f;
 
-	// wordmark (694x282), left aligned
+	// wordmark, left aligned
 	const float LogoH = 62.0f;
-	const float LogoW = LogoH * (694.0f / 282.0f);
 	const float LogoY = MainView.y + MainView.h * 0.17f;
-	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
-	Graphics()->QuadsBegin();
-	Graphics()->SetColor(1, 1, 1, 1);
-	IGraphics::CQuadItem LogoItem(Left, LogoY, LogoW, LogoH);
-	Graphics()->QuadsDrawTL(&LogoItem, 1);
-	Graphics()->QuadsEnd();
+	RenderKingLogo(Left, LogoY, LogoH);
 
 	// menu
 	const float Row = 46.0f;
