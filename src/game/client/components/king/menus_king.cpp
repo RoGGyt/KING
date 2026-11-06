@@ -135,7 +135,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, "Fast input", 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 		TextLine(Ui(), LeftView, "20 ms = one tick. Higher shows you further ahead", 11.0f);
 		TextLine(Ui(), LeftView, "but corrects more when you change direction.", 11.0f);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgKingSmooth, "Smooth small corrections (40 ms glide, no jumps)", &g_Config.m_KgKingSmooth, &LeftView, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgKingSmooth, "Smooth small corrections (30 ms glide, no jumps)", &g_Config.m_KgKingSmooth, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_DELTA:
 		TextLine(Ui(), LeftView, "Fixed offset in hundredths of a tick, also between");

@@ -129,6 +129,15 @@ void CKing::OnInit()
 		g_Config.m_KgDefaultsVersion = 4;
 	}
 	g_Config.m_KgDefaultsVersion = std::max(g_Config.m_KgDefaultsVersion, 5);
+	if(g_Config.m_KgDefaultsVersion < 6)
+	{
+		// less input delay: margin cap 40 -> 28 ms, Smooth mode blend 60 -> 30 ms (only untouched defaults)
+		if(g_Config.m_KgAutoMarginMax == 40)
+			g_Config.m_KgAutoMarginMax = 28;
+		if(g_Config.m_KgSmoothMs == 60)
+			g_Config.m_KgSmoothMs = 30;
+		g_Config.m_KgDefaultsVersion = 6;
+	}
 	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
@@ -494,7 +503,7 @@ void CKing::UpdateBestInput()
 		// only how long corrections are blended follows the connection
 		const float Jitter = Stats.m_Valid ? Stats.m_JitterMs : 0.0f;
 		m_BestTarget = 20;
-		m_BestSmoothMs = Jitter < 3.0f ? 50 : (Jitter < 8.0f ? 70 : 100);
+		m_BestSmoothMs = Jitter < 3.0f ? 20 : (Jitter < 8.0f ? 25 : 30); // longer blends feel like input delay
 		m_BestCurve = SMOOTH_CURVE_SMOOTH;
 	}
 	else
@@ -504,7 +513,7 @@ void CKing::UpdateBestInput()
 		// hysteresis: ping noise must not make the offset flicker by 1 ms
 		if(g_Config.m_KgBestLatencyComp == 0 || absolute(Wanted - m_BestTarget) >= 2)
 			m_BestTarget = Wanted;
-		m_BestSmoothMs = round_to_int(g_Config.m_KgBestSmoothing * 1.5f);
+		m_BestSmoothMs = round_to_int(g_Config.m_KgBestSmoothing * 0.3f);
 		m_BestCurve = std::clamp(g_Config.m_KgBestInterpolation, 0, 2);
 	}
 	m_BestFastMs = m_BestTarget;

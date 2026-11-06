@@ -28,8 +28,8 @@ class CKingNetMonitor
 public:
 	static constexpr int WINDOW = 500; // ~10 s of inputs at 50 Hz
 	static constexpr int MIN_SAMPLES = 25;
-	static constexpr float HOLD_SECONDS = 20.0f; // keep a spike in mind this long
-	static constexpr float DECAY_SECONDS = 40.0f; // then forget it slowly
+	static constexpr float HOLD_SECONDS = 8.0f; // keep a spike in mind this long
+	static constexpr float DECAY_SECONDS = 15.0f; // then forget it (every ms of margin is input delay)
 
 	void Reset(float BaseMargin)
 	{
@@ -126,8 +126,8 @@ public:
 	}
 
 	// Moves the applied margin towards Target: fast up (+25 ms/s, so a needed
-	// increase is there within a few ticks), slow down (-2 ms/s). Both are far
-	// below anything you can see on screen.
+	// increase is there within a few ticks), down at -5 ms/s (1/4 tick per second,
+	// too small to see, but extra input delay is gone within seconds).
 	void Advance(float TargetMs, int64_t Now)
 	{
 		if(!m_LastAdvance)
@@ -140,7 +140,7 @@ public:
 		if(TargetMs > m_CurrentMs)
 			m_CurrentMs = std::min(TargetMs, m_CurrentMs + 25.0f * Dt);
 		else if(TargetMs < m_CurrentMs)
-			m_CurrentMs = std::max(TargetMs, m_CurrentMs - 2.0f * Dt);
+			m_CurrentMs = std::max(TargetMs, m_CurrentMs - 5.0f * Dt);
 	}
 	void SetCurrent(float Ms) { m_CurrentMs = Ms; }
 	float CurrentMs() const { return m_CurrentMs; }
