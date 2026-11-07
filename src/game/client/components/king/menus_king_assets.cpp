@@ -18,12 +18,7 @@
 void CMenus::RenderKingAssetCatalog(CUIRect MainView, int Tab, bool &Active)
 {
 	const int Cat = std::clamp(Tab, 0, (int)CKingAssetCatalog::NUM_CATS - 1);
-	m_KingAssets.Update();
-
-	// finished downloads go into the normal asset list right away
-	CKingAssetCatalog::SInstalled Installed;
-	while(m_KingAssets.PopInstalled(Installed))
-		KingAddDownloadedAsset(Installed.m_Cat, Installed.m_aName, Installed.m_Image);
+	m_KingAssets.Update(); // finished downloads reach the asset list in CMenus::OnRender
 
 	const ColorRGBA Accent(0.96f, 0.76f, 0.30f, 1.0f);
 	const float FontSize = 12.0f;

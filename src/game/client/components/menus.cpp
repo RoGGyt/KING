@@ -2405,7 +2405,14 @@ void CMenus::OnWindowResize()
 
 void CMenus::OnRender()
 {
-	m_KingAssets.ReleaseIfHidden(); // KING: frees the catalog previews once it is closed
+	// KING: frees the catalog previews once it is closed, finishes downloads started there
+	m_KingAssets.ReleaseIfHidden();
+	m_KingAssets.UpdateInstallsIfAny();
+	{
+		CKingAssetCatalog::SInstalled Installed;
+		while(m_KingAssets.PopInstalled(Installed))
+			KingAddDownloadedAsset(Installed.m_Cat, Installed.m_aName, Installed.m_Image);
+	}
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		SetActive(true);
 

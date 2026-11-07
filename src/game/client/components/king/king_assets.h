@@ -105,6 +105,12 @@ public:
 	void Update();
 	// called every frame by the menu component: frees everything once the catalog is gone
 	void ReleaseIfHidden();
+	// downloads keep going after the catalog is closed; nothing to do when there are none
+	void UpdateInstallsIfAny()
+	{
+		if(!m_vpInstallTasks.empty())
+			UpdateInstalls();
+	}
 	void Refresh();
 
 	int IndexState() const { return m_IndexState; }
