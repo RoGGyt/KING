@@ -388,19 +388,6 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	s_Sections.End(RightView);
 
-	// ***** Preset ***** //
-	RightView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &RightView);
-	s_Sections.Begin(RightView);
-	Headline(Ui(), RightView, Localize("KoG Preset"));
-	TextBlock(Ui(), TextRender(), RightView, Localize("KING mode, antiping on, vsync off, uncapped update rate. Your binds and visuals are not touched."), 11.0f);
-	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
-	RightView.HSplitTop(KING_LINE * 1.25f, &Button, &RightView);
-	static CButtonContainer s_PresetButton;
-	if(DoButton_Menu(&s_PresetButton, Localize("Apply KoG preset"), 0, &Button))
-		GameClient()->m_King.ApplyKogPreset();
-
-	s_Sections.End(RightView);
-
 	// ***** Updates ***** //
 	RightView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &RightView);
 	s_Sections.Begin(RightView);
