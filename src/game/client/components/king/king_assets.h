@@ -10,7 +10,7 @@
  *    cached on disk (king/assets/thumbs), and at most 2 previews are uploaded per frame;
  *  - downloading an asset streams it into memory on the HTTP thread, a job checks that it
  *    is a valid PNG and writes it to assets/<type>/, the decoded image is handed to the
- *    menu list so nothing is loaded again;
+ *    menu list as a preview so nothing is loaded again;
  *  - when the catalog has not been drawn for a second, every preview texture is freed and
  *    queued work is dropped.
  */
@@ -88,7 +88,7 @@ public:
 		CButtonContainer m_Button;
 	};
 
-	// a finished download, for the menu list (the decoded image saves loading it again)
+	// a finished download, for the menu list (with its preview, so nothing is loaded again)
 	struct SInstalled
 	{
 		int m_Cat = 0;

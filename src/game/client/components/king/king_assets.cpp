@@ -388,7 +388,9 @@ private:
 		str_format(aPath, sizeof(aPath), "assets/%s/%s.png", s_apCategoryFolders[m_Cat], m_aName);
 		if(!pData || !m_pGraphics->LoadPng(m_Image, pData, DataSize, aPath))
 			return; // not a valid PNG: nothing is written
-		ConvertToRgba(m_Image);
+		// the menu list only shows a preview of it (using it loads the real file), so a
+		// 4096x4096 entities image does not become a 64 MB texture upload on the main thread
+		MakeThumbnail(m_Image);
 
 		char aFolder[IO_MAX_PATH_LENGTH];
 		str_format(aFolder, sizeof(aFolder), "assets/%s", s_apCategoryFolders[m_Cat]);
