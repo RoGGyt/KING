@@ -76,8 +76,8 @@ Classic TClient fast input: your tee is shown this far ahead with your newest in
 = %d.%02d ticks ahead (20 ms = 1 tick). More reacts earlier, but corrects harder when you change direction.
 == = %d.%02d Ticks voraus (20 ms = 1 Tick). Mehr reagiert früher, korrigiert aber stärker beim Richtungswechsel.
 
-One tick of fast input and a safe auto margin: never below the stock 10 ms, and it changes smoothly.
-== Ein Tick Fast Input und eine sichere Auto-Margin: nie unter den Standard-10 ms und ändert sich sanft.
+One tick of fast input (20 ms) and light correction smoothing.
+== Ein Tick Fast Input (20 ms) und leichtes Glätten kleiner Korrekturen.
 
 20 ms = one tick. Higher shows you further ahead, but corrects more when you change direction.
 == 20 ms = ein Tick. Mehr zeigt dich weiter voraus, korrigiert aber stärker beim Richtungswechsel.
@@ -133,9 +133,6 @@ Prediction Margin
 
 Manual margin (Classic works exactly like TClient)
 == Manuelle Margin (Classic funktioniert genau wie TClient)
-
-Auto margin: on (%s mode)
-== Auto-Margin: an (%s-Modus)
 
 Auto margin (adapts to jitter)
 == Auto-Margin (passt sich dem Jitter an)
@@ -467,8 +464,8 @@ Apply
 Fast input
 == Fast Input
 
-Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms). The margin follows your connection by itself, so your inputs do not arrive late.
-== Dein Tee wird genau so weit voraus gezeigt, einstellbar in Tausendstel-Ticks (0.001 Tick = 0.02 ms). Die Margin passt sich selbst deiner Verbindung an, damit deine Inputs nicht zu spät ankommen.
+Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms).
+== Dein Tee wird genau so weit voraus gezeigt, einstellbar in Tausendstel-Ticks (0.001 Tick = 0.02 ms).
 
 Offset %d.%03d ticks
 == Offset %d.%03d Ticks

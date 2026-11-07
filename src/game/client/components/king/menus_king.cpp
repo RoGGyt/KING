@@ -148,7 +148,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothSelf, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgSmoothSelf, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_KING:
-		TextBlock(Ui(), TextRender(), LeftView, Localize("One tick of fast input and a safe auto margin: never below the stock 10 ms, and it changes smoothly."));
+		TextBlock(Ui(), TextRender(), LeftView, Localize("One tick of fast input (20 ms) and light correction smoothing."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, Localize("Fast input"), 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
@@ -157,7 +157,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		break;
 	case CKing::INPUT_MODE_F:
 	{
-		TextBlock(Ui(), TextRender(), LeftView, Localize("Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms). The margin follows your connection by itself, so your inputs do not arrive late."));
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms)."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		char aLabel[64];
 		str_format(aLabel, sizeof(aLabel), Localize("Offset %d.%03d ticks"), g_Config.m_KgFInputAmount / 1000, g_Config.m_KgFInputAmount % 1000);
@@ -254,20 +254,13 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
 	Headline(Ui(), LeftView, Localize("Prediction Margin", "KING"));
 
-	const bool ForcedAuto = CKing::ModeUsesAutoMargin(g_Config.m_KgInputMode);
 	const bool ForcedManual = g_Config.m_KgInputMode == CKing::INPUT_MODE_CLASSIC;
 	if(ForcedManual)
 		TextBlock(Ui(), TextRender(), LeftView, Localize("Manual margin (Classic works exactly like TClient)"));
-	else if(ForcedAuto)
-	{
-		char aForced[64];
-		str_format(aForced, sizeof(aForced), Localize("Auto margin: on (%s mode)"), CKing::InputModeName(g_Config.m_KgInputMode));
-		TextLine(Ui(), LeftView, aForced);
-	}
 	else
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAutoMargin, Localize("Auto margin (adapts to jitter)"), &g_Config.m_KgAutoMargin, &LeftView, KING_LINE);
 
-	if(!ForcedManual && (ForcedAuto || g_Config.m_KgAutoMargin))
+	if(!ForcedManual && g_Config.m_KgAutoMargin)
 	{
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMin, &g_Config.m_KgAutoMarginMin, &Button, Localize("Min (stock 10)"), 1, 30, &CUi::ms_LinearScrollbarScale, 0u, " ms");

@@ -311,7 +311,7 @@ MACRO_CONFIG_INT(KgSnapTapDelay, kg_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | 
 MACRO_CONFIG_INT(KgAim45, kg_aim_45, 0, 0, 1, CFGFLAG_CLIENT, "Snap aim to 45 degree steps (toggle; hold version: +kg_45)")
 MACRO_CONFIG_INT(KgSmallSens, kg_small_sens, 0, 0, 1, CFGFLAG_CLIENT, "Lower mouse sensitivity (toggle; hold version: +kg_small_sens)")
 MACRO_CONFIG_INT(KgSmallSensFactor, kg_small_sens_factor, 30, 5, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Small sens: percent of normal sensitivity")
-MACRO_CONFIG_INT(KgAutoMargin, kg_auto_margin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Adapt prediction margin to measured network jitter (always on in KING mode)")
+MACRO_CONFIG_INT(KgAutoMargin, kg_auto_margin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Adapt prediction margin to measured network jitter (off: fixed cl_prediction_margin; never in Classic)")
 MACRO_CONFIG_INT(KgAutoMarginMin, kg_auto_margin_min, 10, 1, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Lowest prediction margin auto margin may use (ms, stock DDNet uses 10)")
 MACRO_CONFIG_INT(KgAutoMarginMax, kg_auto_margin_max, 28, 5, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Highest prediction margin auto margin may use (ms)")
 MACRO_CONFIG_INT(KgAutoMarginSafety, kg_auto_margin_safety, 3, 0, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Extra ms auto margin keeps on top of measured jitter")

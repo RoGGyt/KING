@@ -77,8 +77,8 @@ Classic TClient fast input: your tee is shown this far ahead with your newest in
 = %d.%02d ticks ahead (20 ms = 1 tick). More reacts earlier, but corrects harder when you change direction.
 == = %d.%02d тика вперёд (20 мс = 1 тик). Больше — отклик раньше, но сильнее поправки при смене направления.
 
-One tick of fast input and a safe auto margin: never below the stock 10 ms, and it changes smoothly.
-== Fast input на один тик и безопасный авто-маржин: не ниже стандартных 10 мс и меняется плавно.
+One tick of fast input (20 ms) and light correction smoothing.
+== Fast input на один тик (20 мс) и лёгкое сглаживание поправок.
 
 20 ms = one tick. Higher shows you further ahead, but corrects more when you change direction.
 == 20 мс = один тик. Чем больше, тем дальше вперёд видно тишку, но тем сильнее поправки при смене направления.
@@ -134,9 +134,6 @@ Prediction Margin
 
 Manual margin (Classic works exactly like TClient)
 == Ручной маржин (Classic работает в точности как TClient)
-
-Auto margin: on (%s mode)
-== Авто-маржин включён (режим %s)
 
 Auto margin (adapts to jitter)
 == Авто-маржин (подстраивается под джиттер)
@@ -462,8 +459,8 @@ Clip Name
 Display
 == Отображение
 
-Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms). The margin follows your connection by itself, so your inputs do not arrive late.
-== Тишка показывается ровно на столько вперёд, с точностью до тысячной тика (0.001 тика = 0.02 мс). Маржин сам подстраивается под твою сеть, поэтому нажатия не опаздывают к серверу.
+Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms).
+== Тишка показывается ровно на столько вперёд, с точностью до тысячной тика (0.001 тика = 0.02 мс).
 
 Offset %d.%03d ticks
 == Смещение: %d.%03d тика

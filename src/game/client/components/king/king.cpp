@@ -149,6 +149,13 @@ void CKing::OnInit()
 		g_Config.m_KgSmallSens = 0;
 		g_Config.m_KgDefaultsVersion = 7;
 	}
+	if(g_Config.m_KgDefaultsVersion < 8)
+	{
+		// 1.0.24: no input mode turns auto margin on by itself any more; it is a checkbox
+		// that starts off, the margin is the fixed cl_prediction_margin otherwise
+		g_Config.m_KgAutoMargin = 0;
+		g_Config.m_KgDefaultsVersion = 8;
+	}
 	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
@@ -449,11 +456,11 @@ void CKing::ReadLastInstallResult()
 
 void CKing::ApplyKogPreset()
 {
-	// Input: KING mode = one tick fast input + safe auto margin + light correction smoothing
+	// Input: KING mode = one tick fast input + light correction smoothing, manual margin
 	g_Config.m_KgInputMode = INPUT_MODE_KING;
 	g_Config.m_KgFastInputAmount = 20;
 	g_Config.m_KgKingSmooth = 1;
-	g_Config.m_KgAutoMargin = 1;
+	g_Config.m_KgAutoMargin = 0; // only when the player turns it on
 	g_Config.m_KgAutoMarginMin = 10;
 	g_Config.m_KgAutoMarginMax = 28; // every ms above what the network needs is input delay
 	g_Config.m_KgAutoMarginSafety = 3;
@@ -917,7 +924,7 @@ void CKing::LagLogSettings(const char *pPrefix)
 {
 	LagLog("%s: mode %s, fast input %s %d ms, smoothing %d ms, margin %s (min %d max %d safety %d, manual %d), antiping %d players %d, fps cap %d, vsync %d, refresh %d",
 		pPrefix, InputModeName(g_Config.m_KgInputMode), g_Config.m_TcFastInput ? "on" : "off", g_Config.m_TcFastInputAmount, round_to_int(SmoothDurationMs()),
-		ModeUsesAutoMargin(g_Config.m_KgInputMode) || (g_Config.m_KgAutoMargin && g_Config.m_KgInputMode != INPUT_MODE_CLASSIC) ? "auto" : "manual",
+		ModeUsesAutoMargin(g_Config.m_KgInputMode) ? "auto" : "manual",
 		g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety, g_Config.m_ClPredictionMargin,
 		g_Config.m_ClAntiPing, g_Config.m_ClAntiPingPlayers, g_Config.m_GfxRefreshRate, g_Config.m_GfxVsync, g_Config.m_ClRefreshRate);
 }

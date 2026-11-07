@@ -27,12 +27,12 @@ public:
 	{
 		INPUT_MODE_CUSTOM = 0, // leave TClient settings alone
 		INPUT_MODE_CLASSIC, // old TClient fast input: whole ticks ahead, manual margin
-		INPUT_MODE_KING, // one tick fast input + safe auto margin + light correction smoothing
+		INPUT_MODE_KING, // one tick fast input + light correction smoothing
 		INPUT_MODE_DELTA, // fixed sub-tick offset in 0.01 ticks
 		INPUT_MODE_PING_COMP, // offset follows a share of the measured ping
 		INPUT_MODE_SMOOTH, // KING + longer, adjustable correction smoothing
 		INPUT_MODE_BEST, // offset + latency comp + smoothing + interpolation, auto or custom
-		INPUT_MODE_F, // exact offset in 0.001 ticks + safe auto margin + light smoothing
+		INPUT_MODE_F, // exact offset in 0.001 ticks + light smoothing
 		NUM_INPUT_MODES,
 	};
 
@@ -93,7 +93,8 @@ public:
 
 	static const char *InputModeName(int Mode);
 	static float AspectRatioValue(int Setting); // 0 = native
-	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH || Mode == INPUT_MODE_BEST || Mode == INPUT_MODE_F; }
+	// auto margin only when the player turns it on; never in Classic (works like TClient)
+	static bool ModeUsesAutoMargin(int Mode) { return Mode != INPUT_MODE_CLASSIC && g_Config.m_KgAutoMargin; }
 	// fast input KING applies right now in ms (float, exact); -1 when KING does not control it
 	float ExactFastInputMs() const { return g_Config.m_KgInputMode != INPUT_MODE_CUSTOM ? m_AppliedFastMs : -1.0f; }
 	// correction smoothing of our own tee; 0 = off

@@ -5551,21 +5551,13 @@ int CClient::MaxLatencyTicks() const
 	return GameTickSpeed() + (PredictionMargin() * GameTickSpeed()) / 1000;
 }
 
-// KING input modes (kg_input_mode): KING=2, Ping Comp=4, Smooth=5 and Best=6 always use
-// the auto margin; Classic=1 never does (works exactly like TClient); Custom=0 and
-// Delta=3 follow the kg_auto_margin checkbox.
+// KING: auto margin is used only when the kg_auto_margin checkbox is on (off by default),
+// in any input mode except Classic=1, which works exactly like TClient.
 static bool KingAutoMarginActive()
 {
-	switch(g_Config.m_KgInputMode)
-	{
-	case 1: return false;
-	case 2:
-	case 4:
-	case 5:
-	case 6:
-	case 7: return true; // KING, Ping Comp, Smooth, Best, F input
-	default: return g_Config.m_KgAutoMargin != 0;
-	}
+	// only when the player turns it on (kg_auto_margin); no input mode switches it on by
+	// itself, and Classic always keeps the manual margin
+	return g_Config.m_KgInputMode != 1 && g_Config.m_KgAutoMargin != 0;
 }
 
 float CClient::KingMarginMs() const
