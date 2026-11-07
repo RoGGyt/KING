@@ -652,3 +652,27 @@ Click parts of the base to place it, Esc to stop
 
 Drag or click donor parts onto the base. Right click resets a part.
 == Ziehe oder klicke Spenderteile auf die Basis. Rechtsklick setzt einen Teil zurück.
+
+Drag or click donor parts onto the base. Right click resets, Delete removes a part.
+== Ziehe oder klicke Spenderteile auf die Basis. Rechtsklick setzt zurück, Entf entfernt einen Teil.
+
+Remove
+== Entfernen
+
+Take
+== Nehmen
+
+Part removed
+== Teil entfernt
+
+removed
+== entfernt
+
+Make this part empty (Delete key)
+== Diesen Teil leeren (Entf-Taste)
+
+Remove a whole weapon:
+== Ganze Waffe entfernen:
+
+Removed: %s
+== Entfernt: %s

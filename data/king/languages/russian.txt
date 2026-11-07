@@ -647,3 +647,27 @@ Click parts of the base to place it, Esc to stop
 
 Drag or click donor parts onto the base. Right click resets a part.
 == Перетаскивай или кликай части донора на основу. ПКМ сбрасывает часть.
+
+Drag or click donor parts onto the base. Right click resets, Delete removes a part.
+== Перетаскивай или кликай части донора на основу. ПКМ — сброс, Delete — удалить часть.
+
+Remove
+== Удалить
+
+Take
+== Взять
+
+Part removed
+== Часть удалена
+
+removed
+== удалено
+
+Make this part empty (Delete key)
+== Сделать эту часть пустой (клавиша Delete)
+
+Remove a whole weapon:
+== Удалить оружие целиком:
+
+Removed: %s
+== Удалено: %s

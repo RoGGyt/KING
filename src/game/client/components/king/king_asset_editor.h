@@ -1,8 +1,8 @@
 /* KING: asset mixer (Settings > Assets > Editor).
  *
  * Mix gunpacks (and emoticons, particles, HUD, extras): pick a donor and a base, drag parts
- * of the donor onto the base, tint parts, take a whole weapon at once, undo, save as a new
- * asset. Loading, mixing and saving run on job threads; the menu only uploads the result
+ * of the donor onto the base, tint parts, remove parts, take or remove a whole weapon at
+ * once, undo, save as a new asset. Loading, mixing and saving run on job threads; the menu only uploads the result
  * (at most one texture per finished mix), so editing never stalls a frame.
  */
 #ifndef GAME_CLIENT_COMPONENTS_KING_KING_ASSET_EDITOR_H
@@ -45,10 +45,11 @@ struct SKingEditorEdit
 	unsigned m_Color = 0x00FF80; // packed HSL like tee colors
 	int m_Blend = KING_EDITOR_BLEND_TEE;
 	int m_Opacity = 100;
-	bool Edited() const { return m_From >= 0 || m_Tint; }
+	bool m_Erase = false; // the part is removed (transparent), e.g. no gun at all
+	bool Edited() const { return m_From >= 0 || m_Tint || m_Erase; }
 	bool operator==(const SKingEditorEdit &Other) const
 	{
-		return m_From == Other.m_From && m_Tint == Other.m_Tint && m_Color == Other.m_Color && m_Blend == Other.m_Blend && m_Opacity == Other.m_Opacity;
+		return m_From == Other.m_From && m_Tint == Other.m_Tint && m_Color == Other.m_Color && m_Blend == Other.m_Blend && m_Opacity == Other.m_Opacity && m_Erase == Other.m_Erase;
 	}
 };
 

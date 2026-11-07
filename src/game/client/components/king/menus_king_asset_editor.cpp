@@ -270,6 +270,14 @@ void Mix(const CImageInfo &Base, const CImageInfo *pDonor, int GridX, int GridY,
 			continue;
 		const SKingEditorPart &Part = vParts[i];
 		const int X = Part.m_X * CellW, Y = Part.m_Y * CellH, W = Part.m_W * CellW, H = Part.m_H * CellH;
+		if(Edit.m_Erase)
+		{
+			// removed: fully transparent, the game then draws nothing there
+			if(X >= 0 && Y >= 0 && X + W <= (int)Out.m_Width && Y + H <= (int)Out.m_Height)
+				for(int Row = 0; Row < H; Row++)
+					mem_zero(Out.m_pData + ((size_t)(Y + Row) * Out.m_Width + X) * 4, (size_t)W * 4);
+			continue;
+		}
 		if(Edit.m_From >= 0 && Edit.m_From < (int)vParts.size() && pDonor && DonorW > 0 && DonorH > 0)
 		{
 			const SKingEditorPart &From = vParts[Edit.m_From];
@@ -657,6 +665,12 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 			E.m_Dirty = true;
 			E.m_Unsaved = true;
 		}
+		if(CLineInput::GetActiveInput() == nullptr && E.m_Selected >= 0 && Input()->KeyPress(KEY_DELETE) && !E.m_vEdits[E.m_Selected].m_Erase)
+		{
+			PushUndo(E);
+			E.m_vEdits[E.m_Selected].m_Erase = true;
+			SetStatus(E, false, Localize("Part removed"));
+		}
 		if((E.m_Picked >= 0 || E.m_Dragging) && Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 		{
 			E.m_Picked = -1;
@@ -862,10 +876,11 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 	const int HoverResult = CanInteract && E.m_Base.m_pImage ? HitPart(ResultFit, Mouse, pDragPart) : -1;
 	const bool Down = Ui()->MouseButton(0), WasDown = Ui()->LastMouseButton(0);
 	auto Place = [&](int Target, int From) {
-		if(E.m_vEdits[Target].m_From == From)
+		if(E.m_vEdits[Target].m_From == From && !E.m_vEdits[Target].m_Erase)
 			return;
 		PushUndo(E);
 		E.m_vEdits[Target].m_From = From;
+		E.m_vEdits[Target].m_Erase = false;
 		E.m_Selected = Target;
 		char aBuf[160];
 		str_format(aBuf, sizeof(aBuf), Localize("%s now uses %s from %s"), E.m_vParts[Target].m_aName, E.m_vParts[From].m_aName, E.m_Donor.m_aName);
@@ -942,7 +957,15 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 		for(size_t i = 0; i < E.m_vParts.size(); i++)
 		{
 			const bool Edited = E.m_vEdits[i].Edited();
-			Outline(PartRect(ResultFit, E.m_vParts[i]), Edited ? ColorRGBA(0.45f, 1.0f, 0.55f, 0.55f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.12f));
+			const CUIRect R = PartRect(ResultFit, E.m_vParts[i]);
+			if(E.m_vEdits[i].m_Erase)
+			{
+				// a removed part: faint red, so it can still be found and restored
+				R.Draw(ColorRGBA(1.0f, 0.3f, 0.3f, 0.12f), IGraphics::CORNER_NONE, 0.0f);
+				Outline(R, ColorRGBA(1.0f, 0.4f, 0.4f, 0.6f));
+			}
+			else
+				Outline(R, Edited ? ColorRGBA(0.45f, 1.0f, 0.55f, 0.55f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.12f));
 		}
 		if(E.m_Selected >= 0)
 			Outline(PartRect(ResultFit, E.m_vParts[E.m_Selected]), ED_ACCENT);
@@ -997,7 +1020,9 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 		if(E.m_Selected >= 0)
 		{
 			const SKingEditorEdit &Edit = E.m_vEdits[E.m_Selected];
-			if(Edit.m_From >= 0)
+			if(Edit.m_Erase)
+				str_format(aBuf, sizeof(aBuf), "%s (%s)", E.m_vParts[E.m_Selected].m_aName, Localize("removed"));
+			else if(Edit.m_From >= 0)
 				str_format(aBuf, sizeof(aBuf), "%s ← %s", E.m_vParts[E.m_Selected].m_aName, E.m_vParts[Edit.m_From].m_aName);
 			else
 				str_copy(aBuf, E.m_vParts[E.m_Selected].m_aName);
@@ -1012,10 +1037,21 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		Tools.HSplitTop(4.0f, nullptr, &Tools);
 
-		CUIRect Row, ResetPart, SamePlace;
+		CUIRect Row, ResetPart, SamePlace, RemovePart;
 		Tools.HSplitTop(ED_LINE, &Row, &Tools);
-		Row.VSplitMid(&ResetPart, &SamePlace, 4.0f);
-		static CButtonContainer s_ResetPart, s_SamePlace;
+		const float PartButtonW = (Row.w - 8.0f) / 3.0f;
+		Row.VSplitLeft(PartButtonW, &ResetPart, &Row);
+		Row.VSplitLeft(4.0f, nullptr, &Row);
+		Row.VSplitLeft(PartButtonW, &SamePlace, &Row);
+		Row.VSplitLeft(4.0f, nullptr, &RemovePart);
+		static CButtonContainer s_ResetPart, s_SamePlace, s_RemovePart;
+		if(DoButton_Menu(&s_RemovePart, Localize("Remove"), 0, &RemovePart, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 0.4f, 0.4f, 0.45f)) && E.m_Selected >= 0 && !E.m_vEdits[E.m_Selected].m_Erase)
+		{
+			PushUndo(E);
+			E.m_vEdits[E.m_Selected].m_Erase = true;
+			SetStatus(E, false, Localize("Part removed"));
+		}
+		GameClient()->m_Tooltips.DoToolTip(&s_RemovePart, &RemovePart, Localize("Make this part empty (Delete key)"));
 		if(DoButton_Menu(&s_ResetPart, Localize("Reset part"), 0, &ResetPart) && E.m_Selected >= 0 && E.m_vEdits[E.m_Selected].Edited())
 		{
 			PushUndo(E);
@@ -1029,8 +1065,21 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 		{
 			Tools.HSplitTop(8.0f, nullptr, &Tools);
 			Tools.HSplitTop(ED_TITLE, &Line, &Tools);
+			// one row of weapons, two jobs: take them from the donor or remove them
+			static bool s_WeaponRemove = false;
+			CUIRect Take, Remove;
+			Line.VSplitRight(std::min(170.0f, Line.w * 0.5f), &Line, &Remove);
+			Remove.VSplitMid(&Take, &Remove, 2.0f);
+			static CButtonContainer s_TakeMode, s_RemoveMode;
+			if(DoButton_Menu(&s_TakeMode, Localize("Take"), !s_WeaponRemove, &Take, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L, 4.0f))
+				s_WeaponRemove = false;
+			if(DoButton_Menu(&s_RemoveMode, Localize("Remove"), s_WeaponRemove, &Remove, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R, 4.0f, 0.0f, ColorRGBA(1.0f, 0.4f, 0.4f, 0.45f)))
+				s_WeaponRemove = true;
 			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
-			Ui()->DoLabel(&Line, Localize("Whole weapon from the donor:"), ED_FONT, TEXTALIGN_ML);
+			SLabelProperties WeaponProps;
+			WeaponProps.m_MaxWidth = Line.w - 4.0f;
+			WeaponProps.m_EllipsisAtEnd = true;
+			Ui()->DoLabel(&Line, s_WeaponRemove ? Localize("Remove a whole weapon:") : Localize("Whole weapon from the donor:"), ED_FONT, TEXTALIGN_ML, WeaponProps);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			static CButtonContainer s_aWeaponButtons[std::size(s_apWeaponGroups)];
 			const char *apWeaponNames[] = {Localize("Hammer"), Localize("Gun"), Localize("Shotgun"), Localize("Grenade"), Localize("Laser"), Localize("Ninja"), Localize("Hook")};
@@ -1040,9 +1089,20 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 					PushUndo(E);
 					for(size_t p = 0; p < E.m_vParts.size(); p++)
 						if(str_comp(E.m_vParts[p].m_aGroup, s_apWeaponGroups[i]) == 0)
-							E.m_vEdits[p].m_From = (int)p;
+						{
+							if(s_WeaponRemove)
+								E.m_vEdits[p].m_Erase = true;
+							else
+							{
+								E.m_vEdits[p].m_From = (int)p;
+								E.m_vEdits[p].m_Erase = false;
+							}
+						}
 					char aMsg[128];
-					str_format(aMsg, sizeof(aMsg), Localize("%s taken from %s"), apWeaponNames[i], E.m_Donor.m_aName);
+					if(s_WeaponRemove)
+						str_format(aMsg, sizeof(aMsg), Localize("Removed: %s"), apWeaponNames[i]);
+					else
+						str_format(aMsg, sizeof(aMsg), Localize("%s taken from %s"), apWeaponNames[i], E.m_Donor.m_aName);
 					SetStatus(E, false, aMsg);
 				}
 			});
@@ -1054,7 +1114,10 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 			{
 				PushUndo(E);
 				for(size_t p = 0; p < E.m_vParts.size(); p++)
+				{
 					E.m_vEdits[p].m_From = (int)p;
+					E.m_vEdits[p].m_Erase = false;
+				}
 			}
 			if(i == 1 && DoButton_Menu(&s_ResetAllButton, Localize("Reset all"), 0, &Button))
 			{
@@ -1148,7 +1211,7 @@ void CMenus::RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active)
 			TextRender()->TextColor(E.m_StatusError ? ColorRGBA(1.0f, 0.45f, 0.45f, 1.0f) : ColorRGBA(0.55f, 1.0f, 0.6f, 1.0f));
 			Ui()->DoLabel(&Left, E.m_aStatus, ED_FONT - 1.0f, TEXTALIGN_ML, Props);
 		}
-		const char *pHint = E.m_Dragging ? Localize("Drop it on a part of the base") : (E.m_Picked >= 0 ? Localize("Click parts of the base to place it, Esc to stop") : Localize("Drag or click donor parts onto the base. Right click resets a part."));
+		const char *pHint = E.m_Dragging ? Localize("Drop it on a part of the base") : (E.m_Picked >= 0 ? Localize("Click parts of the base to place it, Esc to stop") : Localize("Drag or click donor parts onto the base. Right click resets, Delete removes a part."));
 		Props.m_MaxWidth = Right.w;
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.5f);
 		Ui()->DoLabel(&Right, pHint, ED_FONT - 1.0f, TEXTALIGN_MR, Props);
