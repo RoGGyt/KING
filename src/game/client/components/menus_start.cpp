@@ -292,16 +292,16 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		static CButtonContainer s_KingUpdateButton;
 		if(King.Installing())
 			Ui()->RenderProgressBar(KingButton, King.DownloadProgress());
-		else if(GameClient()->m_Menus.DoButton_Menu(&s_KingUpdateButton, King.CanInstallUpdate() ? "Update" : "Download", 0, &KingButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		else if(GameClient()->m_Menus.DoButton_Menu(&s_KingUpdateButton, King.CanInstallUpdate() ? Localize("Update") : Localize("Download"), 0, &KingButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 			King.InstallUpdate();
 
 		char aKingBuf[160];
 		if(King.Installing())
-			str_format(aKingBuf, sizeof(aKingBuf), "Downloading KING %s... %d%%", King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
+			str_format(aKingBuf, sizeof(aKingBuf), Localize("Downloading KING %s... %d%%"), King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
 		else if(King.InstallError()[0])
 			str_copy(aKingBuf, King.InstallError());
 		else
-			str_format(aKingBuf, sizeof(aKingBuf), "KING %s is out! (you have " KING_VERSION ")", King.LatestVersion());
+			str_format(aKingBuf, sizeof(aKingBuf), Localize("KING %s is out! (you have %s)"), King.LatestVersion(), KING_VERSION);
 		SLabelProperties KingLabelProps;
 		KingLabelProps.SetColor(ColorRGBA(1.0f, 0.82f, 0.2f, 1.0f));
 		Ui()->DoLabel(&KingUpdate, aKingBuf, 14.0f, TEXTALIGN_ML, KingLabelProps);
@@ -604,15 +604,15 @@ void CMenusStart::RenderKingStartMenu(CUIRect MainView)
 		static CButtonContainer s_KingUpdateButton;
 		if(King.Installing())
 			Ui()->RenderProgressBar(NoticeButton, King.DownloadProgress());
-		else if(King.UpdateAvailable() && GameClient()->m_Menus.DoButton_Menu(&s_KingUpdateButton, King.CanInstallUpdate() ? "Update" : "Download", 0, &NoticeButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 4.0f, 0.0f, ColorRGBA(0.91f, 0.70f, 0.29f, 0.85f)))
+		else if(King.UpdateAvailable() && GameClient()->m_Menus.DoButton_Menu(&s_KingUpdateButton, King.CanInstallUpdate() ? Localize("Update") : Localize("Download"), 0, &NoticeButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 4.0f, 0.0f, ColorRGBA(0.91f, 0.70f, 0.29f, 0.85f)))
 			King.InstallUpdate();
 		char aBuf[160];
 		if(King.Installing())
-			str_format(aBuf, sizeof(aBuf), "Downloading %s... %d%%", King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
+			str_format(aBuf, sizeof(aBuf), Localize("Downloading %s... %d%%"), King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
 		else if(King.InstallError()[0])
 			str_copy(aBuf, King.InstallError());
 		else
-			str_format(aBuf, sizeof(aBuf), "KING %s is out", King.LatestVersion());
+			str_format(aBuf, sizeof(aBuf), Localize("KING %s is out"), King.LatestVersion());
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.7f);
 		Ui()->DoLabel(&Notice, aBuf, 12.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());

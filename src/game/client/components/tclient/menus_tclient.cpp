@@ -399,7 +399,7 @@ void CMenus::RenderSettingsKingPage(CUIRect MainView)
 	};
 	static int s_CurTab = KING_TAB_GENERAL;
 	static CButtonContainer s_aTabs[NUM_KING_TABS];
-	const char *apNames[NUM_KING_TABS] = {"General", "Display", "Performance", "Info"};
+	const char *apNames[NUM_KING_TABS] = {Localize("General"), Localize("Display"), Localize("Performance"), Localize("Info")};
 
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(LineSize, &TabBar, &MainView);

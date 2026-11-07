@@ -1,6 +1,7 @@
 /* KING client: input modes, KoG preset, network HUD, lag log, music player and update check. */
 #include "king.h"
 #include "king_install.h"
+#include <game/localization.h>
 #include <base/aio.h>
 #include <engine/shared/king_badge.h>
 #include "king_system.h"
@@ -1611,7 +1612,7 @@ void CKing::LookupPlayer(const char *pName)
 	m_pLookupDDNet = Start(aUrl);
 
 	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "Looking up %s...", pName);
+	str_format(aBuf, sizeof(aBuf), Localize("Looking up %s..."), pName);
 	GameClient()->m_Chat.Echo(aBuf);
 }
 
@@ -1656,13 +1657,13 @@ void CKing::FinishLookup()
 		{
 			char aYear[8];
 			str_truncate(aYear, sizeof(aYear), Since.u.string.ptr, 4);
-			str_format(aHours, sizeof(aHours), "%d hours played (since %s)", round_to_int(Value / 3600.0), aYear);
+			str_format(aHours, sizeof(aHours), Localize("%d hours played (since %s)"), round_to_int(Value / 3600.0), aYear);
 		}
 		else
-			str_format(aHours, sizeof(aHours), "%d hours played", round_to_int(Value / 3600.0));
+			str_format(aHours, sizeof(aHours), Localize("%d hours played"), round_to_int(Value / 3600.0));
 	}
 	else if(pDDNet && KingJsonNumber((*pDDNet)["hours_played_past_365_days"], Value))
-		str_format(aHours, sizeof(aHours), "%d hours played in the last year (total unknown)", round_to_int(Value));
+		str_format(aHours, sizeof(aHours), Localize("%d hours played in the last year (total unknown)"), round_to_int(Value));
 
 	// points: ddnet.org is the official source
 	char aPoints[128] = "";
@@ -1673,12 +1674,12 @@ void CKing::FinishLookup()
 		const bool HaveTotal = KingJsonNumber((*pPoints)["total"], Total);
 		const bool HaveRank = KingJsonNumber((*pPoints)["rank"], Rank);
 		if(HaveRank && HaveTotal)
-			str_format(aPoints, sizeof(aPoints), "%d / %d points (rank #%d)", round_to_int(Points), round_to_int(Total), round_to_int(Rank));
+			str_format(aPoints, sizeof(aPoints), Localize("%d / %d points (rank #%d)"), round_to_int(Points), round_to_int(Total), round_to_int(Rank));
 		else
-			str_format(aPoints, sizeof(aPoints), "%d points", round_to_int(Points));
+			str_format(aPoints, sizeof(aPoints), Localize("%d points"), round_to_int(Points));
 	}
 	else if(pStats && KingJsonNumber((*pStats)["profile"]["points"], Points))
-		str_format(aPoints, sizeof(aPoints), "%d points", round_to_int(Points));
+		str_format(aPoints, sizeof(aPoints), Localize("%d points"), round_to_int(Points));
 
 	char aBuf[512];
 	if(aHours[0] && aPoints[0])
@@ -1686,9 +1687,9 @@ void CKing::FinishLookup()
 	else if(aHours[0] || aPoints[0])
 		str_format(aBuf, sizeof(aBuf), "%s: %s", m_aLookupName, aHours[0] ? aHours : aPoints);
 	else if(pStats || pDDNet)
-		str_format(aBuf, sizeof(aBuf), "%s: no stats found (new player or a different name)", m_aLookupName);
+		str_format(aBuf, sizeof(aBuf), Localize("%s: no stats found (new player or a different name)"), m_aLookupName);
 	else
-		str_format(aBuf, sizeof(aBuf), "%s: stats sites did not answer, try again later", m_aLookupName);
+		str_format(aBuf, sizeof(aBuf), Localize("%s: stats sites did not answer, try again later"), m_aLookupName);
 	GameClient()->m_Chat.Echo(aBuf);
 
 	if(pStats)

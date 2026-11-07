@@ -13,6 +13,7 @@
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/client/ui_scrollregion.h>
+#include <game/localization.h>
 #include <game/version.h>
 
 #include <algorithm>
@@ -42,6 +43,18 @@ void TextLine(CUi *pUi, CUIRect &View, const char *pText, float Size = KING_TEXT
 	View.HSplitTop(Size + 4.0f, &Label, &View);
 	pUi->DoLabel(&Label, pText, Size, TEXTALIGN_ML);
 }
+
+// a paragraph wrapped to the column width (translations differ in length)
+void TextBlock(CUi *pUi, ITextRender *pTextRender, CUIRect &View, const char *pText, float Size = KING_TEXT)
+{
+	const float Height = pTextRender->TextBoundingBox(Size, pText, -1, View.w).m_H;
+	CUIRect Label;
+	View.HSplitTop(std::max(Height, Size) + 4.0f, &Label, &View);
+	SLabelProperties Props;
+	Props.m_MaxWidth = Label.w;
+	Props.m_EnableWidthCheck = false;
+	pUi->DoLabel(&Label, pText, Size, TEXTALIGN_TL, Props);
+}
 } // namespace
 
 void CMenus::RenderSettingsKing(CUIRect MainView)
@@ -59,12 +72,12 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
 	// ***** Input mode ***** //
-	Headline(Ui(), LeftView, "KING Input");
+	Headline(Ui(), LeftView, Localize("KING Input"));
 	{
 		int Mode = g_Config.m_KgInputMode;
 		static std::vector<CButtonContainer> s_vModeButtonsA = {{}, {}, {}};
 		static std::vector<CButtonContainer> s_vModeButtonsB = {{}, {}, {}, {}};
-		bool Changed = DoLine_RadioMenu(LeftView, "Mode",
+		bool Changed = DoLine_RadioMenu(LeftView, Localize("Mode"),
 			s_vModeButtonsA,
 			{CKing::InputModeName(CKing::INPUT_MODE_BEST), CKing::InputModeName(CKing::INPUT_MODE_KING), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC)},
 			{CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_KING, CKing::INPUT_MODE_CLASSIC},
@@ -83,225 +96,218 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	{
 	case CKing::INPUT_MODE_BEST:
 	{
-		TextLine(Ui(), LeftView, "Offset + latency comp + correction smoothing +");
-		TextLine(Ui(), LeftView, "blend curve. Auto: one tick ahead, smoothing");
-		TextLine(Ui(), LeftView, "follows your connection.");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Offset, latency compensation, correction smoothing and a blend curve. Auto keeps you one tick ahead and adapts the smoothing to your connection."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		static std::vector<CButtonContainer> s_vPreset = {{}, {}};
 		int Preset = g_Config.m_KgBestPreset;
-		if(DoLine_RadioMenu(LeftView, "Preset", s_vPreset, {"Auto", "Custom"}, {1, 0}, Preset))
+		if(DoLine_RadioMenu(LeftView, Localize("Preset"), s_vPreset, {Localize("Auto"), Localize("Custom", "KING")}, {1, 0}, Preset))
 			g_Config.m_KgBestPreset = Preset;
 		if(g_Config.m_KgBestPreset)
 		{
 			char aNow[96];
-			str_format(aNow, sizeof(aNow), "Now: %d ms ahead, %d ms smoothing", std::max(GameClient()->m_King.BestFastMs(), 0), GameClient()->m_King.BestSmoothMs());
+			str_format(aNow, sizeof(aNow), Localize("Now: %d ms ahead, %d ms smoothing"), std::max(GameClient()->m_King.BestFastMs(), 0), GameClient()->m_King.BestSmoothMs());
 			TextLine(Ui(), LeftView, aNow, 11.0f);
 		}
 		else
 		{
 			char aLabel[64];
 			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-			str_format(aLabel, sizeof(aLabel), "Offset %d.%02d ticks", g_Config.m_KgBestOffset / 100, g_Config.m_KgBestOffset % 100);
+			str_format(aLabel, sizeof(aLabel), Localize("Offset %d.%02d ticks"), g_Config.m_KgBestOffset / 100, g_Config.m_KgBestOffset % 100);
 			Ui()->DoScrollbarOption(&g_Config.m_KgBestOffset, &g_Config.m_KgBestOffset, &Button, aLabel, 0, 300, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
 			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-			Ui()->DoScrollbarOption(&g_Config.m_KgBestLatencyComp, &g_Config.m_KgBestLatencyComp, &Button, "Latency comp", 0, 50, &CUi::ms_LinearScrollbarScale, 0u, "% of ping");
+			Ui()->DoScrollbarOption(&g_Config.m_KgBestLatencyComp, &g_Config.m_KgBestLatencyComp, &Button, Localize("Latency comp"), 0, 50, &CUi::ms_LinearScrollbarScale, 0u, Localize("% of ping"));
 			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-			Ui()->DoScrollbarOption(&g_Config.m_KgBestSmoothing, &g_Config.m_KgBestSmoothing, &Button, "Smoothing", 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+			Ui()->DoScrollbarOption(&g_Config.m_KgBestSmoothing, &g_Config.m_KgBestSmoothing, &Button, Localize("Smoothing"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
 			static std::vector<CButtonContainer> s_vCurve = {{}, {}, {}};
 			int Curve = g_Config.m_KgBestInterpolation;
-			if(DoLine_RadioMenu(LeftView, "Curve", s_vCurve, {"Linear", "Cubic", "Smooth"}, {0, 1, 2}, Curve))
+			if(DoLine_RadioMenu(LeftView, Localize("Curve"), s_vCurve, {Localize("Linear"), Localize("Cubic"), Localize("Smooth")}, {0, 1, 2}, Curve))
 				g_Config.m_KgBestInterpolation = Curve;
 		}
 		break;
 	}
 	case CKing::INPUT_MODE_CLASSIC:
-		TextLine(Ui(), LeftView, "Classic TClient fast input: your tee is shown this");
-		TextLine(Ui(), LeftView, "far ahead with your newest input. Margin stays manual.");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Classic TClient fast input: your tee is shown this far ahead with your newest input. The margin stays manual."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		DoSliderWithScaledValue(&g_Config.m_KgClassicMs, &g_Config.m_KgClassicMs, &Button, "Fast input", 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
+		DoSliderWithScaledValue(&g_Config.m_KgClassicMs, &g_Config.m_KgClassicMs, &Button, Localize("Fast input"), 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 		{
-			char aInfo[96];
-			str_format(aInfo, sizeof(aInfo), "= %d.%02d ticks ahead (20 ms = 1 tick). More = earlier,", g_Config.m_KgClassicMs / 20, (g_Config.m_KgClassicMs % 20) * 5);
-			TextLine(Ui(), LeftView, aInfo, 11.0f);
-			TextLine(Ui(), LeftView, "but bigger corrections when you change direction.", 11.0f);
+			char aInfo[256];
+			str_format(aInfo, sizeof(aInfo), Localize("= %d.%02d ticks ahead (20 ms = 1 tick). More reacts earlier, but corrects harder when you change direction."), g_Config.m_KgClassicMs / 20, (g_Config.m_KgClassicMs % 20) * 5);
+			TextBlock(Ui(), TextRender(), LeftView, aInfo, 11.0f);
 		}
 		break;
 	case CKing::INPUT_MODE_KING:
-		TextLine(Ui(), LeftView, "One tick fast input + safe auto margin (never");
-		TextLine(Ui(), LeftView, "below stock 10 ms, changes smoothly).");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("One tick of fast input and a safe auto margin: never below the stock 10 ms, and it changes smoothly."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, "Fast input", 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
-		TextLine(Ui(), LeftView, "20 ms = one tick. Higher shows you further ahead", 11.0f);
-		TextLine(Ui(), LeftView, "but corrects more when you change direction.", 11.0f);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgKingSmooth, "Smooth small corrections (30 ms glide, no jumps)", &g_Config.m_KgKingSmooth, &LeftView, KING_LINE);
+		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, Localize("Fast input"), 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("20 ms = one tick. Higher shows you further ahead, but corrects more when you change direction."), 11.0f);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgKingSmooth, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgKingSmooth, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_DELTA:
-		TextLine(Ui(), LeftView, "Fixed offset in hundredths of a tick, also between");
-		TextLine(Ui(), LeftView, "whole ticks (e.g. 0.75 tick = 15 ms).");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("A fixed offset in hundredths of a tick, also between whole ticks (0.75 tick = 15 ms)."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		{
 			char aLabel[64];
-			str_format(aLabel, sizeof(aLabel), "Offset %d.%02d ticks", g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100);
+			str_format(aLabel, sizeof(aLabel), Localize("Offset %d.%02d ticks"), g_Config.m_KgDeltaAmount / 100, g_Config.m_KgDeltaAmount % 100);
 			Ui()->DoScrollbarOption(&g_Config.m_KgDeltaAmount, &g_Config.m_KgDeltaAmount, &Button, aLabel, 0, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
 		}
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgDeltaOthers, "Shift other tees too", &g_Config.m_KgDeltaOthers, &LeftView, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgDeltaOthers, Localize("Shift other tees too"), &g_Config.m_KgDeltaOthers, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_PING_COMP:
-		TextLine(Ui(), LeftView, "Fast input grows with your ping: you see your tee");
-		TextLine(Ui(), LeftView, "this share of the round trip ahead (max 100 ms).");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Fast input follows your ping: your tee is shown this share of the round trip ahead (up to 100 ms)."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgPingComp, &g_Config.m_KgPingComp, &Button, "Share of ping", 0, 50, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_KgPingComp, &g_Config.m_KgPingComp, &Button, Localize("Share of ping"), 0, 50, &CUi::ms_LinearScrollbarScale, 0u, "%");
 		{
 			char aNow[64];
-			str_format(aNow, sizeof(aNow), "Now: %d ms ahead", GameClient()->m_King.PingCompAmount());
+			str_format(aNow, sizeof(aNow), Localize("Now: %d ms ahead"), GameClient()->m_King.PingCompAmount());
 			TextLine(Ui(), LeftView, aNow, 11.0f);
 		}
 		break;
 	case CKing::INPUT_MODE_SMOOTH:
-		TextLine(Ui(), LeftView, "KING mode, but when the server corrects your tee it");
-		TextLine(Ui(), LeftView, "glides to the right spot instead of jumping. Only");
-		TextLine(Ui(), LeftView, "visual: your inputs and hitbox are not delayed.");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Like KING mode, but when the server corrects your tee it glides to the right spot instead of jumping. Visual only: your inputs and hitbox are not delayed."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, "Fast input", 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
+		DoSliderWithScaledValue(&g_Config.m_KgFastInputAmount, &g_Config.m_KgFastInputAmount, &Button, Localize("Fast input"), 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgSmoothMs, &g_Config.m_KgSmoothMs, &Button, "Smoothing", 10, 300, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_KgSmoothMs, &g_Config.m_KgSmoothMs, &Button, Localize("Smoothing"), 10, 300, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		break;
 	default:
-		TextLine(Ui(), LeftView, "Uses the fast input settings as they are");
-		TextLine(Ui(), LeftView, "(Settings tab > Input).");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Uses your fast input settings as they are (Settings > Input)."));
 		break;
 	}
 
 	// ***** Input helpers ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
-	Headline(Ui(), LeftView, "Input Helpers");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSnapTap, "Snap Tap (left+right: last pressed wins)", &g_Config.m_KgSnapTap, &LeftView, KING_LINE);
+	Headline(Ui(), LeftView, Localize("Input Helpers"));
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSnapTap, Localize("Snap Tap (left+right: last pressed wins)"), &g_Config.m_KgSnapTap, &LeftView, KING_LINE);
 	if(g_Config.m_KgSnapTap)
 	{
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgSnapTapDelay, &g_Config.m_KgSnapTapDelay, &Button, "Snap Tap delay", 0, 200, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_KgSnapTapDelay, &g_Config.m_KgSnapTapDelay, &Button, Localize("Snap Tap delay"), 0, 200, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 	}
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAim45, "45 degree aim (toggle)", &g_Config.m_KgAim45, &LeftView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmallSens, "Small sensitivity (toggle)", &g_Config.m_KgSmallSens, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAim45, Localize("45 degree aim (toggle)"), &g_Config.m_KgAim45, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmallSens, Localize("Small sensitivity (toggle)"), &g_Config.m_KgSmallSens, &LeftView, KING_LINE);
 	LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_KgSmallSensFactor, &g_Config.m_KgSmallSensFactor, &Button, "Small sens", 5, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-	TextLine(Ui(), LeftView, "Hold binds: bind <key> +kg_45 / +kg_small_sens", 11.0f);
+	Ui()->DoScrollbarOption(&g_Config.m_KgSmallSensFactor, &g_Config.m_KgSmallSensFactor, &Button, Localize("Small sens"), 5, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+	TextLine(Ui(), LeftView, Localize("Hold binds: bind <key> +kg_45 / +kg_small_sens"), 11.0f);
 
 	// ***** Prediction margin ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
-	Headline(Ui(), LeftView, "Prediction Margin");
+	Headline(Ui(), LeftView, Localize("Prediction Margin", "KING"));
 
 	const bool ForcedAuto = CKing::ModeUsesAutoMargin(g_Config.m_KgInputMode);
 	const bool ForcedManual = g_Config.m_KgInputMode == CKing::INPUT_MODE_CLASSIC;
 	if(ForcedManual)
-		TextLine(Ui(), LeftView, "Manual margin (Classic works exactly like TClient)");
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Manual margin (Classic works exactly like TClient)"));
 	else if(ForcedAuto)
 	{
 		char aForced[64];
-		str_format(aForced, sizeof(aForced), "Auto margin: on (%s mode)", CKing::InputModeName(g_Config.m_KgInputMode));
+		str_format(aForced, sizeof(aForced), Localize("Auto margin: on (%s mode)"), CKing::InputModeName(g_Config.m_KgInputMode));
 		TextLine(Ui(), LeftView, aForced);
 	}
 	else
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAutoMargin, "Auto margin (adapts to jitter)", &g_Config.m_KgAutoMargin, &LeftView, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAutoMargin, Localize("Auto margin (adapts to jitter)"), &g_Config.m_KgAutoMargin, &LeftView, KING_LINE);
 
 	if(!ForcedManual && (ForcedAuto || g_Config.m_KgAutoMargin))
 	{
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMin, &g_Config.m_KgAutoMarginMin, &Button, "Min (stock 10)", 1, 30, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMin, &g_Config.m_KgAutoMarginMin, &Button, Localize("Min (stock 10)"), 1, 30, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMax, &g_Config.m_KgAutoMarginMax, &Button, "Max", 5, 100, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginMax, &g_Config.m_KgAutoMarginMax, &Button, Localize("Max"), 5, 100, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginSafety, &g_Config.m_KgAutoMarginSafety, &Button, "Safety", 0, 20, &CUi::ms_LinearScrollbarScale, 0u, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_KgAutoMarginSafety, &g_Config.m_KgAutoMarginSafety, &Button, Localize("Safety"), 0, 20, &CUi::ms_LinearScrollbarScale, 0u, " ms");
 		if(g_Config.m_KgAutoMarginMax < g_Config.m_KgAutoMarginMin)
 			g_Config.m_KgAutoMarginMax = g_Config.m_KgAutoMarginMin;
 	}
 	else
 	{
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, "Margin", 1, 75, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
+		Ui()->DoScrollbarOption(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, Localize("Margin"), 1, 75, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 	}
 
 	// ***** Live network ***** //
-	Headline(Ui(), RightView, "Live Network");
+	Headline(Ui(), RightView, Localize("Live Network"));
 	if(Client()->State() == IClient::STATE_ONLINE)
 	{
 		const SKingNetStats Stats = Client()->KingNetStats();
 		char aBuf[128];
 		if(Stats.m_Valid)
 		{
-			str_format(aBuf, sizeof(aBuf), "Ping: %d ms", round_to_int(Stats.m_RttMs));
+			str_format(aBuf, sizeof(aBuf), Localize("Ping: %d ms"), round_to_int(Stats.m_RttMs));
 			TextLine(Ui(), RightView, aBuf);
-			str_format(aBuf, sizeof(aBuf), "Jitter: %.1f ms  (input spread %.1f ms)", Stats.m_JitterMs, Stats.m_SpreadMs);
+			str_format(aBuf, sizeof(aBuf), Localize("Jitter: %.1f ms  (input spread %.1f ms)"), Stats.m_JitterMs, Stats.m_SpreadMs);
 			TextLine(Ui(), RightView, aBuf);
 		}
 		else
-			TextLine(Ui(), RightView, "Measuring...");
+			TextLine(Ui(), RightView, Localize("Measuring..."));
 
 		if(Stats.m_MarginLocked)
-			str_format(aBuf, sizeof(aBuf), "Margin: %d ms (server forces 10 ms)", Stats.m_MarginMs);
+			str_format(aBuf, sizeof(aBuf), Localize("Margin: %d ms (server forces 10 ms)"), Stats.m_MarginMs);
 		else
-			str_format(aBuf, sizeof(aBuf), "Margin: %.1f ms (%s, heading to %.0f)", Stats.m_MarginExactMs, Stats.m_MarginAuto ? "auto" : "fixed", Stats.m_MarginAuto ? Stats.m_MarginTargetMs : Stats.m_MarginExactMs);
+		{
+			if(Stats.m_MarginAuto)
+				str_format(aBuf, sizeof(aBuf), Localize("Margin: %.1f ms (auto, heading to %.0f)"), Stats.m_MarginExactMs, Stats.m_MarginTargetMs);
+			else
+				str_format(aBuf, sizeof(aBuf), Localize("Margin: %.1f ms (fixed)"), Stats.m_MarginExactMs);
+		}
 		TextLine(Ui(), RightView, aBuf);
-		str_format(aBuf, sizeof(aBuf), "Late inputs this session: %d", Stats.m_LateInputs);
+		str_format(aBuf, sizeof(aBuf), Localize("Late inputs this session: %d"), Stats.m_LateInputs);
 		TextLine(Ui(), RightView, aBuf);
 		const CKing::SLagStats &Lag = GameClient()->m_King.LagStats();
-		str_format(aBuf, sizeof(aBuf), "Corrections: %d (biggest %.0f units)", Lag.m_Corrections, Lag.m_MaxCorrection);
+		str_format(aBuf, sizeof(aBuf), Localize("Corrections: %d (biggest %.0f units)"), Lag.m_Corrections, Lag.m_MaxCorrection);
 		TextLine(Ui(), RightView, aBuf);
-		str_format(aBuf, sizeof(aBuf), "Stutters: %d   Snapshot gaps: %d", Lag.m_Stutters, Lag.m_SnapGaps);
+		str_format(aBuf, sizeof(aBuf), Localize("Stutters: %d   Snapshot gaps: %d"), Lag.m_Stutters, Lag.m_SnapGaps);
 		TextLine(Ui(), RightView, aBuf);
 	}
 	else
-		TextLine(Ui(), RightView, "Join a server to see live stats.");
+		TextLine(Ui(), RightView, Localize("Join a server to see live stats."));
 
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Show network HUD in game", &g_Config.m_KgNetHud, &RightView, KING_LINE);
-	TextLine(Ui(), RightView, "Every lag is written with its cause to", 11.0f);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, Localize("Show network HUD in game"), &g_Config.m_KgNetHud, &RightView, KING_LINE);
+	TextLine(Ui(), RightView, Localize("Every lag is written with its cause to"), 11.0f);
 	TextLine(Ui(), RightView, "%APPDATA%\\DDNet\\king_lag.log", 11.0f);
 
 	// ***** Preset ***** //
 	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
-	Headline(Ui(), RightView, "KoG Preset");
-	TextLine(Ui(), RightView, "KING mode, antiping on, vsync off, uncapped", 11.0f);
-	TextLine(Ui(), RightView, "update rate. Binds and visuals are not touched.", 11.0f);
+	Headline(Ui(), RightView, Localize("KoG Preset"));
+	TextBlock(Ui(), TextRender(), RightView, Localize("KING mode, antiping on, vsync off, uncapped update rate. Your binds and visuals are not touched."), 11.0f);
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 	RightView.HSplitTop(KING_LINE * 1.25f, &Button, &RightView);
 	static CButtonContainer s_PresetButton;
-	if(DoButton_Menu(&s_PresetButton, "Apply KoG preset", 0, &Button))
+	if(DoButton_Menu(&s_PresetButton, Localize("Apply KoG preset"), 0, &Button))
 		GameClient()->m_King.ApplyKogPreset();
 
 	// ***** Updates ***** //
 	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
-	Headline(Ui(), RightView, "Updates");
+	Headline(Ui(), RightView, Localize("Updates"));
 	{
 		CKing &King = GameClient()->m_King;
 		char aBuf[128];
 		switch(King.UpdateState())
 		{
-		case CKing::UPDATE_CHECKING: str_copy(aBuf, "Checking for updates..."); break;
-		case CKing::UPDATE_LATEST: str_copy(aBuf, "You have the latest version (" KING_VERSION ")"); break;
-		case CKing::UPDATE_AVAILABLE: str_format(aBuf, sizeof(aBuf), "KING %s is available (you have " KING_VERSION ")", King.LatestVersion()); break;
-		case CKing::UPDATE_FAILED: str_copy(aBuf, "Update check failed (no internet or GitHub limit)"); break;
-		default: str_copy(aBuf, "Version " KING_VERSION); break;
+		case CKing::UPDATE_CHECKING: str_copy(aBuf, Localize("Checking for updates...")); break;
+		case CKing::UPDATE_LATEST: str_format(aBuf, sizeof(aBuf), Localize("You have the latest version (%s)"), KING_VERSION); break;
+		case CKing::UPDATE_AVAILABLE: str_format(aBuf, sizeof(aBuf), Localize("KING %s is available (you have %s)"), King.LatestVersion(), KING_VERSION); break;
+		case CKing::UPDATE_FAILED: str_copy(aBuf, Localize("Update check failed (no internet or GitHub limit)")); break;
+		default: str_format(aBuf, sizeof(aBuf), Localize("Version %s"), KING_VERSION); break;
 		}
 		TextLine(Ui(), RightView, aBuf);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgUpdateCheck, "Check for updates on start", &g_Config.m_KgUpdateCheck, &RightView, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgUpdateCheck, Localize("Check for updates on start"), &g_Config.m_KgUpdateCheck, &RightView, KING_LINE);
 
 		CUIRect CheckButton, DownloadButton;
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		RightView.HSplitTop(KING_LINE * 1.25f, &Button, &RightView);
 		Button.VSplitMid(&CheckButton, &DownloadButton, KING_MARGIN_SMALL);
 		static CButtonContainer s_CheckButton;
-		if(DoButton_Menu(&s_CheckButton, King.UpdateState() == CKing::UPDATE_CHECKING ? "Checking..." : "Check now", 0, &CheckButton))
+		if(DoButton_Menu(&s_CheckButton, King.UpdateState() == CKing::UPDATE_CHECKING ? Localize("Checking...") : Localize("Check now"), 0, &CheckButton))
 			King.CheckForUpdates();
 		static CButtonContainer s_DownloadButton;
 		if(King.Installing())
 			Ui()->RenderProgressBar(DownloadButton, King.DownloadProgress());
-		else if(DoButton_Menu(&s_DownloadButton, King.CanInstallUpdate() ? "Update now" : (King.UpdateAvailable() ? "Download update" : "Releases page"), 0, &DownloadButton))
+		else if(DoButton_Menu(&s_DownloadButton, King.CanInstallUpdate() ? Localize("Update now") : (King.UpdateAvailable() ? Localize("Download update") : Localize("Releases page")), 0, &DownloadButton))
 		{
 			if(King.UpdateAvailable())
 				King.InstallUpdate();
@@ -311,7 +317,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 		if(King.Installing())
 		{
-			str_format(aBuf, sizeof(aBuf), "Downloading %s... %d%% (KING restarts by itself)", King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
+			str_format(aBuf, sizeof(aBuf), Localize("Downloading %s... %d%% (KING restarts by itself)"), King.LatestVersion(), round_to_int(King.DownloadProgress() * 100.0f));
 			TextLine(Ui(), RightView, aBuf, 11.0f);
 		}
 		else if(King.InstallError()[0])
@@ -397,21 +403,21 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 
 	// ***** Interface size (like Minecraft's GUI scale) ***** //
 	s_Sections.Begin(LeftView);
-	Headline(Ui(), LeftView, "Interface Size");
+	Headline(Ui(), LeftView, Localize("Interface Size"));
 	{
 		static std::vector<CButtonContainer> s_vMenuScale = {{}, {}, {}, {}, {}, {}};
 		int Value = g_Config.m_KgUiScale;
-		if(DoLine_RadioMenu(LeftView, "Menus", s_vMenuScale, {"80%", "90%", "100%", "110%", "120%", "130%"}, {80, 90, 100, 110, 120, 130}, Value))
+		if(DoLine_RadioMenu(LeftView, Localize("Menus"), s_vMenuScale, {"80%", "90%", "100%", "110%", "120%", "130%"}, {80, 90, 100, 110, 120, 130}, Value))
 			g_Config.m_KgUiScale = Value;
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgScoreboardScale, &g_Config.m_KgScoreboardScale, &Button, "Scoreboard (TAB)", 50, 150, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_KgScoreboardScale, &g_Config.m_KgScoreboardScale, &Button, Localize("Scoreboard (TAB)"), 50, 150, &CUi::ms_LinearScrollbarScale, 0u, "%");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_ClChatFontSize, &g_Config.m_ClChatFontSize, &Button, "Chat", 10, 100);
+		Ui()->DoScrollbarOption(&g_Config.m_ClChatFontSize, &g_Config.m_ClChatFontSize, &Button, Localize("Chat"), 10, 100);
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
-		TextLine(Ui(), LeftView, "Console: kg_ui_scale, kg_scoreboard_scale (50-150)", 11.0f);
+		TextLine(Ui(), LeftView, Localize("Console: kg_ui_scale, kg_scoreboard_scale (50-150)"), 11.0f);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 	s_Sections.End(LeftView);
@@ -419,21 +425,21 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	// ***** Aspect ratio ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &LeftView);
 	s_Sections.Begin(LeftView);
-	Headline(Ui(), LeftView, "Aspect Ratio");
+	Headline(Ui(), LeftView, Localize("Aspect Ratio"));
 	{
 		static CUi::SDropDownState s_PresetState;
 		static CScrollRegion s_PresetScrollRegion;
 		s_PresetState.m_SelectionPopupContext.m_pScrollRegion = &s_PresetScrollRegion; // the popup needs one, or it crashes
-		static const char *s_apPresets[] = {"Native", "4:3", "5:4", "3:2", "16:10", "16:9", "Custom"};
-		CUIRect Control = LabeledRow(Ui(), LeftView, "Preset");
+		const char *s_apPresets[] = {Localize("Native"), "4:3", "5:4", "3:2", "16:10", "16:9", Localize("Custom", "KING")};
+		CUIRect Control = LabeledRow(Ui(), LeftView, Localize("Preset"));
 		const int Preset = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgAspectRatio, 0, 6), s_apPresets, std::size(s_apPresets), s_PresetState);
 		g_Config.m_KgAspectRatio = Preset;
 
 		static CUi::SDropDownState s_ApplyState;
 		static CScrollRegion s_ApplyScrollRegion;
 		s_ApplyState.m_SelectionPopupContext.m_pScrollRegion = &s_ApplyScrollRegion; // the popup needs one, or it crashes
-		static const char *s_apApply[] = {"Full", "World only"};
-		Control = LabeledRow(Ui(), LeftView, "Apply");
+		const char *s_apApply[] = {Localize("Full"), Localize("World only")};
+		Control = LabeledRow(Ui(), LeftView, Localize("Apply"));
 		g_Config.m_KgAspectApply = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgAspectApply, 0, 1), s_apApply, std::size(s_apApply), s_ApplyState);
 
 		if(g_Config.m_KgAspectRatio == 6)
@@ -446,7 +452,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 				s_Height.SetInteger(g_Config.m_KgAspectCustomH);
 				s_Init = true;
 			}
-			Control = LabeledRow(Ui(), LeftView, "Custom size");
+			Control = LabeledRow(Ui(), LeftView, Localize("Custom size"));
 			CUIRect WidthBox, Colon, HeightBox;
 			Control.VSplitMid(&WidthBox, &HeightBox, 16.0f);
 			Colon = WidthBox;
@@ -461,7 +467,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 			LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 			ApplyRow.VSplitLeft(ApplyRow.w * 0.32f, nullptr, &ApplyRow);
 			static CButtonContainer s_ApplyButton;
-			if(DoButton_Menu(&s_ApplyButton, "Apply", 0, &ApplyRow))
+			if(DoButton_Menu(&s_ApplyButton, Localize("Apply"), 0, &ApplyRow))
 			{
 				const int W = s_Width.GetInteger();
 				const int H = s_Height.GetInteger();
@@ -479,9 +485,9 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 		const float Screen = Graphics()->NativeScreenAspect();
 		const float Game = CKing::AspectRatioValue(g_Config.m_KgAspectRatio);
 		if(Game > 0.0f)
-			str_format(aNow, sizeof(aNow), "Screen %.2f, game %.2f: stretched x%.2f%s", Screen, Game, Screen / Game, g_Config.m_KgAspectApply == CKing::ASPECT_APPLY_FULL ? " (world, HUD, menus)" : " (world only)");
+			str_format(aNow, sizeof(aNow), Localize("Screen %.2f, game %.2f: stretched x%.2f%s"), Screen, Game, Screen / Game, g_Config.m_KgAspectApply == CKing::ASPECT_APPLY_FULL ? Localize(" (world, HUD, menus)") : Localize(" (world only)"));
 		else
-			str_format(aNow, sizeof(aNow), "Screen %.2f, the game uses the same", Screen);
+			str_format(aNow, sizeof(aNow), Localize("Screen %.2f, the game uses the same"), Screen);
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
 		TextLine(Ui(), LeftView, aNow, 11.0f);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
@@ -491,11 +497,11 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	// ***** Interface ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &LeftView);
 	s_Sections.Begin(LeftView);
-	Headline(Ui(), LeftView, "Interface");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, "Network HUD in game", &g_Config.m_KgNetHud, &LeftView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLagLog, "Lag log (king_lag.log: every lag and its cause)", &g_Config.m_KgLagLog, &LeftView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShow, "Crown next to KING players (game and TAB)", &g_Config.m_KgBadgeShow, &LeftView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShare, "Show my crown to other KING players", &g_Config.m_KgBadgeShare, &LeftView, KING_LINE);
+	Headline(Ui(), LeftView, Localize("Interface"));
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgNetHud, Localize("Network HUD in game"), &g_Config.m_KgNetHud, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLagLog, Localize("Lag log (king_lag.log: every lag and its cause)"), &g_Config.m_KgLagLog, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShow, Localize("Crown next to KING players (game and TAB)"), &g_Config.m_KgBadgeShow, &LeftView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShare, Localize("Show my crown to other KING players"), &g_Config.m_KgBadgeShare, &LeftView, KING_LINE);
 	s_Sections.End(LeftView);
 
 	// ***** Music player ***** //
@@ -505,49 +511,49 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 		RightView.HSplitTop(KING_HEADLINE, &Header, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		Header.VSplitRight(KING_HEADLINE * 1.4f, &Header, &Reset);
-		Ui()->DoLabel(&Header, "Music Player", KING_HEADLINE, TEXTALIGN_ML);
+		Ui()->DoLabel(&Header, Localize("Music Player"), KING_HEADLINE, TEXTALIGN_ML);
 		static CButtonContainer s_ResetButton;
 		if(Ui()->DoButton_FontIcon(&s_ResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &Reset, BUTTONFLAG_LEFT))
 			GameClient()->m_King.ResetMusicSettings();
 	}
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicHud, "Enable music player", &g_Config.m_KgMusicHud, &RightView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgMusicHud, Localize("Enable music player"), &g_Config.m_KgMusicHud, &RightView, KING_LINE);
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 	{
 		static CUi::SDropDownState s_ColorState;
 		static CScrollRegion s_ColorScrollRegion;
 		s_ColorState.m_SelectionPopupContext.m_pScrollRegion = &s_ColorScrollRegion; // the popup needs one, or it crashes
-		static const char *s_apColor[] = {"Cover", "KING", "White"};
-		CUIRect Control = LabeledRow(Ui(), RightView, "Color mode");
+		const char *s_apColor[] = {Localize("Cover"), "KING", Localize("White")};
+		CUIRect Control = LabeledRow(Ui(), RightView, Localize("Color mode"));
 		g_Config.m_KgMusicColorMode = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgMusicColorMode, 0, 2), s_apColor, std::size(s_apColor), s_ColorState);
 
 		static CUi::SDropDownState s_VisState;
 		static CScrollRegion s_VisScrollRegion;
 		s_VisState.m_SelectionPopupContext.m_pScrollRegion = &s_VisScrollRegion; // the popup needs one, or it crashes
-		static const char *s_apVis[] = {"Off", "Bottom", "Center"};
-		Control = LabeledRow(Ui(), RightView, "Visualizer mode");
+		const char *s_apVis[] = {Localize("Off"), Localize("Bottom"), Localize("Center")};
+		Control = LabeledRow(Ui(), RightView, Localize("Visualizer mode"));
 		g_Config.m_KgMusicVisualizer = Ui()->DoDropDown(&Control, std::clamp(g_Config.m_KgMusicVisualizer, 0, 2), s_apVis, std::size(s_apVis), s_VisState);
 
 		RightView.HSplitTop(KING_LINE, &Button, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgMusicTextScale, &g_Config.m_KgMusicTextScale, &Button, "Text scale", 50, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_KgMusicTextScale, &g_Config.m_KgMusicTextScale, &Button, Localize("Text scale"), 50, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
 		RightView.HSplitTop(KING_LINE, &Button, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgMusicColumns, &g_Config.m_KgMusicColumns, &Button, "Columns", 3, 24);
+		Ui()->DoScrollbarOption(&g_Config.m_KgMusicColumns, &g_Config.m_KgMusicColumns, &Button, Localize("Columns"), 3, 24);
 
-		Control = LabeledRow(Ui(), RightView, "Rounding");
+		Control = LabeledRow(Ui(), RightView, Localize("Rounding"));
 		CUIRect Cube, Soft;
 		Control.VSplitMid(&Cube, &Soft, 0.0f);
 		static CButtonContainer s_Cube, s_Soft;
-		if(DoButton_Menu(&s_Cube, "Cube", g_Config.m_KgMusicRounding == 0, &Cube, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+		if(DoButton_Menu(&s_Cube, Localize("Cube"), g_Config.m_KgMusicRounding == 0, &Cube, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 			g_Config.m_KgMusicRounding = 0;
-		if(DoButton_Menu(&s_Soft, "Soft", g_Config.m_KgMusicRounding == 1, &Soft, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+		if(DoButton_Menu(&s_Soft, Localize("Soft"), g_Config.m_KgMusicRounding == 1, &Soft, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 			g_Config.m_KgMusicRounding = 1;
 
 		CUIRect LyricsRow, Badge;
 		RightView.HSplitTop(KING_LINE, &LyricsRow, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		LyricsRow.VSplitRight(52.0f, &LyricsRow, &Badge);
-		if(DoButton_CheckBox(&g_Config.m_KgMusicLyrics, "Show song lyrics", g_Config.m_KgMusicLyrics, &LyricsRow))
+		if(DoButton_CheckBox(&g_Config.m_KgMusicLyrics, Localize("Show song lyrics"), g_Config.m_KgMusicLyrics, &LyricsRow))
 			g_Config.m_KgMusicLyrics ^= 1;
 		Badge.Margin(2.0f, &Badge);
 		Badge.Draw(ColorRGBA(0.86f, 0.16f, 0.16f, 1.0f), IGraphics::CORNER_ALL, 4.0f);
@@ -558,7 +564,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	RightView.HSplitTop(KING_MARGIN, nullptr, &RightView);
 	CKingMedia &Media = GameClient()->m_King.m_Media;
 	if(!Media.Supported())
-		TextLine(Ui(), RightView, "Music player is not supported on this system.", 11.0f);
+		TextLine(Ui(), RightView, Localize("Music player is not supported on this system."), 11.0f);
 	else
 	{
 		CUIRect Preview;
@@ -570,7 +576,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 		if(g_Config.m_KgMusicHud && Info.m_Valid && (Info.m_aTitle[0] || Info.m_aArtist[0]))
 			GameClient()->m_King.RenderMusicPill(Preview.x + Preview.w / 2.0f, Preview.y, Unit, "12:34", ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false);
 		else
-			Ui()->DoLabel(&Preview, g_Config.m_KgMusicHud ? "Play something (Spotify, browser, Yandex Music...) to see it here" : "Music player is off", 11.0f, TEXTALIGN_MC);
+			Ui()->DoLabel(&Preview, g_Config.m_KgMusicHud ? Localize("Play something (Spotify, browser, Yandex Music...) to see it here") : Localize("Music player is off"), 11.0f, TEXTALIGN_MC);
 
 		char aBuf[600];
 		if(Info.m_Valid && (Info.m_aTitle[0] || Info.m_aArtist[0]))
@@ -600,8 +606,8 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.5f);
 		if(g_Config.m_KgMusicVisualizer != CKing::MUSIC_VIS_OFF && Media.VisualizerCapturing())
-			TextLine(Ui(), RightView, Media.VisualizerExcludesGame() ? "Visualizer listens to your PC (game sounds excluded)" : "Visualizer listens to your PC output", 11.0f);
-		TextLine(Ui(), RightView, "Binds: kg_music_toggle, kg_music_next, kg_music_prev", 11.0f);
+			TextLine(Ui(), RightView, Media.VisualizerExcludesGame() ? Localize("Visualizer listens to your PC (game sounds excluded)") : Localize("Visualizer listens to your PC output"), 11.0f);
+		TextLine(Ui(), RightView, Localize("Binds: kg_music_toggle, kg_music_next, kg_music_prev"), 11.0f);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 	s_Sections.End(RightView);
@@ -630,8 +636,8 @@ void CMenus::RenderSettingsKingPerformance(CUIRect MainView)
 
 	// ***** Optimizer ***** //
 	s_Sections.Begin(LeftView);
-	Headline(Ui(), LeftView, "Optimizer");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptimizer, "Enable optimizer", &g_Config.m_KgOptimizer, &LeftView, KING_LINE);
+	Headline(Ui(), LeftView, Localize("Optimizer"));
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptimizer, Localize("Enable optimizer"), &g_Config.m_KgOptimizer, &LeftView, KING_LINE);
 	{
 		// the options only work while the optimizer is on
 		CUIRect Options = LeftView;
@@ -639,34 +645,31 @@ void CMenus::RenderSettingsKingPerformance(CUIRect MainView)
 		const float StartY = Options.y;
 		if(!g_Config.m_KgOptimizer)
 			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.45f);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoParticles, "Disable all particles render", &g_Config.m_KgOptNoParticles, &Options, KING_LINE);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoQuads, "Disable map quads render", &g_Config.m_KgOptNoQuads, &Options, KING_LINE);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoHighDetail, "Disable high detail", &g_Config.m_KgOptNoHighDetail, &Options, KING_LINE);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptFpsFog, "FPS fog (cull outside limit)", &g_Config.m_KgOptFpsFog, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoParticles, Localize("Disable all particles render"), &g_Config.m_KgOptNoParticles, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoQuads, Localize("Disable map quads render"), &g_Config.m_KgOptNoQuads, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptNoHighDetail, Localize("Disable high detail"), &g_Config.m_KgOptNoHighDetail, &Options, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgOptFpsFog, Localize("FPS fog (cull outside limit)"), &g_Config.m_KgOptFpsFog, &Options, KING_LINE);
 		if(g_Config.m_KgOptFpsFog)
 		{
 			Options.HSplitTop(KING_LINE, &Button, &Options);
 			Options.HSplitTop(KING_MARGIN_SMALL, nullptr, &Options);
-			Ui()->DoScrollbarOption(&g_Config.m_KgOptFpsFogRadius, &g_Config.m_KgOptFpsFogRadius, &Button, "Fog distance", 10, 150, &CUi::ms_LinearScrollbarScale, 0u, " tiles");
+			Ui()->DoScrollbarOption(&g_Config.m_KgOptFpsFogRadius, &g_Config.m_KgOptFpsFogRadius, &Button, Localize("Fog distance"), 10, 150, &CUi::ms_LinearScrollbarScale, 0u, Localize(" tiles"));
 		}
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		LeftView.HSplitTop(Options.y - StartY, nullptr, &LeftView);
 	}
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
-	TextLine(Ui(), LeftView, "Only what you see changes: physics, hitboxes and", 11.0f);
-	TextLine(Ui(), LeftView, "inputs stay exactly the same.", 11.0f);
+	TextBlock(Ui(), TextRender(), LeftView, Localize("Only what you see changes: physics, hitboxes and inputs stay exactly the same."), 11.0f);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	s_Sections.End(LeftView);
 
 	// ***** Performance ***** //
 	s_Sections.Begin(RightView);
-	Headline(Ui(), RightView, "Performance");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgHighPriority, "High KING Process Priority", &g_Config.m_KgHighPriority, &RightView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLowerDiscord, "Lower Discord's Process Priority", &g_Config.m_KgLowerDiscord, &RightView, KING_LINE);
+	Headline(Ui(), RightView, Localize("Performance"));
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgHighPriority, Localize("High KING Process Priority"), &g_Config.m_KgHighPriority, &RightView, KING_LINE);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLowerDiscord, Localize("Lower Discord's Process Priority"), &g_Config.m_KgLowerDiscord, &RightView, KING_LINE);
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
-	TextLine(Ui(), RightView, "Windows gives KING more CPU time than background", 11.0f);
-	TextLine(Ui(), RightView, "apps; Discord gets less while KING runs and its", 11.0f);
-	TextLine(Ui(), RightView, "normal priority back when KING closes.", 11.0f);
+	TextBlock(Ui(), TextRender(), RightView, Localize("Windows gives KING more CPU time than background apps. Discord gets less while KING runs and gets its normal priority back when KING closes."), 11.0f);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	s_Sections.End(RightView);
 	s_Sections.Swap();

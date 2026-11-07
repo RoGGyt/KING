@@ -1844,7 +1844,7 @@ void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 	{
 		g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_KING;
 	}
-	GameClient()->m_Tooltips.DoToolTip(&s_KingTabButton, &KingTabButton, "KING players");
+	GameClient()->m_Tooltips.DoToolTip(&s_KingTabButton, &KingTabButton, Localize("KING players"));
 
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
@@ -1883,7 +1883,7 @@ void CMenus::RenderServerbrowserKing(CUIRect View)
 	CUIRect Row, Button;
 	View.HSplitTop(RowHeight, &Row, &View);
 	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "KING players: %d", Total);
+	str_format(aBuf, sizeof(aBuf), Localize("KING players: %d"), Total);
 	Row.VSplitLeft(RowHeight, &Button, &Row);
 	KingDrawCrownIcon(Button, 14.0f, 1.0f);
 	Row.VSplitLeft(4.0f, nullptr, &Row);
@@ -1895,15 +1895,15 @@ void CMenus::RenderServerbrowserKing(CUIRect View)
 		CUIRect AllButton, SelectedButton;
 		Row.VSplitMid(&AllButton, &SelectedButton, 2.0f);
 		static CButtonContainer s_AllButton, s_SelectedButton;
-		if(DoButton_Menu(&s_AllButton, "All servers", s_AllServers, &AllButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+		if(DoButton_Menu(&s_AllButton, Localize("All servers"), s_AllServers, &AllButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 			s_AllServers = true;
-		if(DoButton_Menu(&s_SelectedButton, "Selected server", !s_AllServers, &SelectedButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+		if(DoButton_Menu(&s_SelectedButton, Localize("Selected server"), !s_AllServers, &SelectedButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 			s_AllServers = false;
 	}
 
 	View.HSplitBottom(RowHeight, &View, &Row);
 	View.HSplitBottom(4.0f, &View, nullptr);
-	if(DoButton_CheckBox(&g_Config.m_KgBrowserFilterKing, "Only servers with KING players", g_Config.m_KgBrowserFilterKing, &Row))
+	if(DoButton_CheckBox(&g_Config.m_KgBrowserFilterKing, Localize("Only servers with KING players"), g_Config.m_KgBrowserFilterKing, &Row))
 		g_Config.m_KgBrowserFilterKing ^= 1;
 	View.HSplitTop(6.0f, nullptr, &View);
 
@@ -1937,7 +1937,7 @@ void CMenus::RenderServerbrowserKing(CUIRect View)
 
 	if(vEntries.empty())
 	{
-		const char *pText = s_AllServers ? "No KING players in the server list" : (pSelected ? "No KING players on this server" : "No server selected");
+		const char *pText = s_AllServers ? Localize("No KING players in the server list") : (pSelected ? Localize("No KING players on this server") : Localize("No server selected"));
 		Ui()->DoLabel(&View, pText, FontSize, TEXTALIGN_MC);
 		return;
 	}

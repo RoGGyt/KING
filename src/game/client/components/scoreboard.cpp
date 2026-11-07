@@ -1355,7 +1355,7 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 						     ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f * pUi->ButtonColorMul(&pPopupContext->m_TeamAction));
 		if(pUi->DoButton_FontIcon(&pPopupContext->m_TeamAction, FontIcon::ICON_USERS, IsTeam, &Action, BUTTONFLAG_LEFT, ActionCorners, true, TeamColor))
 			ToggleGroup(GROUP_TEAM);
-		pGameClient->m_Tooltips.DoToolTip(&pPopupContext->m_TeamAction, &Action, IsTeam ? "Remove from team list" : "Add to team list");
+		pGameClient->m_Tooltips.DoToolTip(&pPopupContext->m_TeamAction, &Action, IsTeam ? Localize("Remove from team list") : Localize("Add to team list"));
 
 		Container.VSplitLeft(ActionSpacing, nullptr, &Container);
 		Container.VSplitLeft(ActionSize, &Action, &Container);
@@ -1364,7 +1364,7 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 						   ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f * pUi->ButtonColorMul(&pPopupContext->m_WarAction));
 		if(pUi->DoButton_FontIcon(&pPopupContext->m_WarAction, FontIcon::FLAG_CHECKERED, IsWar, &Action, BUTTONFLAG_LEFT, ActionCorners, true, WarColor))
 			ToggleGroup(GROUP_WAR);
-		pGameClient->m_Tooltips.DoToolTip(&pPopupContext->m_WarAction, &Action, IsWar ? "Remove from war list" : "Add to war list");
+		pGameClient->m_Tooltips.DoToolTip(&pPopupContext->m_WarAction, &Action, IsWar ? Localize("Remove from war list") : Localize("Add to war list"));
 	}
 
 	View.HSplitTop(ItemSpacing * 2, nullptr, &View);
@@ -1379,7 +1379,7 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 	if(pPopupContext->m_CanInvite)
 	{
 		const ColorRGBA InviteColor = ColorRGBA(0.33f, 0.32f, 0.72f, 0.9f * pUi->ButtonColorMul(&pPopupContext->m_InviteButton));
-		if(Button(&pPopupContext->m_InviteButton, "Invite", InviteColor))
+		if(Button(&pPopupContext->m_InviteButton, Localize("Invite"), InviteColor))
 		{
 			KingSayWithName(pScoreboard->Console(), "/invite", Client.m_aName);
 			Close = true;
@@ -1411,7 +1411,7 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 		}
 	}
 
-	if(Button(&pPopupContext->m_ProfileButton, "Profile"))
+	if(Button(&pPopupContext->m_ProfileButton, Localize("Profile")))
 	{
 		char aUrl[512];
 		KingProfileUrl(aUrl, sizeof(aUrl), Client.m_aName);
@@ -1420,7 +1420,7 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 
 	if(!pPopupContext->m_IsLocal)
 	{
-		if(Button(&pPopupContext->m_WhisperButton, "Whisper"))
+		if(Button(&pPopupContext->m_WhisperButton, Localize("Whisper")))
 		{
 			// open the chat with "/w <name> " ready to type
 			char aName[2 * MAX_NAME_LENGTH + 8];
@@ -1437,7 +1437,7 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 			Close = true;
 		}
 
-		if(Button(&pPopupContext->m_CopySkinButton, "Copy Skin"))
+		if(Button(&pPopupContext->m_CopySkinButton, Localize("Copy Skin")))
 		{
 			// to the tee you are controlling right now
 			const bool Dummy = g_Config.m_ClDummy != 0;
@@ -1457,17 +1457,17 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 			pGameClient->m_Chat.Echo(aBuf);
 		}
 
-		if(Button(&pPopupContext->m_VoteKickButton, "Vote Kick"))
+		if(Button(&pPopupContext->m_VoteKickButton, Localize("Vote Kick")))
 		{
 			pGameClient->m_Voting.CallvoteKick(pPopupContext->m_ClientId, "");
 			Close = true;
 		}
 	}
 
-	if(Button(&pPopupContext->m_FindHoursButton, "Find Hours"))
+	if(Button(&pPopupContext->m_FindHoursButton, Localize("Find Hours")))
 		pGameClient->m_King.LookupPlayer(Client.m_aName);
 
-	if(Button(&pPopupContext->m_ClipNameButton, "Clip Name"))
+	if(Button(&pPopupContext->m_ClipNameButton, Localize("Clip Name")))
 	{
 		pScoreboard->Input()->SetClipboardText(Client.m_aName);
 		char aBuf[96];
