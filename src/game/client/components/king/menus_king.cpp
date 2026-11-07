@@ -244,6 +244,9 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		break;
 	}
 
+	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothOthers, Localize("Smooth corrections of other tees (30 ms, visual only)"), &g_Config.m_KgSmoothOthers, &LeftView, KING_LINE);
+
 	// ***** Input helpers ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
 	Headline(Ui(), LeftView, Localize("Input Helpers"));

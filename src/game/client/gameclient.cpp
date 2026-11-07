@@ -2802,6 +2802,22 @@ void CGameClient::OnPredict()
 		KingHaveOld = true;
 	}
 
+	// KING: same for other tees (their drawn tick), for the optional smoothing of their corrections
+	const bool KingSmoothOthers = g_Config.m_KgSmoothOthers && KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy;
+	const int KingOthersTick = m_KingPrevFinalOthers;
+	bool aKingOtherHave[MAX_CLIENTS] = {};
+	vec2 aKingOtherOld[MAX_CLIENTS];
+	if(KingSmoothOthers && KingOthersTick > Client()->GameTick(g_Config.m_ClDummy) && KingOthersTick <= FinalTickOthers)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(i == KingLocalId || !m_Snap.m_aCharacters[i].m_Active || m_aClients[i].m_aPredTick[KingOthersTick % 200] != KingOthersTick)
+				continue;
+			aKingOtherOld[i] = m_aClients[i].m_aPredPos[KingOthersTick % 200];
+			aKingOtherHave[i] = true;
+		}
+	}
+
 	for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= FinalTickSelf; Tick++)
 	{
 		// fetch the previous characters
@@ -3028,6 +3044,32 @@ void CGameClient::OnPredict()
 			m_KingSmoothElapsedMs = 0.0f;
 		}
 	}
+	// KING: corrections of other tees glide out too (visual only, small corrections only)
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!KingSmoothOthers)
+		{
+			m_aKingOtherStart[i] = m_aKingOtherOffset[i] = vec2(0.0f, 0.0f);
+			continue;
+		}
+		if(!aKingOtherHave[i] || m_aClients[i].m_aPredTick[KingOthersTick % 200] != KingOthersTick)
+			continue;
+		const vec2 Err = aKingOtherOld[i] - m_aClients[i].m_aPredPos[KingOthersTick % 200];
+		const float ErrLen = length(Err);
+		if(ErrLen > CKing::SMOOTH_SNAP_DISTANCE)
+			m_aKingOtherStart[i] = m_aKingOtherOffset[i] = vec2(0.0f, 0.0f); // teleport, kill, spawn: show it at once
+		else if(ErrLen > 0.5f)
+		{
+			vec2 Start = m_aKingOtherOffset[i] + Err;
+			const float StartLen = length(Start);
+			if(StartLen > CKing::SMOOTH_SNAP_DISTANCE)
+				Start = Start * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
+			m_aKingOtherStart[i] = m_aKingOtherOffset[i] = Start;
+			m_aKingOtherElapsedMs[i] = 0.0f;
+		}
+	}
+	m_KingPrevFinalOthers = FinalTickOthers;
+
 	m_KingPrevFinalRegular = FinalTickRegular;
 	m_KingPrevLocalId = KingLocalId;
 	m_KingPrevDummy = g_Config.m_ClDummy;
@@ -4289,6 +4331,23 @@ void CGameClient::UpdateRenderedCharacters()
 			m_KingSmoothStart = vec2(0.0f, 0.0f);
 	}
 
+	// KING: fade the correction offsets of other tees (same curve and time as our own)
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_aKingOtherStart[i] == vec2(0.0f, 0.0f))
+			continue;
+		if(!g_Config.m_KgSmoothOthers || !m_Snap.m_aCharacters[i].m_Active)
+		{
+			m_aKingOtherStart[i] = m_aKingOtherOffset[i] = vec2(0.0f, 0.0f);
+			continue;
+		}
+		m_aKingOtherElapsedMs[i] += Client()->RenderFrameTime() * 1000.0f;
+		const float T = std::clamp(m_aKingOtherElapsedMs[i] / CKing::KING_SMOOTH_MS, 0.0f, 1.0f);
+		m_aKingOtherOffset[i] = m_aKingOtherStart[i] * (1.0f - CKing::SmoothEase(T, CKing::SMOOTH_CURVE_SMOOTH));
+		if(T >= 1.0f)
+			m_aKingOtherStart[i] = m_aKingOtherOffset[i] = vec2(0.0f, 0.0f);
+	}
+
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(!m_Snap.m_aCharacters[i].m_Active)
@@ -4359,6 +4418,15 @@ void CGameClient::UpdateRenderedCharacters()
 
 				if(g_Config.m_TcUnpredOthersInFreeze && Client()->m_IsLocalFrozen)
 					Pos = UnpredPos;
+
+				// KING: smoothed corrections, only on top of the plain predicted position
+				// (other smoothing/ghost/freeze modes draw their own position)
+				const bool KingPlainPredicted = !g_Config.m_TcRemoveAnti && !g_Config.m_ClAntiPingSmooth &&
+								!(g_Config.m_TcAntiPingImproved && m_aClients[i].m_ValidAntipingSmooth) &&
+								!(g_Config.m_TcShowOthersGhosts && g_Config.m_TcSwapGhosts && !(m_aClients[i].m_FreezeEnd > 0 && g_Config.m_TcHideFrozenGhosts)) &&
+								!(g_Config.m_TcUnpredOthersInFreeze && Client()->m_IsLocalFrozen);
+				if(KingPlainPredicted && m_aKingOtherStart[i] != vec2(0.0f, 0.0f))
+					Pos += m_aKingOtherOffset[i];
 			}
 		}
 		// KING Smooth: add the fading correction offset to our own tee

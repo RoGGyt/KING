@@ -470,3 +470,6 @@ Offset %d.%03d ticks
 
 = %.2f ms ahead. More than 1 tick shows you earlier, but corrects harder when you change direction.
 == = %.2f мс вперёд. Больше 1 тика — видишь себя раньше, но сильнее поправки при смене направления.
+
+Smooth corrections of other tees (30 ms, visual only)
+== Сглаживать поправки других тишек (30 мс, только визуально)

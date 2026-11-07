@@ -236,6 +236,11 @@ public:
 	vec2 m_KingSmoothOffset = vec2(0.0f, 0.0f); // KING Smooth/Best: current render offset of our tee
 	vec2 m_KingSmoothStart = vec2(0.0f, 0.0f); // offset when the current blend started
 	float m_KingSmoothElapsedMs = 0.0f;
+	// KING: correction smoothing of other tees (kg_smooth_others)
+	vec2 m_aKingOtherOffset[MAX_CLIENTS] = {};
+	vec2 m_aKingOtherStart[MAX_CLIENTS] = {};
+	float m_aKingOtherElapsedMs[MAX_CLIENTS] = {};
+	int m_KingPrevFinalOthers = 0;
 	int m_KingPrevFinalRegular = -1;
 	int m_KingPrevLocalId = -1;
 	int m_KingPrevDummy = -1;

@@ -288,6 +288,7 @@ MACRO_CONFIG_INT(TcShowhudDummyAngle, tc_showhud_dummy_angle, 0, 0, 1, CFGFLAG_C
 
 // KING
 MACRO_CONFIG_INT(KgInputMode, kg_input_mode, 2, 0, 7, CFGFLAG_CLIENT | CFGFLAG_SAVE, "KING input mode (0 = custom, 1 = Classic (whole ticks), 2 = KING (fast input + safe auto margin + light smoothing), 3 = Delta (sub-tick offset), 4 = Ping Comp (offset follows ping), 5 = Smooth (KING + adjustable correction smoothing), 6 = Best (offset + latency comp + smoothing + interpolation), 7 = F input (exact offset in 0.001 ticks + auto margin))")
+MACRO_CONFIG_INT(KgSmoothOthers, kg_smooth_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Glide out small server corrections of other tees too (30 ms, visual only)")
 MACRO_CONFIG_INT(KgFInputAmount, kg_f_input_amount, 1000, 0, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "F input: prediction offset in 0.001 ticks (1000 = 1 tick = 20 ms, max 5 ticks)")
 MACRO_CONFIG_INT(KgFInputOthers, kg_f_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "F input: also shift other tees by the offset")
 MACRO_CONFIG_INT(KgFInputSmooth, kg_f_input_smooth, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "F input: glide out small server corrections (30 ms)")
