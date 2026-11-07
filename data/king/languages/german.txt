@@ -1,0 +1,468 @@
+##### KING client: german #####
+# Loaded after the DDNet and TClient translations.
+
+##### translated strings #####
+
+Looking up %s...
+== Suche Statistiken für %s...
+
+%d hours played (since %s)
+== %d Stunden gespielt (seit %s)
+
+%d hours played
+== %d Stunden gespielt
+
+%d hours played in the last year (total unknown)
+== %d Stunden im letzten Jahr (Gesamtzeit unbekannt)
+
+%d / %d points (rank #%d)
+== %d / %d Punkte (Rang #%d)
+
+%d points
+== %d Punkte
+
+%s: no stats found (new player or a different name)
+== %s: keine Statistiken gefunden (neuer Spieler oder anderer Name)
+
+%s: stats sites did not answer, try again later
+== %s: Statistikseiten antworten nicht, versuch es später nochmal
+
+KING Input
+== KING-Input
+
+Mode
+== Modus
+
+Offset, latency compensation, correction smoothing and a blend curve. Auto keeps you one tick ahead and adapts the smoothing to your connection.
+== Offset, Latenzausgleich, Glättung von Korrekturen und eine Übergangskurve. Auto hält dich einen Tick voraus und passt die Glättung an deine Verbindung an.
+
+Preset
+== Voreinstellung
+
+[KING]
+Custom
+== Eigene
+
+Now: %d ms ahead, %d ms smoothing
+== Jetzt: %d ms voraus, %d ms Glättung
+
+Offset %d.%02d ticks
+== Offset %d.%02d Ticks
+
+Latency comp
+== Latenzausgleich
+
+% of ping
+== % vom Ping
+
+Smoothing
+== Glättung
+
+Curve
+== Kurve
+
+Linear
+== Linear
+
+Cubic
+== Kubisch
+
+Smooth
+== Weich
+
+Classic TClient fast input: your tee is shown this far ahead with your newest input. The margin stays manual.
+== Fast Input wie in TClient: dein Tee wird so weit voraus mit deinem neuesten Input gezeigt. Die Margin stellst du selbst ein.
+
+= %d.%02d ticks ahead (20 ms = 1 tick). More reacts earlier, but corrects harder when you change direction.
+== = %d.%02d Ticks voraus (20 ms = 1 Tick). Mehr reagiert früher, korrigiert aber stärker beim Richtungswechsel.
+
+One tick of fast input and a safe auto margin: never below the stock 10 ms, and it changes smoothly.
+== Ein Tick Fast Input und eine sichere Auto-Margin: nie unter den Standard-10 ms und ändert sich sanft.
+
+20 ms = one tick. Higher shows you further ahead, but corrects more when you change direction.
+== 20 ms = ein Tick. Mehr zeigt dich weiter voraus, korrigiert aber stärker beim Richtungswechsel.
+
+Smooth small corrections (30 ms glide, no jumps)
+== Kleine Korrekturen glätten (30 ms, keine Sprünge)
+
+A fixed offset in hundredths of a tick, also between whole ticks (0.75 tick = 15 ms).
+== Fester Offset in Hundertstel-Ticks, auch zwischen ganzen Ticks (0.75 Tick = 15 ms).
+
+Shift other tees too
+== Andere Tees auch verschieben
+
+Fast input follows your ping: your tee is shown this share of the round trip ahead (up to 100 ms).
+== Fast Input folgt deinem Ping: dein Tee wird um diesen Anteil der Umlaufzeit voraus gezeigt (bis 100 ms).
+
+Share of ping
+== Anteil vom Ping
+
+Now: %d ms ahead
+== Jetzt: %d ms voraus
+
+Like KING mode, but when the server corrects your tee it glides to the right spot instead of jumping. Visual only: your inputs and hitbox are not delayed.
+== Wie der KING-Modus, aber wenn der Server deinen Tee korrigiert, gleitet er an die richtige Stelle statt zu springen. Nur optisch: Inputs und Hitbox werden nicht verzögert.
+
+Uses your fast input settings as they are (Settings > Input).
+== Nutzt deine Fast-Input-Einstellungen unverändert.
+
+Input Helpers
+== Input-Helfer
+
+Snap Tap (left+right: last pressed wins)
+== Snap Tap (links+rechts: zuletzt gedrückt gewinnt)
+
+Snap Tap delay
+== Snap-Tap-Verzögerung
+
+45 degree aim (toggle)
+== 45-Grad-Zielen (umschalten)
+
+Small sensitivity (toggle)
+== Niedrige Empfindlichkeit (umschalten)
+
+Small sens
+== Niedrige Empf.
+
+Hold binds: bind <key> +kg_45 / +kg_small_sens
+== Halte-Binds: bind <Taste> +kg_45 / +kg_small_sens
+
+[KING]
+Prediction Margin
+== Vorhersage-Margin
+
+Manual margin (Classic works exactly like TClient)
+== Manuelle Margin (Classic funktioniert genau wie TClient)
+
+Auto margin: on (%s mode)
+== Auto-Margin: an (%s-Modus)
+
+Auto margin (adapts to jitter)
+== Auto-Margin (passt sich dem Jitter an)
+
+Min (stock 10)
+== Min (Standard 10)
+
+Max
+== Max
+
+Safety
+== Puffer
+
+Margin
+== Margin
+
+Live Network
+== Netzwerk live
+
+Ping: %d ms
+== Ping: %d ms
+
+Jitter: %.1f ms  (input spread %.1f ms)
+== Jitter: %.1f ms  (Input-Streuung %.1f ms)
+
+Measuring...
+== Messe...
+
+Margin: %d ms (server forces 10 ms)
+== Margin: %d ms (Server erzwingt 10 ms)
+
+Margin: %.1f ms (auto, heading to %.0f)
+== Margin: %.1f ms (auto, Ziel %.0f)
+
+Margin: %.1f ms (fixed)
+== Margin: %.1f ms (fest)
+
+Late inputs this session: %d
+== Verspätete Inputs in dieser Sitzung: %d
+
+Corrections: %d (biggest %.0f units)
+== Korrekturen: %d (größte %.0f Einheiten)
+
+Stutters: %d   Snapshot gaps: %d
+== Ruckler: %d   Snapshot-Lücken: %d
+
+Join a server to see live stats.
+== Tritt einem Server bei, um Live-Werte zu sehen.
+
+Show network HUD in game
+== Netzwerk-HUD im Spiel anzeigen
+
+Every lag is written with its cause to
+== Jeder Lag wird mit seiner Ursache gespeichert in
+
+KoG Preset
+== KoG-Voreinstellung
+
+KING mode, antiping on, vsync off, uncapped update rate. Your binds and visuals are not touched.
+== KING-Modus, Antiping an, VSync aus, unbegrenzte Update-Rate. Binds und Optik bleiben unverändert.
+
+Apply KoG preset
+== KoG-Voreinstellung anwenden
+
+Updates
+== Updates
+
+Checking for updates...
+== Suche nach Updates...
+
+You have the latest version (%s)
+== Du hast die neueste Version (%s)
+
+KING %s is available (you have %s)
+== KING %s ist verfügbar (du hast %s)
+
+Update check failed (no internet or GitHub limit)
+== Update-Prüfung fehlgeschlagen (kein Internet oder GitHub-Limit)
+
+Version %s
+== Version %s
+
+Check for updates on start
+== Beim Start nach Updates suchen
+
+Checking...
+== Prüfe...
+
+Download update
+== Update herunterladen
+
+Releases page
+== Release-Seite
+
+Downloading %s... %d%% (KING restarts by itself)
+== Lade %s herunter... %d%% (KING startet von selbst neu)
+
+Interface Size
+== Oberflächengröße
+
+Menus
+== Menüs
+
+Scoreboard (TAB)
+== Punktetabelle (TAB)
+
+Console: kg_ui_scale, kg_scoreboard_scale (50-150)
+== Konsole: kg_ui_scale, kg_scoreboard_scale (50-150)
+
+Aspect Ratio
+== Seitenverhältnis
+
+Native
+== Wie Monitor
+
+Full
+== Alles
+
+World only
+== Nur Spielwelt
+
+Custom size
+== Eigene Größe
+
+Screen %.2f, game %.2f: stretched x%.2f%s
+== Bildschirm %.2f, Spiel %.2f: gestreckt x%.2f%s
+
+ (world, HUD, menus)
+==  (Welt, HUD, Menüs)
+
+ (world only)
+==  (nur Welt)
+
+Screen %.2f, the game uses the same
+== Bildschirm %.2f, das Spiel nutzt dasselbe
+
+Interface
+== Oberfläche
+
+Network HUD in game
+== Netzwerk-HUD im Spiel
+
+Lag log (king_lag.log: every lag and its cause)
+== Lag-Log (king_lag.log: jeder Lag und seine Ursache)
+
+Crown next to KING players (game and TAB)
+== Krone neben KING-Spielern (im Spiel und in TAB)
+
+Show my crown to other KING players
+== Meine Krone anderen KING-Spielern zeigen
+
+Music Player
+== Musikplayer
+
+Enable music player
+== Musikplayer aktivieren
+
+Cover
+== Cover
+
+White
+== Weiß
+
+Color mode
+== Farbmodus
+
+Off
+== Aus
+
+Bottom
+== Unten
+
+Center
+== Mitte
+
+Visualizer mode
+== Visualizer
+
+Text scale
+== Textgröße
+
+Columns
+== Balken
+
+Rounding
+== Abrundung
+
+Cube
+== Eckig
+
+Soft
+== Weich
+
+Show song lyrics
+== Songtext anzeigen
+
+Music player is not supported on this system.
+== Der Musikplayer wird auf diesem System nicht unterstützt.
+
+Play something (Spotify, browser, Yandex Music...) to see it here
+== Spiel etwas ab (Spotify, Browser...), dann erscheint es hier
+
+Music player is off
+== Musikplayer ist aus
+
+Visualizer listens to your PC (game sounds excluded)
+== Visualizer hört die Ausgabe deines PCs (ohne Spielsounds)
+
+Visualizer listens to your PC output
+== Visualizer hört die Ausgabe deines PCs
+
+Binds: kg_music_toggle, kg_music_next, kg_music_prev
+== Binds: kg_music_toggle, kg_music_next, kg_music_prev
+
+Optimizer
+== Optimierung
+
+Enable optimizer
+== Optimierung aktivieren
+
+Disable all particles render
+== Keine Partikel rendern
+
+Disable map quads render
+== Keine Map-Quads rendern
+
+Disable high detail
+== Hohe Details deaktivieren
+
+FPS fog (cull outside limit)
+== FPS-Nebel (außerhalb des Limits nicht rendern)
+
+Fog distance
+== Nebeldistanz
+
+ tiles
+==  Tiles
+
+Only what you see changes: physics, hitboxes and inputs stay exactly the same.
+== Nur die Optik ändert sich: Physik, Hitboxen und Inputs bleiben genau gleich.
+
+Performance
+== Leistung
+
+High KING Process Priority
+== Hohe Prozesspriorität für KING
+
+Lower Discord's Process Priority
+== Discords Prozesspriorität senken
+
+Windows gives KING more CPU time than background apps. Discord gets less while KING runs and gets its normal priority back when KING closes.
+== Windows gibt KING mehr CPU-Zeit als Hintergrundprogrammen. Discord bekommt weniger, solange KING läuft, und seine normale Priorität zurück, wenn KING geschlossen wird.
+
+KING players
+== KING-Spieler
+
+KING players: %d
+== KING-Spieler: %d
+
+All servers
+== Alle Server
+
+Selected server
+== Gewählter Server
+
+Only servers with KING players
+== Nur Server mit KING-Spielern
+
+No KING players in the server list
+== Keine KING-Spieler in der Serverliste
+
+No KING players on this server
+== Keine KING-Spieler auf diesem Server
+
+Update
+== Aktualisieren
+
+Downloading KING %s... %d%%
+== Lade KING %s herunter... %d%%
+
+KING %s is out! (you have %s)
+== KING %s ist da! (du hast %s)
+
+Downloading %s... %d%%
+== Lade %s herunter... %d%%
+
+KING %s is out
+== KING %s ist da
+
+Remove from team list
+== Von der Teamliste entfernen
+
+Add to team list
+== Zur Teamliste hinzufügen
+
+Remove from war list
+== Von der Warliste entfernen
+
+Add to war list
+== Zur Warliste hinzufügen
+
+Invite
+== Einladen
+
+Profile
+== Profil
+
+Whisper
+== Flüstern
+
+Copy Skin
+== Skin kopieren
+
+Vote Kick
+== Kick-Abstimmung
+
+Find Hours
+== Stunden & Punkte
+
+Clip Name
+== Namen kopieren
+
+Display
+== Anzeige
+
+Apply
+== Anwenden
+
+Fast input
+== Fast Input
