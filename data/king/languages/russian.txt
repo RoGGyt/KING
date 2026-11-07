@@ -461,3 +461,12 @@ Clip Name
 
 Display
 == Отображение
+
+Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms). The margin follows your connection by itself, so your inputs do not arrive late.
+== Тишка показывается ровно на столько вперёд, с точностью до тысячной тика (0.001 тика = 0.02 мс). Маржин сам подстраивается под твою сеть, поэтому нажатия не опаздывают к серверу.
+
+Offset %d.%03d ticks
+== Смещение: %d.%03d тика
+
+= %.2f ms ahead. More than 1 tick shows you earlier, but corrects harder when you change direction.
+== = %.2f мс вперёд. Больше 1 тика — видишь себя раньше, но сильнее поправки при смене направления.

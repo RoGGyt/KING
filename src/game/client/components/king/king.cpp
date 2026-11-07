@@ -49,6 +49,7 @@ const char *CKing::InputModeName(int Mode)
 	case INPUT_MODE_PING_COMP: return "Ping Comp";
 	case INPUT_MODE_SMOOTH: return "Smooth";
 	case INPUT_MODE_BEST: return "Best";
+	case INPUT_MODE_F: return "F input";
 	}
 	return "?";
 }
@@ -488,8 +489,10 @@ void CKing::SetFastInput(float WantedMs, bool Ramp, bool Others)
 	m_LastFastUpdate = Now;
 	m_LastAppliedMode = Mode;
 
+	// the exact value (m_AppliedFastMs) is what prediction uses (CGameClient::KingFastInputMs);
+	// the integer TClient setting is kept in sync for everything else
 	const int Amount = round_to_int(m_AppliedFastMs);
-	g_Config.m_TcFastInput = Amount > 0;
+	g_Config.m_TcFastInput = m_AppliedFastMs > 0.005f;
 	g_Config.m_TcFastInputAmount = std::clamp(Amount, 1, 100);
 	g_Config.m_TcFastInputOthers = Others;
 	g_Config.m_TcFastInputRepredictHook = 0;
@@ -539,6 +542,10 @@ void CKing::ApplyInputMode()
 		// 0.01 tick units -> ms (1 tick = 20 ms). 0 turns fast input off.
 		SetFastInput(g_Config.m_KgDeltaAmount * 0.2f, false, g_Config.m_KgDeltaOthers);
 		break;
+	case INPUT_MODE_F:
+		// 0.001 tick units -> ms, applied exactly (no 1 ms rounding). Margin is automatic.
+		SetFastInput(g_Config.m_KgFInputAmount * 0.02f, false, g_Config.m_KgFInputOthers);
+		break;
 	case INPUT_MODE_PING_COMP:
 	{
 		// show our tee a share of the round trip ahead; follows the ping slowly
@@ -571,6 +578,7 @@ float CKing::SmoothDurationMs() const
 	case INPUT_MODE_KING: return g_Config.m_KgKingSmooth ? KING_SMOOTH_MS : 0.0f;
 	case INPUT_MODE_SMOOTH: return (float)g_Config.m_KgSmoothMs;
 	case INPUT_MODE_BEST: return (float)m_BestSmoothMs;
+	case INPUT_MODE_F: return g_Config.m_KgFInputSmooth ? KING_SMOOTH_MS : 0.0f;
 	}
 	return 0.0f;
 }

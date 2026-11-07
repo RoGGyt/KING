@@ -5560,7 +5560,8 @@ static bool KingAutoMarginActive()
 	case 2:
 	case 4:
 	case 5:
-	case 6: return true;
+	case 6:
+	case 7: return true; // KING, Ping Comp, Smooth, Best, F input
 	default: return g_Config.m_KgAutoMargin != 0;
 	}
 }

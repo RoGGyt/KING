@@ -1086,6 +1086,9 @@ public:
 	int m_SmoothTick = 0;
 	float m_SmoothIntraTick = 0;
 	bool CheckNewInput() override;
+	// KING: fast input in ms with sub-millisecond precision (F input), and the ticks it predicts ahead
+	float KingFastInputMs() const;
+	int KingFastInputTicks() const;
 	std::optional<CServerInfo> m_ConnectServerInfo = std::nullopt;
 	void SetConnectInfo(const NETADDR *pAddress) override;
 };

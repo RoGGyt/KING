@@ -75,12 +75,12 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	Headline(Ui(), LeftView, Localize("KING Input"));
 	{
 		int Mode = g_Config.m_KgInputMode;
-		static std::vector<CButtonContainer> s_vModeButtonsA = {{}, {}, {}};
+		static std::vector<CButtonContainer> s_vModeButtonsA = {{}, {}, {}, {}};
 		static std::vector<CButtonContainer> s_vModeButtonsB = {{}, {}, {}, {}};
 		bool Changed = DoLine_RadioMenu(LeftView, Localize("Mode"),
 			s_vModeButtonsA,
-			{CKing::InputModeName(CKing::INPUT_MODE_BEST), CKing::InputModeName(CKing::INPUT_MODE_KING), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC)},
-			{CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_KING, CKing::INPUT_MODE_CLASSIC},
+			{CKing::InputModeName(CKing::INPUT_MODE_BEST), CKing::InputModeName(CKing::INPUT_MODE_KING), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC), CKing::InputModeName(CKing::INPUT_MODE_F)},
+			{CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_KING, CKing::INPUT_MODE_CLASSIC, CKing::INPUT_MODE_F},
 			Mode);
 		Changed |= DoLine_RadioMenu(LeftView, "",
 			s_vModeButtonsB,
@@ -144,6 +144,61 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		TextBlock(Ui(), TextRender(), LeftView, Localize("20 ms = one tick. Higher shows you further ahead, but corrects more when you change direction."), 11.0f);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgKingSmooth, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgKingSmooth, &LeftView, KING_LINE);
 		break;
+	case CKing::INPUT_MODE_F:
+	{
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms). The margin follows your connection by itself, so your inputs do not arrive late."));
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		char aLabel[64];
+		str_format(aLabel, sizeof(aLabel), Localize("Offset %d.%03d ticks"), g_Config.m_KgFInputAmount / 1000, g_Config.m_KgFInputAmount % 1000);
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgFInputAmount, &g_Config.m_KgFInputAmount, &Button, aLabel, 0, 5000, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
+
+		// fine tuning: -0.01 -0.001 [exact value] +0.001 +0.01
+		CUIRect Row, Minus10, Minus1, Value, Plus1, Plus10;
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		LeftView.HSplitTop(KING_LINE, &Row, &LeftView);
+		const float StepW = std::min(54.0f, Row.w / 6.0f);
+		Row.VSplitLeft(StepW, &Minus10, &Row);
+		Row.VSplitLeft(2.0f, nullptr, &Row);
+		Row.VSplitLeft(StepW, &Minus1, &Row);
+		Row.VSplitRight(StepW, &Row, &Plus10);
+		Row.VSplitRight(2.0f, &Row, nullptr);
+		Row.VSplitRight(StepW, &Row, &Plus1);
+		Row.VMargin(4.0f, &Value);
+		static CButtonContainer s_aStep[4];
+		int Amount = g_Config.m_KgFInputAmount;
+		if(DoButton_Menu(&s_aStep[0], "-0.01", 0, &Minus10))
+			Amount -= 10;
+		if(DoButton_Menu(&s_aStep[1], "-0.001", 0, &Minus1))
+			Amount -= 1;
+		if(DoButton_Menu(&s_aStep[2], "+0.001", 0, &Plus1))
+			Amount += 1;
+		if(DoButton_Menu(&s_aStep[3], "+0.01", 0, &Plus10))
+			Amount += 10;
+		static CLineInputNumber s_FValue;
+		static int s_ShownAmount = -1;
+		if(!s_FValue.IsActive() && s_ShownAmount != g_Config.m_KgFInputAmount)
+		{
+			char aValue[16];
+			str_format(aValue, sizeof(aValue), "%d.%03d", g_Config.m_KgFInputAmount / 1000, g_Config.m_KgFInputAmount % 1000);
+			s_FValue.Set(aValue);
+			s_ShownAmount = g_Config.m_KgFInputAmount;
+		}
+		if(Ui()->DoEditBox(&s_FValue, &Value, KING_TEXT))
+		{
+			const float Ticks = s_FValue.GetFloat();
+			Amount = round_to_int(Ticks * 1000.0f);
+			s_ShownAmount = Amount;
+		}
+		g_Config.m_KgFInputAmount = std::clamp(Amount, 0, 5000);
+
+		char aInfo[192];
+		str_format(aInfo, sizeof(aInfo), Localize("= %.2f ms ahead. More than 1 tick shows you earlier, but corrects harder when you change direction."), g_Config.m_KgFInputAmount * 0.02f);
+		TextBlock(Ui(), TextRender(), LeftView, aInfo, 11.0f);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgFInputSmooth, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgFInputSmooth, &LeftView, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgFInputOthers, Localize("Shift other tees too"), &g_Config.m_KgFInputOthers, &LeftView, KING_LINE);
+		break;
+	}
 	case CKing::INPUT_MODE_DELTA:
 		TextBlock(Ui(), TextRender(), LeftView, Localize("A fixed offset in hundredths of a tick, also between whole ticks (0.75 tick = 15 ms)."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);

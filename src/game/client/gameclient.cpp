@@ -2775,9 +2775,7 @@ void CGameClient::OnPredict()
 	bool RealPredTick = false;
 	// predict
 
-	int FastInputTicks = 0;
-	if(g_Config.m_TcFastInput)
-		FastInputTicks = (g_Config.m_TcFastInputAmount + 19) / 20;
+	const int FastInputTicks = KingFastInputTicks();
 
 	int FinalTickRegular = Client()->PredGameTick(g_Config.m_ClDummy); // The vanilla final tick disregarding fast input
 
@@ -4506,7 +4504,7 @@ void CGameClient::DetectStrongHook()
 
 vec2 CGameClient::GetSmoothPos(int ClientId)
 {
-	const int FastInputTicks = g_Config.m_TcFastInput ? (g_Config.m_TcFastInputAmount + 19) / 20 : 0;
+	const int FastInputTicks = KingFastInputTicks();
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	int64_t Now = time_get();
 	for(int i = 0; i < 2; i++)
@@ -4538,8 +4536,10 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
 
-	float FastInputIntra = (g_Config.m_TcFastInputAmount % 20) / 20.0f;
-	int FastInputTicks = g_Config.m_TcFastInputAmount / 20;
+	// KING: exact (float) offset, so F input can go in 0.001 tick steps
+	const float FastInputTotal = KingFastInputMs() / 20.0f;
+	int FastInputTicks = (int)std::floor(FastInputTotal);
+	float FastInputIntra = FastInputTotal - FastInputTicks;
 
 	float CombinedIntra = PredIntraTick + FastInputIntra;
 
@@ -4599,8 +4599,10 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 	m_SmoothTick = SmoothTick;
 	m_SmoothIntraTick = SmoothIntra;
 
-	float FastInputIntra = (g_Config.m_TcFastInputAmount % 20) / 20.0f;
-	int FastInputTicks = g_Config.m_TcFastInputAmount / 20;
+	// KING: exact (float) offset, so F input can go in 0.001 tick steps
+	const float FastInputTotal = KingFastInputMs() / 20.0f;
+	int FastInputTicks = (int)std::floor(FastInputTotal);
+	float FastInputIntra = FastInputTotal - FastInputTicks;
 
 	float CombinedIntra = SmoothIntra + FastInputIntra;
 
@@ -5658,6 +5660,20 @@ void CGameClient::StoreSave(const char *pTeamMembers, const char *pGeneratedCode
 }
 
 // TClient
+
+float CGameClient::KingFastInputMs() const
+{
+	if(!g_Config.m_TcFastInput)
+		return 0.0f;
+	const float Exact = m_King.ExactFastInputMs();
+	return Exact >= 0.0f ? Exact : (float)g_Config.m_TcFastInputAmount;
+}
+
+int CGameClient::KingFastInputTicks() const
+{
+	const float Ms = KingFastInputMs();
+	return Ms > 0.0f ? (int)std::ceil(Ms / 20.0f - 0.0001f) : 0;
+}
 
 bool CGameClient::CheckNewInput()
 {

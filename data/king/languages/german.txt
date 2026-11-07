@@ -466,3 +466,12 @@ Apply
 
 Fast input
 == Fast Input
+
+Your tee is shown exactly this far ahead, set in thousandths of a tick (0.001 tick = 0.02 ms). The margin follows your connection by itself, so your inputs do not arrive late.
+== Dein Tee wird genau so weit voraus gezeigt, einstellbar in Tausendstel-Ticks (0.001 Tick = 0.02 ms). Die Margin passt sich selbst deiner Verbindung an, damit deine Inputs nicht zu spät ankommen.
+
+Offset %d.%03d ticks
+== Offset %d.%03d Ticks
+
+= %.2f ms ahead. More than 1 tick shows you earlier, but corrects harder when you change direction.
+== = %.2f ms voraus. Mehr als 1 Tick zeigt dich früher, korrigiert aber stärker beim Richtungswechsel.

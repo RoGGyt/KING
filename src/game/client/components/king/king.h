@@ -32,6 +32,7 @@ public:
 		INPUT_MODE_PING_COMP, // offset follows a share of the measured ping
 		INPUT_MODE_SMOOTH, // KING + longer, adjustable correction smoothing
 		INPUT_MODE_BEST, // offset + latency comp + smoothing + interpolation, auto or custom
+		INPUT_MODE_F, // exact offset in 0.001 ticks + safe auto margin + light smoothing
 		NUM_INPUT_MODES,
 	};
 
@@ -91,7 +92,9 @@ public:
 
 	static const char *InputModeName(int Mode);
 	static float AspectRatioValue(int Setting); // 0 = native
-	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH || Mode == INPUT_MODE_BEST; }
+	static bool ModeUsesAutoMargin(int Mode) { return Mode == INPUT_MODE_KING || Mode == INPUT_MODE_PING_COMP || Mode == INPUT_MODE_SMOOTH || Mode == INPUT_MODE_BEST || Mode == INPUT_MODE_F; }
+	// fast input KING applies right now in ms (float, exact); -1 when KING does not control it
+	float ExactFastInputMs() const { return g_Config.m_KgInputMode != INPUT_MODE_CUSTOM ? m_AppliedFastMs : -1.0f; }
 	// correction smoothing of our own tee; 0 = off
 	float SmoothDurationMs() const;
 	int SmoothCurve() const;
