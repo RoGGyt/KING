@@ -2271,7 +2271,10 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 		Ui()->DoLabel(&Label, "RoGGyt", LineSize, TEXTALIGN_ML);
 		if(Ui()->DoButton_FontIcon(&s_DevLinkButton, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
 			Client()->ViewLink("https://github.com/RoGGyt");
-		RenderDevSkin(TeeRect.Center(), 50.0f, g_Config.m_ClPlayerSkin, "default", g_Config.m_ClPlayerUseCustomColor, g_Config.m_ClPlayerColorFeet, g_Config.m_ClPlayerColorBody, 0, false, true); // your own skin
+		// the developer's skin: Grizli2, body 221/141/0, feet 180/141/0 (hue/sat/lgt, downloaded on demand)
+		constexpr int DevColorBody = (221 << 16) | (141 << 8) | 0;
+		constexpr int DevColorFeet = (180 << 16) | (141 << 8) | 0;
+		RenderDevSkin(TeeRect.Center(), 50.0f, "Grizli2", "default", true, DevColorFeet, DevColorBody, 0, false, true);
 	}
 
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
