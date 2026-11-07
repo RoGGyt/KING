@@ -74,21 +74,31 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	// ***** Input mode ***** //
 	Headline(Ui(), LeftView, Localize("KING Input"));
 	{
-		int Mode = g_Config.m_KgInputMode;
-		static std::vector<CButtonContainer> s_vModeButtonsA = {{}, {}, {}, {}};
-		static std::vector<CButtonContainer> s_vModeButtonsB = {{}, {}, {}, {}};
-		bool Changed = DoLine_RadioMenu(LeftView, Localize("Mode"),
-			s_vModeButtonsA,
-			{CKing::InputModeName(CKing::INPUT_MODE_BEST), CKing::InputModeName(CKing::INPUT_MODE_KING), CKing::InputModeName(CKing::INPUT_MODE_CLASSIC), CKing::InputModeName(CKing::INPUT_MODE_F)},
-			{CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_KING, CKing::INPUT_MODE_CLASSIC, CKing::INPUT_MODE_F},
-			Mode);
-		Changed |= DoLine_RadioMenu(LeftView, "",
-			s_vModeButtonsB,
-			{CKing::InputModeName(CKing::INPUT_MODE_DELTA), CKing::InputModeName(CKing::INPUT_MODE_PING_COMP), CKing::InputModeName(CKing::INPUT_MODE_SMOOTH), CKing::InputModeName(CKing::INPUT_MODE_CUSTOM)},
-			{CKing::INPUT_MODE_DELTA, CKing::INPUT_MODE_PING_COMP, CKing::INPUT_MODE_SMOOTH, CKing::INPUT_MODE_CUSTOM},
-			Mode);
-		if(Changed)
-			g_Config.m_KgInputMode = Mode;
+		// all modes in one dropdown (too many for buttons); KING first, it is the default
+		static const int s_aModes[] = {CKing::INPUT_MODE_KING, CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_F, CKing::INPUT_MODE_CLASSIC,
+			CKing::INPUT_MODE_DELTA, CKing::INPUT_MODE_PING_COMP, CKing::INPUT_MODE_SMOOTH, CKing::INPUT_MODE_CUSTOM};
+		const char *apNames[std::size(s_aModes)];
+		int Selected = 0;
+		for(size_t i = 0; i < std::size(s_aModes); i++)
+		{
+			apNames[i] = s_aModes[i] == CKing::INPUT_MODE_CUSTOM ? Localize("Custom", "KING") : CKing::InputModeName(s_aModes[i]);
+			if(s_aModes[i] == g_Config.m_KgInputMode)
+				Selected = (int)i;
+		}
+
+		CUIRect Row, Label, Control;
+		LeftView.HSplitTop(KING_LINE, &Row, &LeftView);
+		Row.VSplitLeft(std::min(120.0f, Row.w * 0.3f), &Label, &Control);
+		char aLabel[64];
+		str_format(aLabel, sizeof(aLabel), "%s:", Localize("Mode"));
+		Ui()->DoLabel(&Label, aLabel, KING_TEXT + 1.0f, TEXTALIGN_ML);
+
+		static CUi::SDropDownState s_ModeState;
+		static CScrollRegion s_ModeScrollRegion;
+		s_ModeState.m_SelectionPopupContext.m_pScrollRegion = &s_ModeScrollRegion; // the popup needs one, or it crashes
+		const int NewSelected = Ui()->DoDropDown(&Control, Selected, apNames, (int)std::size(s_aModes), s_ModeState);
+		if(NewSelected >= 0 && NewSelected < (int)std::size(s_aModes))
+			g_Config.m_KgInputMode = s_aModes[NewSelected];
 	}
 	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 
