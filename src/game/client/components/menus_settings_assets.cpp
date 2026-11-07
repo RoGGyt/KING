@@ -385,6 +385,15 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		}
 	}
 
+	// KING: asset mixer (keeps the tab while it has unsaved work)
+	static bool s_KingEditor = false;
+	if(s_KingEditor)
+	{
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		RenderKingAssetEditor(MainView, s_CurCustomTab, s_KingEditor);
+		return;
+	}
+
 	if(s_CurCustomTab == ASSETS_TAB_SOUNDS)
 	{
 		MainView.HSplitTop(10.0f, nullptr, &MainView);
@@ -641,10 +650,15 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 	CUIRect KingCatalogButton;
 	DirectoryButton.VSplitRight(175.0f, &KingCatalogButton, &DirectoryButton);
 	KingCatalogButton.VSplitRight(10.0f, &KingCatalogButton, nullptr);
-	KingCatalogButton.VSplitRight(std::min(190.0f, KingCatalogButton.w), nullptr, &KingCatalogButton);
-	static CButtonContainer s_KingCatalogButton;
+	CUIRect KingEditorButton;
+	KingCatalogButton.VSplitRight(std::min(170.0f, KingCatalogButton.w * 0.55f), &KingEditorButton, &KingCatalogButton);
+	KingEditorButton.VSplitRight(5.0f, &KingEditorButton, nullptr);
+	KingEditorButton.VSplitRight(std::min(120.0f, KingEditorButton.w), nullptr, &KingEditorButton);
+	static CButtonContainer s_KingCatalogButton, s_KingEditorButton;
 	if(KingCatalogButton.w >= 60.0f && DoButton_Menu(&s_KingCatalogButton, Localize("Download assets"), 0, &KingCatalogButton))
 		s_KingCatalog = true;
+	if(KingEditorSupports(s_CurCustomTab) && KingEditorButton.w >= 50.0f && DoButton_Menu(&s_KingEditorButton, Localize("Mix assets"), 0, &KingEditorButton))
+		s_KingEditor = true;
 	DirectoryButton.VSplitRight(25.0f, &DirectoryButton, &ReloadButton);
 	DirectoryButton.VSplitRight(10.0f, &DirectoryButton, nullptr);
 	static CButtonContainer s_AssetsDirId;

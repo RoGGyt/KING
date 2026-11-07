@@ -34,6 +34,11 @@ class IHttpRequest;
 class IStorage;
 class IJob;
 
+// a plain asset file name (no separators, not hidden, < 50 bytes, not "default")
+bool KingValidAssetName(const char *pName);
+// RGBA preview, longest side at most 320 px (premultiplied 2x2 halving, then bicubic)
+void KingMakeThumbnail(CImageInfo &Image);
+
 class CKingAssetCatalog
 {
 public:

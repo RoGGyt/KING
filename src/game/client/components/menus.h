@@ -17,6 +17,7 @@
 
 #include <game/client/component.h>
 #include <game/client/components/community_icons.h>
+#include <game/client/components/king/king_asset_editor.h>
 #include <game/client/components/king/king_assets.h>
 #include <game/client/components/mapimages.h>
 #include <game/client/components/menus_ingame_touch_controls.h>
@@ -138,6 +139,12 @@ protected:
 	void KingAddDownloadedAsset(int Tab, const char *pName, CImageInfo &Image);
 	void KingApplyAsset(int Tab, const char *pName);
 	bool KingAssetIsCurrent(int Tab, const char *pName) const;
+	// KING: asset mixer
+	SKingAssetEditor m_KingEditor;
+	void RenderKingAssetEditor(CUIRect MainView, int &Tab, bool &Active);
+	void KingEditorClose();
+	void KingEditorLoadSide(SKingEditorSide &Side, const char *pName);
+	bool KingEditorSupports(int Tab) const;
 
 	static void ConchainAssetsEntities(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainAssetGame(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);

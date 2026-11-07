@@ -521,3 +521,129 @@ Download
 
 Asset catalog tile size
 == Размер плиток в каталоге ассетов
+
+Mix assets
+== Смешать ассеты
+
+Save your mix or leave the editor before switching the type.
+== Сохрани микс или выйди из редактора, прежде чем менять тип.
+
+Could not load this asset.
+== Не удалось загрузить этот ассет.
+
+Saved as %s
+== Сохранено как %s
+
+Could not save: an asset with this name exists, or the folder is not writable.
+== Не удалось сохранить: ассет с таким именем уже есть или папка недоступна для записи.
+
+Leave without saving?
+== Выйти без сохранения?
+
+You have unsaved changes. Click again to leave without saving.
+== Есть несохранённые изменения. Нажми ещё раз, чтобы выйти без сохранения.
+
+Saving…
+== Сохранение…
+
+Save
+== Сохранить
+
+This name cannot be used for a file.
+== Такое имя нельзя использовать для файла.
+
+An asset with this name already exists.
+== Ассет с таким именем уже есть.
+
+The base is still loading.
+== Основа ещё загружается.
+
+Donor
+== Донор
+
+Base
+== Основа
+
+%s now uses %s from %s
+== %s теперь берёт %s из %s
+
+Part reset
+== Часть сброшена
+
+Loading…
+== Загрузка…
+
+Click a part on the base to edit it
+== Нажми на часть основы, чтобы её изменить
+
+Reset part
+== Сбросить часть
+
+From donor
+== Из донора
+
+Take the same part from the donor
+== Взять эту же часть у донора
+
+Whole weapon from the donor:
+== Целое оружие из донора:
+
+Hammer
+== Молот
+
+Gun
+== Пистолет
+
+Shotgun
+== Дробовик
+
+Grenade
+== Гранатомёт
+
+Laser
+== Лазер
+
+Ninja
+== Ниндзя
+
+Hook
+== Хук
+
+%s taken from %s
+== %s взят из %s
+
+Everything from donor
+== Всё из донора
+
+Reset all
+== Сбросить всё
+
+Undo
+== Отменить
+
+Color this part
+== Перекрасить часть
+
+Like tee
+== Как у тишки
+
+Screen
+== Осветление
+
+Multiply
+== Умножение
+
+Overlay
+== Перекрытие
+
+Strength
+== Сила
+
+Drop it on a part of the base
+== Отпусти на нужной части основы
+
+Click parts of the base to place it, Esc to stop
+== Нажимай на части основы, чтобы поставить, Esc — закончить
+
+Drag or click donor parts onto the base. Right click resets a part.
+== Перетаскивай или кликай части донора на основу. ПКМ сбрасывает часть.

@@ -526,3 +526,129 @@ Download
 
 Asset catalog tile size
 == Kachelgröße im Asset-Katalog
+
+Mix assets
+== Assets mischen
+
+Save your mix or leave the editor before switching the type.
+== Speichere die Mischung oder verlasse den Editor, bevor du den Typ wechselst.
+
+Could not load this asset.
+== Dieses Asset konnte nicht geladen werden.
+
+Saved as %s
+== Gespeichert als %s
+
+Could not save: an asset with this name exists, or the folder is not writable.
+== Speichern fehlgeschlagen: Ein Asset mit diesem Namen existiert oder der Ordner ist schreibgeschützt.
+
+Leave without saving?
+== Ohne Speichern verlassen?
+
+You have unsaved changes. Click again to leave without saving.
+== Es gibt ungespeicherte Änderungen. Klicke nochmal, um ohne Speichern zu verlassen.
+
+Saving…
+== Speichert…
+
+Save
+== Speichern
+
+This name cannot be used for a file.
+== Dieser Name kann nicht als Dateiname verwendet werden.
+
+An asset with this name already exists.
+== Ein Asset mit diesem Namen existiert bereits.
+
+The base is still loading.
+== Die Basis wird noch geladen.
+
+Donor
+== Spender
+
+Base
+== Basis
+
+%s now uses %s from %s
+== %s nutzt jetzt %s aus %s
+
+Part reset
+== Teil zurückgesetzt
+
+Loading…
+== Lädt…
+
+Click a part on the base to edit it
+== Klicke auf einen Teil der Basis, um ihn zu bearbeiten
+
+Reset part
+== Teil zurücksetzen
+
+From donor
+== Vom Spender
+
+Take the same part from the donor
+== Denselben Teil vom Spender nehmen
+
+Whole weapon from the donor:
+== Ganze Waffe vom Spender:
+
+Hammer
+== Hammer
+
+Gun
+== Pistole
+
+Shotgun
+== Schrotflinte
+
+Grenade
+== Granatwerfer
+
+Laser
+== Laser
+
+Ninja
+== Ninja
+
+Hook
+== Haken
+
+%s taken from %s
+== %s aus %s übernommen
+
+Everything from donor
+== Alles vom Spender
+
+Reset all
+== Alles zurücksetzen
+
+Undo
+== Rückgängig
+
+Color this part
+== Diesen Teil einfärben
+
+Like tee
+== Wie Tee
+
+Screen
+== Aufhellen
+
+Multiply
+== Multiplizieren
+
+Overlay
+== Überlagern
+
+Strength
+== Stärke
+
+Drop it on a part of the base
+== Lass es auf einem Teil der Basis los
+
+Click parts of the base to place it, Esc to stop
+== Klicke Teile der Basis an, um es einzusetzen, Esc zum Beenden
+
+Drag or click donor parts onto the base. Right click resets a part.
+== Ziehe oder klicke Spenderteile auf die Basis. Rechtsklick setzt einen Teil zurück.

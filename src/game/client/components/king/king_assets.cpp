@@ -46,7 +46,7 @@ static int CategoryFromFolder(const char *pFolder, int Length)
 }
 
 // only plain file names: no paths, no hidden files, fits the menu list, not the reserved "default"
-static bool ValidAssetName(const char *pName)
+bool KingValidAssetName(const char *pName)
 {
 	const int Length = str_length(pName);
 	if(Length <= 0 || Length >= 50 || pName[0] == '.' || str_comp(pName, "default") == 0)
@@ -85,7 +85,7 @@ static bool RequestUnreachable(const std::shared_ptr<IHttpRequest> &pRequest)
 
 // downscale to fit KING_THUMB_MAX: halving with 2x2 averages (premultiplied alpha, so
 // transparent pixels do not darken the edges), then one bicubic step for the rest
-static void MakeThumbnail(CImageInfo &Image)
+void KingMakeThumbnail(CImageInfo &Image)
 {
 	ConvertToRgba(Image);
 	auto Halve = [](CImageInfo &Img) {
@@ -178,7 +178,7 @@ private:
 		if(NameLength <= 0 || NameLength >= (int)sizeof(Entry.m_aName))
 			return;
 		str_truncate(Entry.m_aName, sizeof(Entry.m_aName), pSlash + 1, NameLength);
-		if(!ValidAssetName(Entry.m_aName))
+		if(!KingValidAssetName(Entry.m_aName))
 			return;
 		m_vEntries.push_back(Entry);
 	}
@@ -328,7 +328,7 @@ private:
 			m_Aspect = m_Image.m_Height / (float)std::max<size_t>(1, m_Image.m_Width);
 			if(State() == IJob::STATE_ABORTED)
 				return;
-			MakeThumbnail(m_Image);
+			KingMakeThumbnail(m_Image);
 			// cache the preview (it keeps the aspect of the original)
 			IOHANDLE File = m_pStorage->OpenFile(m_aCachePath, IOFLAG_WRITE, IStorage::TYPE_SAVE);
 			if(File)
@@ -390,7 +390,7 @@ private:
 			return; // not a valid PNG: nothing is written
 		// the menu list only shows a preview of it (using it loads the real file), so a
 		// 4096x4096 entities image does not become a 64 MB texture upload on the main thread
-		MakeThumbnail(m_Image);
+		KingMakeThumbnail(m_Image);
 
 		char aFolder[IO_MAX_PATH_LENGTH];
 		str_format(aFolder, sizeof(aFolder), "assets/%s", s_apCategoryFolders[m_Cat]);
