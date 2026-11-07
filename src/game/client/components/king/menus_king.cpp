@@ -247,21 +247,6 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothOthers, Localize("Smooth corrections of other tees (30 ms, visual only)"), &g_Config.m_KgSmoothOthers, &LeftView, KING_LINE);
 
-	// ***** Input helpers ***** //
-	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
-	Headline(Ui(), LeftView, Localize("Input Helpers"));
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSnapTap, Localize("Snap Tap (left+right: last pressed wins)"), &g_Config.m_KgSnapTap, &LeftView, KING_LINE);
-	if(g_Config.m_KgSnapTap)
-	{
-		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_KgSnapTapDelay, &g_Config.m_KgSnapTapDelay, &Button, Localize("Snap Tap delay"), 0, 200, &CUi::ms_LinearScrollbarScale, 0u, " ms");
-	}
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgAim45, Localize("45 degree aim (toggle)"), &g_Config.m_KgAim45, &LeftView, KING_LINE);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmallSens, Localize("Small sensitivity (toggle)"), &g_Config.m_KgSmallSens, &LeftView, KING_LINE);
-	LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_KgSmallSensFactor, &g_Config.m_KgSmallSensFactor, &Button, Localize("Small sens"), 5, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-	TextLine(Ui(), LeftView, Localize("Hold binds: bind <key> +kg_45 / +kg_small_sens"), 11.0f);
-
 	// ***** Prediction margin ***** //
 	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
 	Headline(Ui(), LeftView, Localize("Prediction Margin", "KING"));

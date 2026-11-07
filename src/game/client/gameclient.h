@@ -236,11 +236,19 @@ public:
 	vec2 m_KingSmoothOffset = vec2(0.0f, 0.0f); // KING Smooth/Best: current render offset of our tee
 	vec2 m_KingSmoothStart = vec2(0.0f, 0.0f); // offset when the current blend started
 	float m_KingSmoothElapsedMs = 0.0f;
-	// KING: correction smoothing of other tees (kg_smooth_others)
-	vec2 m_aKingOtherOffset[MAX_CLIENTS] = {};
-	vec2 m_aKingOtherStart[MAX_CLIENTS] = {};
-	float m_aKingOtherElapsedMs[MAX_CLIENTS] = {};
-	int m_KingPrevFinalOthers = 0;
+	// KING: smoothing of sudden jumps of other tees (kg_smooth_others)
+	struct SKingOtherSmooth
+	{
+		bool m_Valid = false;
+		vec2 m_LastPos = vec2(0.0f, 0.0f); // raw position last frame
+		vec2 m_Velocity = vec2(0.0f, 0.0f); // units per ms
+		vec2 m_Offset = vec2(0.0f, 0.0f);
+		vec2 m_Start = vec2(0.0f, 0.0f);
+		float m_ElapsedMs = 0.0f;
+	};
+	SKingOtherSmooth m_aKingOther[MAX_CLIENTS];
+	int m_KingOtherLastGameTick = 0;
+	vec2 KingSmoothOther(int ClientId, vec2 Pos, bool NewSnapshot);
 	int m_KingPrevFinalRegular = -1;
 	int m_KingPrevLocalId = -1;
 	int m_KingPrevDummy = -1;

@@ -140,6 +140,15 @@ void CKing::OnInit()
 			g_Config.m_KgSmoothMs = 30;
 		g_Config.m_KgDefaultsVersion = 6;
 	}
+	if(g_Config.m_KgDefaultsVersion < 7)
+	{
+		// the Input Helpers section left the menu: switch the helpers off so nothing is
+		// active that cannot be seen (still available from the console)
+		g_Config.m_KgSnapTap = 0;
+		g_Config.m_KgAim45 = 0;
+		g_Config.m_KgSmallSens = 0;
+		g_Config.m_KgDefaultsVersion = 7;
+	}
 	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
