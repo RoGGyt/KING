@@ -145,6 +145,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 			str_format(aInfo, sizeof(aInfo), Localize("= %d.%02d ticks ahead (20 ms = 1 tick). More reacts earlier, but corrects harder when you change direction."), g_Config.m_KgClassicMs / 20, (g_Config.m_KgClassicMs % 20) * 5);
 			TextBlock(Ui(), TextRender(), LeftView, aInfo, 11.0f);
 		}
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothSelf, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgSmoothSelf, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_KING:
 		TextBlock(Ui(), TextRender(), LeftView, Localize("One tick of fast input and a safe auto margin: never below the stock 10 ms, and it changes smoothly."));
@@ -219,6 +220,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 			Ui()->DoScrollbarOption(&g_Config.m_KgDeltaAmount, &g_Config.m_KgDeltaAmount, &Button, aLabel, 0, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
 		}
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgDeltaOthers, Localize("Shift other tees too"), &g_Config.m_KgDeltaOthers, &LeftView, KING_LINE);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothSelf, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgSmoothSelf, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_PING_COMP:
 		TextBlock(Ui(), TextRender(), LeftView, Localize("Fast input follows your ping: your tee is shown this share of the round trip ahead (up to 100 ms)."));
@@ -230,6 +232,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 			str_format(aNow, sizeof(aNow), Localize("Now: %d ms ahead"), GameClient()->m_King.PingCompAmount());
 			TextLine(Ui(), LeftView, aNow, 11.0f);
 		}
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothSelf, Localize("Smooth small corrections (30 ms glide, no jumps)"), &g_Config.m_KgSmoothSelf, &LeftView, KING_LINE);
 		break;
 	case CKing::INPUT_MODE_SMOOTH:
 		TextBlock(Ui(), TextRender(), LeftView, Localize("Like KING mode, but when the server corrects your tee it glides to the right spot instead of jumping. Visual only: your inputs and hitbox are not delayed."));

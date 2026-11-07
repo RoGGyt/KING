@@ -2802,6 +2802,30 @@ void CGameClient::OnPredict()
 		KingHaveOld = true;
 	}
 
+	// The tee is drawn further ahead (fast input) than the tick checked above. While our
+	// own input stays the same, anything that moves that drawn tick comes from the server
+	// too: most of all a hook by another player, whose future moves we can only guess.
+	// That is the shaking when you get hooked, so smoothing measures it there.
+	const CNetObj_PlayerInput &KingInput = m_Controls.m_aInputData[g_Config.m_ClDummy];
+	const bool KingAimMatters = KingInput.m_Hook || (KingInput.m_Fire & 1);
+	const bool KingInputSame = m_KingPrevInputValid &&
+				   KingInput.m_Direction == m_KingPrevInput.m_Direction && KingInput.m_Jump == m_KingPrevInput.m_Jump &&
+				   KingInput.m_Hook == m_KingPrevInput.m_Hook && KingInput.m_Fire == m_KingPrevInput.m_Fire &&
+				   KingInput.m_WantedWeapon == m_KingPrevInput.m_WantedWeapon &&
+				   (!KingAimMatters || (KingInput.m_TargetX == m_KingPrevInput.m_TargetX && KingInput.m_TargetY == m_KingPrevInput.m_TargetY));
+	m_KingPrevInput = KingInput;
+	m_KingPrevInputValid = true;
+	const int KingDrawnTick = m_KingPrevFinalSelf;
+	bool KingHaveDrawn = false;
+	vec2 KingOldDrawnPos = vec2(0.0f, 0.0f);
+	if(KingInputSame && KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy &&
+		KingDrawnTick > Client()->GameTick(g_Config.m_ClDummy) && KingDrawnTick <= FinalTickSelf &&
+		m_aClients[KingLocalId].m_aPredTick[KingDrawnTick % 200] == KingDrawnTick)
+	{
+		KingOldDrawnPos = m_aClients[KingLocalId].m_aPredPos[KingDrawnTick % 200];
+		KingHaveDrawn = true;
+	}
+
 	for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= FinalTickSelf; Tick++)
 	{
 		// fetch the previous characters
@@ -3003,13 +3027,24 @@ void CGameClient::OnPredict()
 	}
 
 	// KING: detect server corrections of our tee; smooth them if the input mode wants it
+	bool KingHaveErr = false;
+	vec2 KingErr = vec2(0.0f, 0.0f);
 	if(KingHaveOld && m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
 	{
-		const vec2 Err = KingOldPos - m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
-		const float ErrLen = length(Err);
+		KingErr = KingOldPos - m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
+		KingHaveErr = true;
+		const float ErrLen = length(KingErr);
 		if(ErrLen > 0.5f)
-			m_King.OnLocalCorrection(ErrLen, KingCheckTick);
-
+			m_King.OnLocalCorrection(ErrLen, KingCheckTick); // lag monitor: real server corrections only
+	}
+	if(KingHaveDrawn && m_aClients[KingLocalId].m_aPredTick[KingDrawnTick % 200] == KingDrawnTick)
+	{
+		KingErr = KingOldDrawnPos - m_aClients[KingLocalId].m_aPredPos[KingDrawnTick % 200];
+		KingHaveErr = true;
+	}
+	if(KingHaveErr)
+	{
+		const float ErrLen = length(KingErr);
 		const float SmoothMs = m_King.SmoothDurationMs();
 		if(SmoothMs <= 0.0f || ErrLen > CKing::SMOOTH_SNAP_DISTANCE)
 		{
@@ -3017,10 +3052,10 @@ void CGameClient::OnPredict()
 			m_KingSmoothOffset = vec2(0.0f, 0.0f);
 			m_KingSmoothStart = vec2(0.0f, 0.0f);
 		}
-		else if(ErrLen > 0.5f)
+		else if(ErrLen > 0.25f)
 		{
 			// start a new blend from where the tee is drawn right now
-			m_KingSmoothStart = m_KingSmoothOffset + Err;
+			m_KingSmoothStart = m_KingSmoothOffset + KingErr;
 			const float StartLen = length(m_KingSmoothStart);
 			if(StartLen > CKing::SMOOTH_SNAP_DISTANCE)
 				m_KingSmoothStart = m_KingSmoothStart * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
@@ -3028,6 +3063,7 @@ void CGameClient::OnPredict()
 			m_KingSmoothElapsedMs = 0.0f;
 		}
 	}
+	m_KingPrevFinalSelf = FinalTickSelf;
 	m_KingPrevFinalRegular = FinalTickRegular;
 	m_KingPrevLocalId = KingLocalId;
 	m_KingPrevDummy = g_Config.m_ClDummy;
@@ -4291,7 +4327,7 @@ vec2 CGameClient::KingSmoothOther(int ClientId, vec2 Pos, bool NewSnapshot)
 	// a jump is clearly bigger than what normal motion, a sudden stop or a jump/hook
 	// impulse can do in one frame. Corrections only ever come with new server data, so
 	// only frames with a new snapshot are checked: motion between them is never touched.
-	const float Threshold = std::max({6.0f, length(Expected) * 1.5f, 0.8f * Dt});
+	const float Threshold = std::max({1.5f, length(Expected) * 1.5f, 0.8f * Dt}); // small enough for hook shaking
 	if(length(Moved) >= CKing::SMOOTH_SNAP_DISTANCE)
 	{
 		State.m_Start = State.m_Offset = vec2(0.0f, 0.0f); // teleport, kill, spawn

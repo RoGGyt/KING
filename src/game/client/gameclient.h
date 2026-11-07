@@ -236,6 +236,9 @@ public:
 	vec2 m_KingSmoothOffset = vec2(0.0f, 0.0f); // KING Smooth/Best: current render offset of our tee
 	vec2 m_KingSmoothStart = vec2(0.0f, 0.0f); // offset when the current blend started
 	float m_KingSmoothElapsedMs = 0.0f;
+	int m_KingPrevFinalSelf = 0; // tick our tee was drawn at in the last prediction
+	CNetObj_PlayerInput m_KingPrevInput = {};
+	bool m_KingPrevInputValid = false;
 	// KING: smoothing of sudden jumps of other tees (kg_smooth_others)
 	struct SKingOtherSmooth
 	{

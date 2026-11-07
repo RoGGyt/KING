@@ -588,6 +588,9 @@ float CKing::SmoothDurationMs() const
 	case INPUT_MODE_SMOOTH: return (float)g_Config.m_KgSmoothMs;
 	case INPUT_MODE_BEST: return (float)m_BestSmoothMs;
 	case INPUT_MODE_F: return g_Config.m_KgFInputSmooth ? KING_SMOOTH_MS : 0.0f;
+	case INPUT_MODE_CLASSIC:
+	case INPUT_MODE_DELTA:
+	case INPUT_MODE_PING_COMP: return g_Config.m_KgSmoothSelf ? KING_SMOOTH_MS : 0.0f;
 	}
 	return 0.0f;
 }
