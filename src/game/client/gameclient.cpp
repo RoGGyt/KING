@@ -2802,10 +2802,11 @@ void CGameClient::OnPredict()
 		KingHaveOld = true;
 	}
 
-	// The tee is drawn further ahead (fast input) than the tick checked above. While our
-	// own input stays the same, anything that moves that drawn tick comes from the server
-	// too: most of all a hook by another player, whose future moves we can only guess.
-	// That is the shaking when you get hooked, so smoothing measures it there.
+	// What the player sees is our tee at the exact time it was drawn last frame, between two
+	// predicted ticks (fast input puts it ahead of the tick checked above). While our own
+	// input stays the same, anything that moves that drawn point comes from the server: most
+	// of all a hook by another player, whose future moves we can only guess. That is the
+	// shaking when you get hooked, so smoothing measures the jump right there.
 	const CNetObj_PlayerInput &KingInput = m_Controls.m_aInputData[g_Config.m_ClDummy];
 	const bool KingAimMatters = KingInput.m_Hook || (KingInput.m_Fire & 1);
 	const bool KingInputSame = m_KingPrevInputValid &&
@@ -2815,14 +2816,21 @@ void CGameClient::OnPredict()
 				   (!KingAimMatters || (KingInput.m_TargetX == m_KingPrevInput.m_TargetX && KingInput.m_TargetY == m_KingPrevInput.m_TargetY));
 	m_KingPrevInput = KingInput;
 	m_KingPrevInputValid = true;
-	const int KingDrawnTick = m_KingPrevFinalSelf;
+	const int KingDrawnTick = m_KingDrawnTick;
+	const float KingDrawnIntra = m_KingDrawnIntra;
+	auto KingDrawnValid = [&]() {
+		return KingDrawnTick - 1 > Client()->GameTick(g_Config.m_ClDummy) && KingDrawnTick <= FinalTickSelf &&
+		       m_aClients[KingLocalId].m_aPredTick[(KingDrawnTick - 1) % 200] == KingDrawnTick - 1 &&
+		       m_aClients[KingLocalId].m_aPredTick[KingDrawnTick % 200] == KingDrawnTick;
+	};
+	auto KingDrawnPos = [&]() {
+		return mix(m_aClients[KingLocalId].m_aPredPos[(KingDrawnTick - 1) % 200], m_aClients[KingLocalId].m_aPredPos[KingDrawnTick % 200], KingDrawnIntra);
+	};
 	bool KingHaveDrawn = false;
 	vec2 KingOldDrawnPos = vec2(0.0f, 0.0f);
-	if(KingInputSame && KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy &&
-		KingDrawnTick > Client()->GameTick(g_Config.m_ClDummy) && KingDrawnTick <= FinalTickSelf &&
-		m_aClients[KingLocalId].m_aPredTick[KingDrawnTick % 200] == KingDrawnTick)
+	if(KingInputSame && KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy && KingDrawnValid())
 	{
-		KingOldDrawnPos = m_aClients[KingLocalId].m_aPredPos[KingDrawnTick % 200];
+		KingOldDrawnPos = KingDrawnPos();
 		KingHaveDrawn = true;
 	}
 
@@ -3037,11 +3045,18 @@ void CGameClient::OnPredict()
 		if(ErrLen > 0.5f)
 			m_King.OnLocalCorrection(ErrLen, KingCheckTick); // lag monitor: real server corrections only
 	}
-	if(KingHaveDrawn && m_aClients[KingLocalId].m_aPredTick[KingDrawnTick % 200] == KingDrawnTick)
+	if(KingHaveDrawn && KingDrawnValid())
 	{
-		KingErr = KingOldDrawnPos - m_aClients[KingLocalId].m_aPredPos[KingDrawnTick % 200];
+		KingErr = KingOldDrawnPos - KingDrawnPos();
 		KingHaveErr = true;
 	}
+	// being hooked by someone else: his moves are guesses, every snapshot fixes them a bit
+	m_KingBeingHooked = false;
+	if(KingLocalId >= 0)
+		for(int i = 0; i < MAX_CLIENTS && !m_KingBeingHooked; i++)
+			if(i != KingLocalId)
+				if(CCharacter *pOther = m_PredictedWorld.GetCharacterById(i))
+					m_KingBeingHooked = pOther->Core()->HookedPlayer() == KingLocalId;
 	if(KingHaveErr)
 	{
 		const float ErrLen = length(KingErr);
@@ -3061,9 +3076,10 @@ void CGameClient::OnPredict()
 				m_KingSmoothStart = m_KingSmoothStart * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
 			m_KingSmoothOffset = m_KingSmoothStart;
 			m_KingSmoothElapsedMs = 0.0f;
+			// while hooked the corrections come every snapshot: a longer glide hides them
+			m_KingSmoothDurMs = m_KingBeingHooked ? std::max(SmoothMs, (float)CKing::SMOOTH_HOOKED_MS) : SmoothMs;
 		}
 	}
-	m_KingPrevFinalSelf = FinalTickSelf;
 	m_KingPrevFinalRegular = FinalTickRegular;
 	m_KingPrevLocalId = KingLocalId;
 	m_KingPrevDummy = g_Config.m_ClDummy;
@@ -4365,7 +4381,7 @@ void CGameClient::UpdateRenderedCharacters()
 	if(KingSmoothMs > 0.0f && Predict() && m_KingSmoothStart != vec2(0.0f, 0.0f))
 	{
 		m_KingSmoothElapsedMs += Client()->RenderFrameTime() * 1000.0f;
-		const float T = std::clamp(m_KingSmoothElapsedMs / KingSmoothMs, 0.0f, 1.0f);
+		const float T = std::clamp(m_KingSmoothElapsedMs / std::max(m_KingSmoothDurMs, KingSmoothMs), 0.0f, 1.0f);
 		m_KingSmoothOffset = m_KingSmoothStart * (1.0f - CKing::SmoothEase(T, m_King.SmoothCurve()));
 		if(T >= 1.0f)
 		{
@@ -4459,6 +4475,21 @@ void CGameClient::UpdateRenderedCharacters()
 				if(g_Config.m_TcUnpredOthersInFreeze && Client()->m_IsLocalFrozen)
 					Pos = UnpredPos;
 
+			}
+		}
+		// KING: remember when our tee was drawn, the next prediction measures corrections there
+		if(i == m_Snap.m_LocalClientId)
+		{
+			m_KingDrawnTick = -1;
+			if(m_aClients[i].m_IsPredictedLocal && !g_Config.m_TcRemoveAnti)
+			{
+				if(g_Config.m_TcFastInput)
+					KingFastInputTime(m_KingDrawnTick, m_KingDrawnIntra);
+				else
+				{
+					m_KingDrawnTick = Client()->PredGameTick(g_Config.m_ClDummy);
+					m_KingDrawnIntra = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+				}
 			}
 		}
 		// KING Smooth: add the fading correction offset to our own tee
@@ -4632,27 +4663,28 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 	}
 	return Pos;
 }
+void CGameClient::KingFastInputTime(int &Tick, float &Intra)
+{
+	// KING: exact (float) offset, so F input can go in 0.001 tick steps
+	const float PredIntraTick = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+	const float FastInputTotal = KingFastInputMs() / 20.0f;
+	const int FastInputTicks = (int)std::floor(FastInputTotal);
+	const float CombinedIntra = PredIntraTick + (FastInputTotal - FastInputTicks);
+	float IntraRemainder = 0.0f;
+	Intra = std::modf(CombinedIntra, &IntraRemainder);
+	Tick = Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicks + static_cast<int>(IntraRemainder);
+}
+
 vec2 CGameClient::GetFastInputPos(int ClientId)
 {
 	float PredIntraTick = Client()->PredIntraGameTick(g_Config.m_ClDummy);
-	int PredTick = Client()->PredGameTick(g_Config.m_ClDummy);
 
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
 
-	// KING: exact (float) offset, so F input can go in 0.001 tick steps
-	const float FastInputTotal = KingFastInputMs() / 20.0f;
-	int FastInputTicks = (int)std::floor(FastInputTotal);
-	float FastInputIntra = FastInputTotal - FastInputTicks;
-
-	float CombinedIntra = PredIntraTick + FastInputIntra;
-
-	float IntraRemainder = 0.0f;
-	float FinalIntra = std::modf(CombinedIntra, &IntraRemainder);
-	int CarryOverTicks = static_cast<int>(IntraRemainder);
-
-	FastInputTicks += CarryOverTicks;
-
-	int FinalTick = PredTick + FastInputTicks;
+	int FinalTick;
+	float FinalIntra;
+	KingFastInputTime(FinalTick, FinalIntra);
+	const int FastInputTicks = FinalTick - Client()->PredGameTick(g_Config.m_ClDummy);
 
 	if(FinalTick > 0 &&
 		m_aClients[ClientId].m_aPredTick[(FinalTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&

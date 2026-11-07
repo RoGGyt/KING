@@ -236,7 +236,10 @@ public:
 	vec2 m_KingSmoothOffset = vec2(0.0f, 0.0f); // KING Smooth/Best: current render offset of our tee
 	vec2 m_KingSmoothStart = vec2(0.0f, 0.0f); // offset when the current blend started
 	float m_KingSmoothElapsedMs = 0.0f;
-	int m_KingPrevFinalSelf = 0; // tick our tee was drawn at in the last prediction
+	float m_KingSmoothDurMs = 0.0f; // length of the current blend (fixed when it starts)
+	int m_KingDrawnTick = -1; // our tee was last drawn between m_aPredPos[tick-1] and [tick] ...
+	float m_KingDrawnIntra = 0.0f; // ... at this fraction (-1 tick: not measurable)
+	bool m_KingBeingHooked = false; // another player has our tee on his hook (predicted)
 	CNetObj_PlayerInput m_KingPrevInput = {};
 	bool m_KingPrevInputValid = false;
 	// KING: smoothing of sudden jumps of other tees (kg_smooth_others)
@@ -1002,6 +1005,7 @@ public:
 	vec2 GetSmoothPos(int ClientId);
 	vec2 GetFreezePos(int ClientId);
 	vec2 GetFastInputPos(int ClientId);
+	void KingFastInputTime(int &Tick, float &Intra);
 
 	int m_MultiViewTeam;
 	float m_MultiViewPersonalZoom;
