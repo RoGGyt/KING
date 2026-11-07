@@ -551,6 +551,8 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgLagLog, Localize("Lag log (king_lag.log: every lag and its cause)"), &g_Config.m_KgLagLog, &LeftView, KING_LINE);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShow, Localize("Crown next to KING players (game and TAB)"), &g_Config.m_KgBadgeShow, &LeftView, KING_LINE);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBadgeShare, Localize("Show my crown to other KING players"), &g_Config.m_KgBadgeShare, &LeftView, KING_LINE);
+	LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+	Ui()->DoScrollbarOption(&g_Config.m_KgAssetsTile, &g_Config.m_KgAssetsTile, &Button, Localize("Asset catalog tile size"), 60, 240, &CUi::ms_LinearScrollbarScale, 0u, "");
 	s_Sections.End(LeftView);
 
 	// ***** Music player ***** //

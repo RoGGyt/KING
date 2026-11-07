@@ -475,3 +475,54 @@ Offset %d.%03d ticks
 
 Smooth corrections of other tees (30 ms, visual only)
 == Korrekturen anderer Tees glätten (30 ms, nur optisch)
+
+Download assets
+== Assets herunterladen
+
+My assets
+== Meine Assets
+
+Community catalog
+== Community-Katalog
+
+offline copy
+== Offline-Kopie
+
+Check the catalog for new assets
+== Katalog auf neue Assets prüfen
+
+Loading the catalog…
+== Katalog wird geladen…
+
+Could not load the catalog. Check your internet connection.
+== Der Katalog konnte nicht geladen werden. Prüfe deine Internetverbindung.
+
+Try again
+== Erneut versuchen
+
+This catalog has nothing of this type yet.
+== Davon gibt es im Katalog noch nichts.
+
+Nothing found
+== Nichts gefunden
+
+No preview
+== Keine Vorschau
+
+Downloading…
+== Wird geladen…
+
+In use
+== Aktiv
+
+Use
+== Verwenden
+
+Failed, retry
+== Fehler, nochmal
+
+Download
+== Herunterladen
+
+Asset catalog tile size
+== Kachelgröße im Asset-Katalog

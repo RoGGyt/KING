@@ -17,6 +17,7 @@
 
 #include <game/client/component.h>
 #include <game/client/components/community_icons.h>
+#include <game/client/components/king/king_assets.h>
 #include <game/client/components/mapimages.h>
 #include <game/client/components/menus_ingame_touch_controls.h>
 #include <game/client/components/menus_settings_controls.h>
@@ -130,6 +131,13 @@ protected:
 	static int ParticlesScan(const char *pName, int IsDir, int DirType, void *pUser);
 	static int HudScan(const char *pName, int IsDir, int DirType, void *pUser);
 	static int ExtrasScan(const char *pName, int IsDir, int DirType, void *pUser);
+
+	// KING: community asset catalog inside the Assets settings
+	CKingAssetCatalog m_KingAssets;
+	void RenderKingAssetCatalog(CUIRect MainView, int Tab, bool &Active);
+	void KingAddDownloadedAsset(int Tab, const char *pName, CImageInfo &Image);
+	void KingApplyAsset(int Tab, const char *pName);
+	bool KingAssetIsCurrent(int Tab, const char *pName) const;
 
 	static void ConchainAssetsEntities(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainAssetGame(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);

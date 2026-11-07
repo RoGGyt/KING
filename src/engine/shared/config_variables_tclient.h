@@ -347,5 +347,6 @@ MACRO_CONFIG_INT(KgMusicRounding, kg_music_rounding, 1, 0, 1, CFGFLAG_CLIENT | C
 MACRO_CONFIG_INT(KgMusicLyrics, kg_music_lyrics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player: show synced song lyrics under the timer (beta, from lrclib.net)")
 MACRO_CONFIG_STR(KgSoundPack, kg_sound_pack, 64, "default", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sound pack from assets/sounds/<name> (default = built-in sounds)")
 MACRO_CONFIG_INT(KgMusicShowPaused, kg_music_show_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep the music player visible while paused")
+MACRO_CONFIG_INT(KgAssetsTile, kg_assets_tile, 110, 60, 240, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Asset catalog: preview tile size")
 MACRO_CONFIG_INT(KgDefaultsVersion, kg_defaults_version, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: last applied KING defaults migration")
 MACRO_CONFIG_INT(KgPresetApplied, kg_preset_applied, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Internal: KoG preset was applied on first start")

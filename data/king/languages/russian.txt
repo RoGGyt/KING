@@ -470,3 +470,54 @@ Offset %d.%03d ticks
 
 Smooth corrections of other tees (30 ms, visual only)
 == Сглаживать поправки других тишек (30 мс, только визуально)
+
+Download assets
+== Скачать ассеты
+
+My assets
+== Мои ассеты
+
+Community catalog
+== Каталог сообщества
+
+offline copy
+== сохранённая копия
+
+Check the catalog for new assets
+== Проверить, есть ли в каталоге новые ассеты
+
+Loading the catalog…
+== Загрузка каталога…
+
+Could not load the catalog. Check your internet connection.
+== Не удалось загрузить каталог. Проверь подключение к интернету.
+
+Try again
+== Повторить
+
+This catalog has nothing of this type yet.
+== В каталоге пока нет ассетов этого типа.
+
+Nothing found
+== Ничего не найдено
+
+No preview
+== Нет превью
+
+Downloading…
+== Скачивание…
+
+In use
+== Используется
+
+Use
+== Применить
+
+Failed, retry
+== Ошибка, ещё раз
+
+Download
+== Скачать
+
+Asset catalog tile size
+== Размер плиток в каталоге ассетов

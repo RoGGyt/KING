@@ -833,6 +833,7 @@ void CMenus::OnInterfacesInit(CGameClient *pClient)
 
 void CMenus::OnInit()
 {
+	m_KingAssets.Init(Graphics(), Storage(), Http(), Engine());
 	if(g_Config.m_ClShowWelcome)
 	{
 		m_Popup = POPUP_LANGUAGE;
@@ -2404,6 +2405,7 @@ void CMenus::OnWindowResize()
 
 void CMenus::OnRender()
 {
+	m_KingAssets.ReleaseIfHidden(); // KING: frees the catalog previews once it is closed
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		SetActive(true);
 

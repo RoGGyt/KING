@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <chrono>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -391,6 +392,15 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		return;
 	}
 
+	// KING: community catalog instead of the local list (the local list is not even loaded)
+	static bool s_KingCatalog = false;
+	if(s_KingCatalog)
+	{
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		RenderKingAssetCatalog(MainView, s_CurCustomTab, s_KingCatalog);
+		return;
+	}
+
 	auto LoadStartTime = time_get_nanoseconds();
 	SMenuAssetScanUser User;
 	User.m_pUser = this;
@@ -628,7 +638,13 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 	}
 
 	DirectoryButton.HSplitTop(5.0f, nullptr, &DirectoryButton);
-	DirectoryButton.VSplitRight(175.0f, nullptr, &DirectoryButton);
+	CUIRect KingCatalogButton;
+	DirectoryButton.VSplitRight(175.0f, &KingCatalogButton, &DirectoryButton);
+	KingCatalogButton.VSplitRight(10.0f, &KingCatalogButton, nullptr);
+	KingCatalogButton.VSplitRight(std::min(190.0f, KingCatalogButton.w), nullptr, &KingCatalogButton);
+	static CButtonContainer s_KingCatalogButton;
+	if(KingCatalogButton.w >= 60.0f && DoButton_Menu(&s_KingCatalogButton, Localize("Download assets"), 0, &KingCatalogButton))
+		s_KingCatalog = true;
 	DirectoryButton.VSplitRight(25.0f, &DirectoryButton, &ReloadButton);
 	DirectoryButton.VSplitRight(10.0f, &DirectoryButton, nullptr);
 	static CButtonContainer s_AssetsDirId;
@@ -841,4 +857,91 @@ void CMenus::RenderKingSoundPacks(CUIRect MainView)
 	if(DoButton_Menu(&s_TestButton, "Test sound", 0, &TestButton))
 		GameClient()->m_Sounds.Play(CSounds::CHN_GUI, SOUND_HOOK_ATTACH_GROUND, 1.0f);
 	(void)Button;
+}
+
+// KING: an asset downloaded from the catalog goes straight into the loaded list, with the
+// image the download job already decoded (nothing is read or decoded again here)
+void CMenus::KingAddDownloadedAsset(int Tab, const char *pName, CImageInfo &Image)
+{
+	auto Add = [&](auto &vList) {
+		if(vList.empty())
+			return; // the list is not loaded yet: its scan will find the new file
+		for(const auto &Item : vList)
+			if(str_comp(Item.m_aName, pName) == 0)
+				return;
+		typename std::remove_reference_t<decltype(vList)>::value_type Item;
+		str_copy(Item.m_aName, pName);
+		Item.m_RenderTexture = Graphics()->LoadTextureRawMove(Image, 0, pName);
+		vList.push_back(Item);
+		std::sort(vList.begin(), vList.end());
+		gs_aInitCustomList[Tab] = true;
+	};
+	switch(Tab)
+	{
+	case ASSETS_TAB_ENTITIES:
+		if(!m_vEntitiesList.empty())
+		{
+			for(const auto &Item : m_vEntitiesList)
+				if(str_comp(Item.m_aName, pName) == 0)
+					return;
+			SCustomEntities Item;
+			str_copy(Item.m_aName, pName);
+			Item.m_aImages[0].m_Texture = Graphics()->LoadTextureRawMove(Image, 0, pName); // one image for all game types
+			Item.m_RenderTexture = Item.m_aImages[0].m_Texture;
+			m_vEntitiesList.push_back(Item);
+			std::sort(m_vEntitiesList.begin(), m_vEntitiesList.end());
+			gs_aInitCustomList[Tab] = true;
+		}
+		break;
+	case ASSETS_TAB_GAME: Add(m_vGameList); break;
+	case ASSETS_TAB_EMOTICONS: Add(m_vEmoticonList); break;
+	case ASSETS_TAB_PARTICLES: Add(m_vParticlesList); break;
+	case ASSETS_TAB_HUD: Add(m_vHudList); break;
+	case ASSETS_TAB_EXTRAS: Add(m_vExtrasList); break;
+	}
+}
+
+void CMenus::KingApplyAsset(int Tab, const char *pName)
+{
+	switch(Tab)
+	{
+	case ASSETS_TAB_ENTITIES:
+		str_copy(g_Config.m_ClAssetsEntities, pName);
+		GameClient()->m_MapImages.ChangeEntitiesPath(pName);
+		break;
+	case ASSETS_TAB_GAME:
+		str_copy(g_Config.m_ClAssetGame, pName);
+		GameClient()->LoadGameSkin(g_Config.m_ClAssetGame);
+		break;
+	case ASSETS_TAB_EMOTICONS:
+		str_copy(g_Config.m_ClAssetEmoticons, pName);
+		GameClient()->LoadEmoticonsSkin(g_Config.m_ClAssetEmoticons);
+		break;
+	case ASSETS_TAB_PARTICLES:
+		str_copy(g_Config.m_ClAssetParticles, pName);
+		GameClient()->LoadParticlesSkin(g_Config.m_ClAssetParticles);
+		break;
+	case ASSETS_TAB_HUD:
+		str_copy(g_Config.m_ClAssetHud, pName);
+		GameClient()->LoadHudSkin(g_Config.m_ClAssetHud);
+		break;
+	case ASSETS_TAB_EXTRAS:
+		str_copy(g_Config.m_ClAssetExtras, pName);
+		GameClient()->LoadExtrasSkin(g_Config.m_ClAssetExtras);
+		break;
+	}
+}
+
+bool CMenus::KingAssetIsCurrent(int Tab, const char *pName) const
+{
+	switch(Tab)
+	{
+	case ASSETS_TAB_ENTITIES: return str_comp(g_Config.m_ClAssetsEntities, pName) == 0;
+	case ASSETS_TAB_GAME: return str_comp(g_Config.m_ClAssetGame, pName) == 0;
+	case ASSETS_TAB_EMOTICONS: return str_comp(g_Config.m_ClAssetEmoticons, pName) == 0;
+	case ASSETS_TAB_PARTICLES: return str_comp(g_Config.m_ClAssetParticles, pName) == 0;
+	case ASSETS_TAB_HUD: return str_comp(g_Config.m_ClAssetHud, pName) == 0;
+	case ASSETS_TAB_EXTRAS: return str_comp(g_Config.m_ClAssetExtras, pName) == 0;
+	}
+	return false;
 }
