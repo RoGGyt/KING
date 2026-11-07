@@ -23,6 +23,9 @@
 //    very slowly.
 //  - the margin is part of the prediction clock: changing it at once makes your
 //    tee jump. The client ramps the applied margin (see Advance()).
+//  - the first seconds after joining (or a prediction clock reset) the clock is still
+//    settling: those timings say nothing about the network. Counting them pushed the
+//    margin to the maximum on every join and it took half a minute to come back.
 class CKingNetMonitor
 {
 public:
@@ -30,6 +33,7 @@ public:
 	static constexpr int MIN_SAMPLES = 25;
 	static constexpr float HOLD_SECONDS = 8.0f; // keep a spike in mind this long
 	static constexpr float DECAY_SECONDS = 15.0f; // then forget it (every ms of margin is input delay)
+	static constexpr float WARMUP_SECONDS = 3.0f; // clock settling after a join / clock reset
 
 	void Reset(float BaseMargin)
 	{
@@ -49,7 +53,12 @@ public:
 		m_aLateTimes.fill(0);
 		m_CurrentMs = BaseMargin;
 		m_LastAdvance = 0;
+		m_WarmupUntil = 0;
 	}
+
+	// the prediction clock was reset: ignore timings until it settled again
+	void Warmup(int64_t Now) { m_WarmupUntil = Now + (int64_t)(WARMUP_SECONDS * time_freq()); }
+	bool WarmingUp(int64_t Now) const { return !m_WarmupUntil || Now < m_WarmupUntil; }
 
 	void OnInputTiming(float RttMs, float TimeLeftMs, float SentMarginMs, int64_t Now)
 	{
@@ -66,18 +75,28 @@ public:
 		m_LastRttMs = RttMs;
 		m_TimeLeftMs = TimeLeftMs;
 
+		if(!m_WarmupUntil)
+			Warmup(Now); // first timing after a join
+		if(Now < m_WarmupUntil)
+			return;
+
 		m_aDev[m_Index] = SentMarginMs - TimeLeftMs;
 		m_Index = (m_Index + 1) % WINDOW;
 		m_Count = std::min(m_Count + 1, WINDOW);
 
 		if(TimeLeftMs < 0.0f)
 		{
-			// late input: the server had to reuse the previous input
+			// late input: the server had to reuse the previous input. A burst of late
+			// inputs (one ping spike) counts as one event for the "repeated" rule below.
 			m_LateTotal++;
+			const bool NewEvent = !m_LastLate || Now - m_LastLate > Freq / 2;
 			m_LastLate = Now;
 			m_LastLateMs = -TimeLeftMs;
-			m_aLateTimes[m_LateIndex] = Now;
-			m_LateIndex = (m_LateIndex + 1) % (int)m_aLateTimes.size();
+			if(NewEvent)
+			{
+				m_aLateTimes[m_LateIndex] = Now;
+				m_LateIndex = (m_LateIndex + 1) % (int)m_aLateTimes.size();
+			}
 		}
 
 		if(m_Count < MIN_SAMPLES)
@@ -90,14 +109,22 @@ public:
 		const int Med = m_Count / 2;
 		std::nth_element(aSorted.begin(), aSorted.begin() + Med, aSorted.begin() + m_Count);
 		const float Median = aSorted[Med];
-		const int High = std::clamp((int)(m_Count * 0.98f), Med, m_Count - 1);
-		std::nth_element(aSorted.begin() + Med, aSorted.begin() + High, aSorted.begin() + m_Count);
+		// ping spikes far beyond what the highest margin could cover (a lag spike of
+		// +100 ms) are late whatever we do: they must not hold the margin at its maximum
+		// for the next 20 s, that is only input delay
+		int Num = 0;
+		for(int i = 0; i < m_Count; i++)
+			if(aSorted[i] - Median <= m_CoverMs)
+				aSorted[Num++] = aSorted[i];
+		const int FMed = std::min(Med, Num - 1);
+		const int High = std::clamp((int)(Num * 0.98f), FMed, Num - 1);
+		std::nth_element(aSorted.begin(), aSorted.begin() + High, aSorted.begin() + Num);
 		float Spread = std::max(0.0f, aSorted[High] - Median);
 
-		// repeated late inputs: cover the worst one too
+		// repeated late inputs: cover the worst one too (if it can be covered at all)
 		if(RecentLateCount(Now, 10 * Freq) >= 2)
 		{
-			const float Worst = *std::max_element(aSorted.begin(), aSorted.begin() + m_Count);
+			const float Worst = *std::max_element(aSorted.begin(), aSorted.begin() + Num);
 			Spread = std::max(Spread, Worst - Median);
 		}
 		m_SpreadMs = Spread;
@@ -143,6 +170,8 @@ public:
 			m_CurrentMs = std::max(TargetMs, m_CurrentMs - 5.0f * Dt);
 	}
 	void SetCurrent(float Ms) { m_CurrentMs = Ms; }
+	// deviations above this are spikes no margin up to Max can absorb
+	void SetLimits(int Max, int Safety) { m_CoverMs = std::max(5.0f, (std::max(Max, 5) - Safety) * 1.5f); }
 	float CurrentMs() const { return m_CurrentMs; }
 
 	bool Valid() const { return m_Count >= MIN_SAMPLES; }
@@ -183,6 +212,8 @@ private:
 	int m_LateIndex = 0;
 	float m_CurrentMs = 10.0f;
 	int64_t m_LastAdvance = 0;
+	int64_t m_WarmupUntil = 0;
+	float m_CoverMs = 1e9f;
 };
 
 #endif

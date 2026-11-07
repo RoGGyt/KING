@@ -3032,6 +3032,7 @@ void CClient::Update()
 					m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client", "prediction time reset!");
 					m_KingPredResets++; // KING lag log
 					m_PredictedTime.Init(CurTickStart + 2 * time_freq() / GameTickSpeed());
+					m_KingNet.Warmup(time_get()); // KING: timings while the clock settles say nothing
 				}
 
 				if(NewPredTick > m_aPredTick[g_Config.m_ClDummy])
@@ -3213,6 +3214,7 @@ void CClient::Update()
 	}
 
 	// KING: move the applied margin smoothly towards what the network needs
+	m_KingNet.SetLimits(g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety);
 	if(KingAutoMarginActive() && m_ServerCapabilities.m_SyncWeaponInput && m_KingNet.Valid())
 		m_KingNet.Advance(m_KingNet.TargetMs(g_Config.m_KgAutoMarginMin, g_Config.m_KgAutoMarginMax, g_Config.m_KgAutoMarginSafety), time_get());
 	else
