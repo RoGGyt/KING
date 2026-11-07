@@ -446,7 +446,7 @@ void CKing::ApplyKogPreset()
 	g_Config.m_KgKingSmooth = 1;
 	g_Config.m_KgAutoMargin = 1;
 	g_Config.m_KgAutoMarginMin = 10;
-	g_Config.m_KgAutoMarginMax = 40;
+	g_Config.m_KgAutoMarginMax = 28; // every ms above what the network needs is input delay
 	g_Config.m_KgAutoMarginSafety = 3;
 
 	// Antiping: predict others so hooks/collisions with other tees line up
