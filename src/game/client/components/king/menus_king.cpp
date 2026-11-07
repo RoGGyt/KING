@@ -29,22 +29,42 @@ constexpr float KING_MARGIN = 10.0f;
 constexpr float KING_MARGIN_SMALL = 5.0f;
 constexpr float KING_SECTION_GAP = 20.0f;
 
+// three levels of text, so a page reads at a glance: gold headlines, white controls and
+// values, dimmed descriptions and hints
+const ColorRGBA KING_ACCENT(0.96f, 0.76f, 0.30f, 1.0f);
+const ColorRGBA KING_TEXT_DESC(0.80f, 0.82f, 0.88f, 0.78f);
+const ColorRGBA KING_TEXT_HINT(0.78f, 0.80f, 0.86f, 0.55f);
+
 void Headline(CUi *pUi, CUIRect &View, const char *pText)
 {
-	CUIRect Label;
+	CUIRect Label, Bar;
 	View.HSplitTop(KING_HEADLINE, &Label, &View);
+	// a short gold bar in front of the title marks where a section starts
+	Label.VSplitLeft(3.0f, &Bar, &Label);
+	Bar.HMargin(3.0f, &Bar);
+	Bar.Draw(KING_ACCENT, IGraphics::CORNER_ALL, 1.5f);
+	Label.VSplitLeft(7.0f, nullptr, &Label);
+	pUi->TextRender()->TextColor(KING_ACCENT);
 	pUi->DoLabel(&Label, pText, KING_HEADLINE, TEXTALIGN_ML);
+	pUi->TextRender()->TextColor(pUi->TextRender()->DefaultTextColor());
 	View.HSplitTop(KING_MARGIN_SMALL, nullptr, &View);
 }
 
-void TextLine(CUi *pUi, CUIRect &View, const char *pText, float Size = KING_TEXT)
+// a status or value line; small lines are hints and are dimmed (Muted = false keeps the
+// color the caller set, for errors)
+void TextLine(CUi *pUi, CUIRect &View, const char *pText, float Size = KING_TEXT, bool Muted = true)
 {
 	CUIRect Label;
 	View.HSplitTop(Size + 4.0f, &Label, &View);
+	const bool Dim = Muted && Size < KING_TEXT;
+	if(Dim)
+		pUi->TextRender()->TextColor(KING_TEXT_HINT);
 	pUi->DoLabel(&Label, pText, Size, TEXTALIGN_ML);
+	if(Dim)
+		pUi->TextRender()->TextColor(pUi->TextRender()->DefaultTextColor());
 }
 
-// a paragraph wrapped to the column width (translations differ in length)
+// a description paragraph (dimmed), wrapped to the column width (translations differ in length)
 void TextBlock(CUi *pUi, ITextRender *pTextRender, CUIRect &View, const char *pText, float Size = KING_TEXT)
 {
 	const float Height = pTextRender->TextBoundingBox(Size, pText, -1, View.w).m_H;
@@ -53,8 +73,44 @@ void TextBlock(CUi *pUi, ITextRender *pTextRender, CUIRect &View, const char *pT
 	SLabelProperties Props;
 	Props.m_MaxWidth = Label.w;
 	Props.m_EnableWidthCheck = false;
+	pTextRender->TextColor(Size < KING_TEXT ? KING_TEXT_HINT : KING_TEXT_DESC);
 	pUi->DoLabel(&Label, pText, Size, TEXTALIGN_TL, Props);
+	pTextRender->TextColor(pTextRender->DefaultTextColor());
 }
+// Section box like the TClient settings: the box is drawn from last frame's layout.
+struct SKingSections
+{
+	std::vector<CUIRect> m_vBoxes;
+	std::vector<CUIRect> m_vNext;
+	float m_PrevScrollY = 0.0f;
+	void Draw(float ScrollY)
+	{
+		const float Shift = ScrollY - m_PrevScrollY; // the page scrolled since last frame
+		m_PrevScrollY = ScrollY;
+		for(CUIRect Box : m_vBoxes)
+		{
+			Box.y += Shift;
+			const float Padding = KING_MARGIN;
+			Box.x -= Padding;
+			Box.y -= Padding;
+			Box.w += Padding * 2.0f;
+			Box.h += Padding * 2.0f;
+			// a card a bit lighter than the page with a thin edge, so sections stand apart
+			Box.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.07f), IGraphics::CORNER_ALL, 10.0f);
+			CUIRect Inner;
+			Box.Margin(1.0f, &Inner);
+			Inner.Draw(ColorRGBA(0.105f, 0.105f, 0.125f, 0.97f), IGraphics::CORNER_ALL, 9.0f);
+		}
+	}
+	void Begin(const CUIRect &Column) { m_vNext.push_back(Column); }
+	void End(const CUIRect &Column) { m_vNext.back().h = Column.y - m_vNext.back().y; }
+	void Swap()
+	{
+		m_vBoxes = m_vNext;
+		m_vNext.clear();
+	}
+};
+
 } // namespace
 
 void CMenus::RenderSettingsKing(CUIRect MainView)
@@ -66,12 +122,17 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	s_ScrollRegion.Begin(&MainView, &ScrollParams);
 	MainView.VSplitRight(10.0f, &MainView, nullptr); // room for the scrollbar
 
+	static SKingSections s_Sections;
+	s_Sections.Draw(MainView.y);
+
 	CUIRect LeftView, RightView, Button;
-	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 3.0f);
+	MainView.Margin(KING_MARGIN, &MainView);
+	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 4.0f);
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
 	// ***** Input mode ***** //
+	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, Localize("KING Input"));
 	{
 		// all modes in one dropdown (too many for buttons); KING first, it is the default
@@ -250,8 +311,11 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgSmoothOthers, Localize("Smooth corrections of other tees (30 ms, visual only)"), &g_Config.m_KgSmoothOthers, &LeftView, KING_LINE);
 
+	s_Sections.End(LeftView);
+
 	// ***** Prediction margin ***** //
-	LeftView.HSplitTop(KING_SECTION_GAP, nullptr, &LeftView);
+	LeftView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &LeftView);
+	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, Localize("Prediction Margin", "KING"));
 
 	const bool ForcedManual = g_Config.m_KgInputMode == CKing::INPUT_MODE_CLASSIC;
@@ -277,7 +341,10 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, Localize("Margin"), 1, 75, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
 	}
 
+	s_Sections.End(LeftView);
+
 	// ***** Live network ***** //
+	s_Sections.Begin(RightView);
 	Headline(Ui(), RightView, Localize("Live Network"));
 	if(Client()->State() == IClient::STATE_ONLINE)
 	{
@@ -319,8 +386,11 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	TextLine(Ui(), RightView, Localize("Every lag is written with its cause to"), 11.0f);
 	TextLine(Ui(), RightView, "%APPDATA%\\DDNet\\king_lag.log", 11.0f);
 
+	s_Sections.End(RightView);
+
 	// ***** Preset ***** //
-	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
+	RightView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &RightView);
+	s_Sections.Begin(RightView);
 	Headline(Ui(), RightView, Localize("KoG Preset"));
 	TextBlock(Ui(), TextRender(), RightView, Localize("KING mode, antiping on, vsync off, uncapped update rate. Your binds and visuals are not touched."), 11.0f);
 	RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
@@ -329,8 +399,11 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	if(DoButton_Menu(&s_PresetButton, Localize("Apply KoG preset"), 0, &Button))
 		GameClient()->m_King.ApplyKogPreset();
 
+	s_Sections.End(RightView);
+
 	// ***** Updates ***** //
-	RightView.HSplitTop(KING_SECTION_GAP, nullptr, &RightView);
+	RightView.HSplitTop(KING_SECTION_GAP + KING_MARGIN, nullptr, &RightView);
+	s_Sections.Begin(RightView);
 	Headline(Ui(), RightView, Localize("Updates"));
 	{
 		CKing &King = GameClient()->m_King;
@@ -372,10 +445,12 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		else if(King.InstallError()[0])
 		{
 			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-			TextLine(Ui(), RightView, King.InstallError(), 11.0f);
+			TextLine(Ui(), RightView, King.InstallError(), 11.0f, false);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 		}
 	}
+	s_Sections.End(RightView);
+	s_Sections.Swap();
 
 	// scroll height = taller column
 	CUIRect ScrollRect;
@@ -389,36 +464,6 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 namespace
 {
-// Section box like the TClient settings: the box is drawn from last frame's layout.
-struct SKingSections
-{
-	std::vector<CUIRect> m_vBoxes;
-	std::vector<CUIRect> m_vNext;
-	float m_PrevScrollY = 0.0f;
-	void Draw(float ScrollY)
-	{
-		const float Shift = ScrollY - m_PrevScrollY; // the page scrolled since last frame
-		m_PrevScrollY = ScrollY;
-		for(CUIRect Box : m_vBoxes)
-		{
-			Box.y += Shift;
-			const float Padding = KING_MARGIN;
-			Box.x -= Padding;
-			Box.y -= Padding;
-			Box.w += Padding * 2.0f;
-			Box.h += Padding * 2.0f;
-			Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_ALL, 10.0f);
-		}
-	}
-	void Begin(const CUIRect &Column) { m_vNext.push_back(Column); }
-	void End(const CUIRect &Column) { m_vNext.back().h = Column.y - m_vNext.back().y; }
-	void Swap()
-	{
-		m_vBoxes = m_vNext;
-		m_vNext.clear();
-	}
-};
-
 // "Label ............ [control]" row; returns the control rect
 CUIRect LabeledRow(CUi *pUi, CUIRect &Column, const char *pLabel, float LabelFraction = 0.32f)
 {
@@ -562,7 +607,14 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 		RightView.HSplitTop(KING_HEADLINE, &Header, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		Header.VSplitRight(KING_HEADLINE * 1.4f, &Header, &Reset);
+		CUIRect Bar;
+		Header.VSplitLeft(3.0f, &Bar, &Header);
+		Bar.HMargin(3.0f, &Bar);
+		Bar.Draw(KING_ACCENT, IGraphics::CORNER_ALL, 1.5f);
+		Header.VSplitLeft(7.0f, nullptr, &Header);
+		TextRender()->TextColor(KING_ACCENT);
 		Ui()->DoLabel(&Header, Localize("Music Player"), KING_HEADLINE, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		static CButtonContainer s_ResetButton;
 		if(Ui()->DoButton_FontIcon(&s_ResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &Reset, BUTTONFLAG_LEFT))
 			GameClient()->m_King.ResetMusicSettings();
