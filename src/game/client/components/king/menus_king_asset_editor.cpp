@@ -467,6 +467,10 @@ static void SetStatus(SKingAssetEditor &E, bool Error, const char *pText)
 
 static void PushUndo(SKingAssetEditor &E, int CoalescePart = -1)
 {
+	// every change remixes the preview right away (a slider drag changes every frame)
+	E.m_Unsaved = true;
+	E.m_ConfirmExit = false;
+	E.m_Dirty = true;
 	// slider drags of one part become one undo step
 	const int64_t Now = time_get();
 	if(CoalescePart >= 0 && CoalescePart == E.m_LastCoalescedPart && Now - E.m_LastCoalescedPush < time_freq() * 6 / 10)
