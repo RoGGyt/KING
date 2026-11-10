@@ -29,24 +29,15 @@ constexpr float KING_MARGIN = 10.0f;
 constexpr float KING_MARGIN_SMALL = 5.0f;
 constexpr float KING_SECTION_GAP = 20.0f;
 
-// three levels of text, so a page reads at a glance: gold headlines, white controls and
-// values, dimmed descriptions and hints
-const ColorRGBA KING_ACCENT(0.96f, 0.76f, 0.30f, 1.0f);
+// text levels: white headlines, controls and values; dimmed descriptions and hints
 const ColorRGBA KING_TEXT_DESC(0.80f, 0.82f, 0.88f, 0.78f);
 const ColorRGBA KING_TEXT_HINT(0.78f, 0.80f, 0.86f, 0.55f);
 
 void Headline(CUi *pUi, CUIRect &View, const char *pText)
 {
-	CUIRect Label, Bar;
+	CUIRect Label;
 	View.HSplitTop(KING_HEADLINE, &Label, &View);
-	// a short gold bar in front of the title marks where a section starts
-	Label.VSplitLeft(3.0f, &Bar, &Label);
-	Bar.HMargin(3.0f, &Bar);
-	Bar.Draw(KING_ACCENT, IGraphics::CORNER_ALL, 1.5f);
-	Label.VSplitLeft(7.0f, nullptr, &Label);
-	pUi->TextRender()->TextColor(KING_ACCENT);
 	pUi->DoLabel(&Label, pText, KING_HEADLINE, TEXTALIGN_ML);
-	pUi->TextRender()->TextColor(pUi->TextRender()->DefaultTextColor());
 	View.HSplitTop(KING_MARGIN_SMALL, nullptr, &View);
 }
 
@@ -585,14 +576,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 		RightView.HSplitTop(KING_HEADLINE, &Header, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		Header.VSplitRight(KING_HEADLINE * 1.4f, &Header, &Reset);
-		CUIRect Bar;
-		Header.VSplitLeft(3.0f, &Bar, &Header);
-		Bar.HMargin(3.0f, &Bar);
-		Bar.Draw(KING_ACCENT, IGraphics::CORNER_ALL, 1.5f);
-		Header.VSplitLeft(7.0f, nullptr, &Header);
-		TextRender()->TextColor(KING_ACCENT);
 		Ui()->DoLabel(&Header, Localize("Music Player"), KING_HEADLINE, TEXTALIGN_ML);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		static CButtonContainer s_ResetButton;
 		if(Ui()->DoButton_FontIcon(&s_ResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &Reset, BUTTONFLAG_LEFT))
 			GameClient()->m_King.ResetMusicSettings();
