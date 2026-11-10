@@ -156,6 +156,19 @@ void CKing::OnInit()
 		g_Config.m_KgAutoMargin = 0;
 		g_Config.m_KgDefaultsVersion = 8;
 	}
+	if(g_Config.m_KgDefaultsVersion < 9)
+	{
+		// 1.0.28: Best input works exactly like BestClient's. Smoothing and latency comp
+		// mean something else there (they scale the offset), so they start at 0 again;
+		// the auto preset is gone (it was one tick ahead)
+		if(g_Config.m_KgBestPreset)
+			g_Config.m_KgBestOffset = 100;
+		g_Config.m_KgBestPreset = 0;
+		g_Config.m_KgBestSmoothing = 0;
+		g_Config.m_KgBestLatencyComp = 0;
+		g_Config.m_KgBestInterpolation = 0;
+		g_Config.m_KgDefaultsVersion = 9;
+	}
 	m_CrownTexture = Graphics()->LoadTexture("tclient/king_crown.png", IStorage::TYPE_ALL);
 	m_Media.Start();
 	ReadLastInstallResult();
@@ -516,27 +529,33 @@ void CKing::SetFastInput(float WantedMs, bool Ramp, bool Others)
 
 void CKing::UpdateBestInput()
 {
-	const SKingNetStats Stats = Client()->KingNetStats();
-	if(g_Config.m_KgBestPreset)
+	// exactly BestClient's Best input: the tee is shown Offset ticks ahead, "smoothing"
+	// shrinks that offset by half its percent, "latency comp" stretches it; no correction
+	// blending at all (a blended tee is what feels floaty)
+	float Ticks = g_Config.m_KgBestOffset / 100.0f;
+	if(g_Config.m_KgBestSmoothing > 0)
+		Ticks *= 1.0f - g_Config.m_KgBestSmoothing / 200.0f;
+	if(g_Config.m_KgBestLatencyComp > 0)
+		Ticks *= 1.0f + g_Config.m_KgBestLatencyComp / 100.0f;
+	m_BestFastMsExact = Ticks * 20.0f;
+	m_BestFastMs = round_to_int(m_BestFastMsExact);
+	m_BestTarget = m_BestFastMs;
+	m_BestSmoothMs = 0;
+	m_BestCurve = std::clamp(g_Config.m_KgBestInterpolation, 0, 2);
+}
+
+// BestClient's interpolation between two predicted ticks: linear, cubic (3t^2 - 2t^3), or
+// "smooth" = linear for slow moves, cubic for long ones
+float CKing::BestIntra(float Fraction, float DeltaLength)
+{
+	const float T = std::clamp(Fraction, 0.0f, 1.0f);
+	const float Cubic = 3.0f * T * T - 2.0f * T * T * T;
+	switch(std::clamp(g_Config.m_KgBestInterpolation, 0, 2))
 	{
-		// auto: always exactly one tick ahead (moving the offset would move your tee),
-		// only how long corrections are blended follows the connection
-		const float Jitter = Stats.m_Valid ? Stats.m_JitterMs : 0.0f;
-		m_BestTarget = 20;
-		m_BestSmoothMs = Jitter < 3.0f ? 20 : (Jitter < 8.0f ? 25 : 30); // longer blends feel like input delay
-		m_BestCurve = SMOOTH_CURVE_SMOOTH;
+	case 1: return Cubic;
+	case 2: return mix(T, Cubic, std::clamp(DeltaLength / 1000.0f, 0.0f, 1.0f));
+	default: return T;
 	}
-	else
-	{
-		const float Rtt = Stats.m_Valid ? Stats.m_RttMs : 0.0f;
-		const int Wanted = std::clamp(round_to_int(g_Config.m_KgBestOffset * 0.2f + Rtt * g_Config.m_KgBestLatencyComp / 100.0f), 0, 100);
-		// hysteresis: ping noise must not make the offset flicker by 1 ms
-		if(g_Config.m_KgBestLatencyComp == 0 || absolute(Wanted - m_BestTarget) >= 2)
-			m_BestTarget = Wanted;
-		m_BestSmoothMs = round_to_int(g_Config.m_KgBestSmoothing * 0.3f);
-		m_BestCurve = std::clamp(g_Config.m_KgBestInterpolation, 0, 2);
-	}
-	m_BestFastMs = m_BestTarget;
 }
 
 void CKing::ApplyInputMode()
@@ -578,7 +597,7 @@ void CKing::ApplyInputMode()
 	}
 	case INPUT_MODE_BEST:
 		UpdateBestInput();
-		SetFastInput((float)m_BestTarget, !g_Config.m_KgBestPreset && g_Config.m_KgBestLatencyComp > 0, false);
+		SetFastInput(m_BestFastMsExact, false, g_Config.m_KgBestOthers);
 		break;
 	default:
 		m_LastAppliedMode = g_Config.m_KgInputMode;
@@ -593,7 +612,7 @@ float CKing::SmoothDurationMs() const
 	{
 	case INPUT_MODE_KING: return g_Config.m_KgKingSmooth ? KING_SMOOTH_MS : 0.0f;
 	case INPUT_MODE_SMOOTH: return (float)g_Config.m_KgSmoothMs;
-	case INPUT_MODE_BEST: return (float)m_BestSmoothMs;
+	case INPUT_MODE_BEST: return 0.0f; // like BestClient: no correction blending
 	case INPUT_MODE_F: return g_Config.m_KgFInputSmooth ? KING_SMOOTH_MS : 0.0f;
 	case INPUT_MODE_CLASSIC:
 	case INPUT_MODE_DELTA:
@@ -1253,18 +1272,17 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 		Graphics()->DrawRect(CoverX, CoverY, CoverSize, CoverSize, ColorRGBA(Accent.r * 0.35f, Accent.g * 0.35f, Accent.b * 0.35f, 0.9f), IGraphics::CORNER_ALL, CoverRounding);
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->TextColor(Accent.WithAlpha(0.9f * PausedAlpha));
-		const float IconSize = CoverSize * 0.55f;
-		const float IconW = TextRender()->TextWidth(IconSize, FontIcon::MUSIC);
-		TextRender()->Text(CoverX + (CoverSize - IconW) / 2.0f, CoverY + (CoverSize - IconSize) / 2.0f - 0.2f * IconSize, IconSize, FontIcon::MUSIC);
+		// centered the way icon buttons are (by the glyph's box, not by a guessed offset)
+		const CUIRect Cover = {CoverX, CoverY, CoverSize, CoverSize};
+		Ui()->DoLabel(&Cover, FontIcon::MUSIC, CoverSize * 0.55f, TEXTALIGN_MC);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	}
 	if(!Info.m_Playing)
 	{
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
-		const float IconSize = CoverSize * 0.45f;
-		const float IconW = TextRender()->TextWidth(IconSize, FontIcon::PAUSE);
-		TextRender()->Text(CoverX + (CoverSize - IconW) / 2.0f, CoverY + (CoverSize - IconSize) / 2.0f - 0.2f * IconSize, IconSize, FontIcon::PAUSE);
+		const CUIRect Cover = {CoverX, CoverY, CoverSize, CoverSize};
+		Ui()->DoLabel(&Cover, FontIcon::PAUSE, CoverSize * 0.45f, TEXTALIGN_MC);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	}
 

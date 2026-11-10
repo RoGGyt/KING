@@ -167,33 +167,24 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	{
 	case CKing::INPUT_MODE_BEST:
 	{
-		TextBlock(Ui(), TextRender(), LeftView, Localize("Offset, latency compensation, correction smoothing and a blend curve. Auto keeps you one tick ahead and adapts the smoothing to your connection."));
+		TextBlock(Ui(), TextRender(), LeftView, Localize("Works exactly like Best input in BestClient: your tee is shown the offset ahead. Smoothing shrinks the offset, latency comp stretches it, the curve shapes the move between ticks."));
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
-		static std::vector<CButtonContainer> s_vPreset = {{}, {}};
-		int Preset = g_Config.m_KgBestPreset;
-		if(DoLine_RadioMenu(LeftView, Localize("Preset"), s_vPreset, {Localize("Auto"), Localize("Custom", "KING")}, {1, 0}, Preset))
-			g_Config.m_KgBestPreset = Preset;
-		if(g_Config.m_KgBestPreset)
-		{
-			char aNow[96];
-			str_format(aNow, sizeof(aNow), Localize("Now: %d ms ahead, %d ms smoothing"), std::max(GameClient()->m_King.BestFastMs(), 0), GameClient()->m_King.BestSmoothMs());
-			TextLine(Ui(), LeftView, aNow, 11.0f);
-		}
-		else
-		{
-			char aLabel[64];
-			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-			str_format(aLabel, sizeof(aLabel), Localize("Offset %d.%02d ticks"), g_Config.m_KgBestOffset / 100, g_Config.m_KgBestOffset % 100);
-			Ui()->DoScrollbarOption(&g_Config.m_KgBestOffset, &g_Config.m_KgBestOffset, &Button, aLabel, 0, 300, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
-			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-			Ui()->DoScrollbarOption(&g_Config.m_KgBestLatencyComp, &g_Config.m_KgBestLatencyComp, &Button, Localize("Latency comp"), 0, 50, &CUi::ms_LinearScrollbarScale, 0u, Localize("% of ping"));
-			LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
-			Ui()->DoScrollbarOption(&g_Config.m_KgBestSmoothing, &g_Config.m_KgBestSmoothing, &Button, Localize("Smoothing"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-			static std::vector<CButtonContainer> s_vCurve = {{}, {}, {}};
-			int Curve = g_Config.m_KgBestInterpolation;
-			if(DoLine_RadioMenu(LeftView, Localize("Curve"), s_vCurve, {Localize("Linear"), Localize("Cubic"), Localize("Smooth")}, {0, 1, 2}, Curve))
-				g_Config.m_KgBestInterpolation = Curve;
-		}
+		char aLabel[64];
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		str_format(aLabel, sizeof(aLabel), Localize("Prediction offset %d.%02d ticks"), g_Config.m_KgBestOffset / 100, g_Config.m_KgBestOffset % 100);
+		Ui()->DoScrollbarOption(&g_Config.m_KgBestOffset, &g_Config.m_KgBestOffset, &Button, aLabel, 0, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgBestSmoothing, &g_Config.m_KgBestSmoothing, &Button, Localize("Smoothing"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_KgBestLatencyComp, &g_Config.m_KgBestLatencyComp, &Button, Localize("Latency comp"), 0, 50, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		static std::vector<CButtonContainer> s_vCurve = {{}, {}, {}};
+		int Curve = g_Config.m_KgBestInterpolation;
+		if(DoLine_RadioMenu(LeftView, Localize("Interpolation"), s_vCurve, {Localize("Linear"), Localize("Cubic"), Localize("Smooth")}, {0, 1, 2}, Curve))
+			g_Config.m_KgBestInterpolation = Curve;
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBestOthers, Localize("Apply to other tees"), &g_Config.m_KgBestOthers, &LeftView, KING_LINE);
+		char aNow[96];
+		str_format(aNow, sizeof(aNow), Localize("= %.1f ms ahead"), GameClient()->m_King.BestFastMsExact());
+		TextLine(Ui(), LeftView, aNow, 11.0f);
 		break;
 	}
 	case CKing::INPUT_MODE_CLASSIC:

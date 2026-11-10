@@ -102,6 +102,8 @@ public:
 	int SmoothCurve() const;
 	static float SmoothEase(float T, int Curve);
 	int BestFastMs() const { return m_BestFastMs; }
+	float BestFastMsExact() const { return m_BestFastMsExact; }
+	static float BestIntra(float Fraction, float DeltaLength);
 	int BestSmoothMs() const { return m_BestSmoothMs; }
 	int PingCompAmount() const { return m_PingCompAmount; }
 
@@ -210,6 +212,7 @@ private:
 	int m_PingCompAmount = 20;
 	int m_PingCompTarget = 20;
 	int m_BestFastMs = 20;
+	float m_BestFastMsExact = 20.0f;
 	int m_BestTarget = 20;
 	int m_BestSmoothMs = 50;
 	int m_BestCurve = SMOOTH_CURVE_SMOOTH;

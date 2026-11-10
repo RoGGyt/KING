@@ -4658,7 +4658,11 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 			if(SmoothTick > 0 &&
 				m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
 				m_aClients[ClientId].m_aPredTick[SmoothTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicks)
-				Pos[i] = mix(m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200][i], m_aClients[ClientId].m_aPredPos[SmoothTick % 200][i], SmoothIntra);
+			{
+				const float From = m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200][i], To = m_aClients[ClientId].m_aPredPos[SmoothTick % 200][i];
+				const float Amount = g_Config.m_KgInputMode == CKing::INPUT_MODE_BEST && FastInputTicks > 0 ? CKing::BestIntra(SmoothIntra, absolute(To - From)) : SmoothIntra;
+				Pos[i] = mix(From, To, Amount);
+			}
 		}
 	}
 	return Pos;
@@ -4690,7 +4694,10 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 		m_aClients[ClientId].m_aPredTick[(FinalTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
 		m_aClients[ClientId].m_aPredTick[FinalTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicks)
 	{
-		Pos = mix(m_aClients[ClientId].m_aPredPos[(FinalTick - 1) % 200], m_aClients[ClientId].m_aPredPos[FinalTick % 200], FinalIntra);
+		const vec2 From = m_aClients[ClientId].m_aPredPos[(FinalTick - 1) % 200], To = m_aClients[ClientId].m_aPredPos[FinalTick % 200];
+		// KING Best input: BestClient's curve between the two ticks
+		const float Amount = g_Config.m_KgInputMode == CKing::INPUT_MODE_BEST ? CKing::BestIntra(FinalIntra, length(To - From)) : FinalIntra;
+		Pos = mix(From, To, Amount);
 	}
 
 	return Pos;
