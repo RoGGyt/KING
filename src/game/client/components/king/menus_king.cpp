@@ -126,7 +126,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, Localize("KING Input"));
 	{
-		// all modes in one dropdown (too many for buttons); KING first, it is the default
+		// all modes in one dropdown (too many for buttons); a new install starts on Custom
 		static const int s_aModes[] = {CKing::INPUT_MODE_KING, CKing::INPUT_MODE_BEST, CKing::INPUT_MODE_F, CKing::INPUT_MODE_CLASSIC,
 			CKing::INPUT_MODE_DELTA, CKing::INPUT_MODE_PING_COMP, CKing::INPUT_MODE_SMOOTH, CKing::INPUT_MODE_CUSTOM};
 		const char *apNames[std::size(s_aModes)];

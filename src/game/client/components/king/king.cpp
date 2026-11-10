@@ -84,12 +84,18 @@ void CKing::OnInit()
 {
 	if(!g_Config.m_KgPresetApplied)
 	{
-		ApplyKogPreset();
+		// First start: KING changes none of the player's settings (they are shared with
+		// DDNet and other clients in the same config folder). The input mode starts as
+		// Custom = fast input, antiping, vsync and margin exactly as they are set; the KING
+		// modes and the KoG preset (kg_kog_preset) are there to be chosen.
+		g_Config.m_KgInputMode = INPUT_MODE_CUSTOM;
 		g_Config.m_KgPresetApplied = 1;
+		g_Config.m_KgThemeApplied = 1; // the interface color stays the player's own too
+		g_Config.m_KgDefaultsVersion = 9; // nothing to migrate
 	}
 	if(!g_Config.m_KgThemeApplied)
 	{
-		// KING look: dark gold interface color (HSLA packed as A H S L)
+		// installs from before 1.0.28 that never got the KING look
 		g_Config.m_UiColor = (0xE4u << 24) | (0x1Eu << 16) | (0x8Cu << 8) | 0x46u;
 		g_Config.m_KgMenuStyle = 1;
 		g_Config.m_KgThemeApplied = 1;
