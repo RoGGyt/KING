@@ -9,6 +9,7 @@
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/http.h>
+#include <engine/textrender.h>
 
 #include "king_media.h"
 
@@ -19,6 +20,12 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+struct SKingLyricLine
+{
+	float m_Time;
+	std::string m_Text;
+};
 
 class CKing : public CComponent
 {
@@ -163,18 +170,16 @@ public:
 	CKingMedia m_Media;
 	bool MusicPillVisible();
 	// Draws the pill centered on CenterX with its top at TopY. Unit scales everything
-	// (1 = HUD units of a 300 high screen). Returns the pill height.
-	float RenderMusicPill(float CenterX, float TopY, float Unit, const char *pTime, ColorRGBA TimeColor, bool Hud);
+	// (1 = HUD units of a 300 high screen). With lyrics on, the pill opens downwards
+	// into a lyrics card (MaxLyricsW limits its width, <= 0 = from the screen).
+	// Returns the full height (pill + lyrics card).
+	float RenderMusicPill(float CenterX, float TopY, float Unit, const char *pTime, ColorRGBA TimeColor, bool Hud, float MaxLyricsW = -1.0f);
+	// current height of the pill with its lyrics card (animated), for layout
+	float MusicPillHeight(bool Hud, float Unit) const;
 	// HUD layout around the pill (HUD units, valid for the current frame only)
 	bool PillRenderedThisFrame() const { return m_PillRenderedThisFrame; }
 	float PillBottom() const { return m_PillBottom; }
 	float PillRight() const { return m_PillRight; }
-	// HUD text placed under the pill: lyrics go below it
-	void ReserveTopCenter(float Bottom)
-	{
-		if(m_PillRenderedThisFrame)
-			m_LyricsTop = std::max(m_LyricsTop, Bottom);
-	}
 	void ResetMusicSettings();
 
 private:
@@ -182,7 +187,7 @@ private:
 	void UpdateBestInput();
 	void SetFastInput(float WantedMs, bool Ramp, bool Others);
 	void RenderNetHud();
-	void RenderLyrics();
+	void StartLyricsParse();
 	void FinishUpdateCheck();
 	void FinishDownload();
 	bool LaunchInstaller();
@@ -255,24 +260,60 @@ private:
 	bool m_PillRenderedThisFrame = false;
 	float m_PillBottom = 0.0f;
 	float m_PillRight = 0.0f;
-	float m_LyricsTop = 0.0f;
 	float m_PillUnit = 1.0f;
 
-	// lyrics (lrclib.net, synced lyrics)
-	struct SLyricLine
-	{
-		float m_Time;
-		std::string m_Text;
-	};
-	std::vector<SLyricLine> m_vLyrics;
+	// lyrics (lrclib.net, synced lyrics); the reply is parsed on a job thread
+	std::vector<SKingLyricLine> m_vLyrics;
+	std::shared_ptr<class CKingLyricsJob> m_pLyricsJob;
 	std::string m_LyricsTrack; // "title\nartist" the lyrics belong to
 	std::string m_LyricsWanted; // track we fetch for
 	std::shared_ptr<IHttpRequest> m_pLyricsTask = nullptr;
 	int m_LyricsAttempt = 0;
-	int m_CurrentLyric = -1;
-	float m_LyricAlpha = 0.0f;
-	int64_t m_TrackChangedTime = 0;
-	std::string m_LastTrack;
+
+	// lyrics card: the pill opens downwards (spring animated), the current line fills
+	// up like karaoke, the next line waits under it. Text is kept in text containers
+	// (built once per line), so a frame only draws, it never lays out text.
+	struct SKingIsland
+	{
+		float m_W = 0.0f, m_WVel = 0.0f; // in units of Scale
+		float m_H = 0.0f, m_HVel = 0.0f;
+		bool m_Init = false;
+		int m_Key = -2; // shown line (-1 = dots before the first line)
+		int m_PrevKey = -2;
+		float m_Shift = 0.0f; // 1 -> 0 while the lines scroll
+		float m_LastPos = -1.0f; // position never steps back by a small jitter of the player's clock
+	};
+	SKingIsland m_aIsland[2]; // HUD, menu preview
+	struct SKingLyricText
+	{
+		std::string m_Text;
+		int m_SizeKey = 0;
+		int m_WidthKey = 0;
+		int m_ScreenW = 0;
+		STextContainerIndex m_Index;
+		float m_W = 0.0f;
+		uint64_t m_LastUse = 0;
+	};
+	std::array<SKingLyricText, 16> m_aLyricTexts;
+	uint64_t m_LyricUse = 0;
+	struct SKingLyricLayout
+	{
+		int m_Line = -1;
+		int m_SizeKey = 0;
+		int m_WidthKey = 0;
+		int m_Rows = 0;
+		std::string m_aRow[2];
+		uint64_t m_LastUse = 0;
+	};
+	std::array<SKingLyricLayout, 4> m_aLyricLayouts;
+	const SKingLyricText *LyricText(const std::string &Text, float Size, float MaxW);
+	const SKingLyricLayout &LyricLayout(int Line, float Size, float MaxW);
+	void LyricClip(float X, float Y, float W, float H);
+	void ClearLyricTexts();
+	void ResetIslands();
+	// small blurred copy of the cover, stretched behind the lyrics
+	IGraphics::CTextureHandle m_CoverBlurTexture;
+	bool m_HasCoverBlurTexture = false;
 
 	// settings are saved right after they change (not only on a clean exit)
 	void AutoSaveConfig();

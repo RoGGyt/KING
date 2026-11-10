@@ -698,7 +698,6 @@ void CHud::RenderTextInfo()
 			// KING: below the music player pill instead of under it
 			const float FrozenTextY = GameClient()->m_King.PillRenderedThisFrame() ? GameClient()->m_King.PillBottom() + 1.0f : 12.0f;
 			TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, FrozenTextY, 10.0f, aBuf);
-			GameClient()->m_King.ReserveTopCenter(FrozenTextY + 11.0f);
 		}
 
 		// str_format(aBuf, sizeof(aBuf), "%d", GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_PrevPredicted.m_FreezeEnd);

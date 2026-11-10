@@ -19,6 +19,8 @@
 
 #include <engine/client.h>
 #include <engine/console.h>
+#include <engine/engine.h>
+#include <engine/shared/jobs.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/image.h>
@@ -35,6 +37,87 @@
 #include <cstdarg>
 #include <cstdio>
 #include <tuple>
+
+static bool KingParseLrcTime(const char *&p, float &Out);
+
+// Parses the lrclib reply (JSON, can be a few hundred KB) off the main thread.
+class CKingLyricsJob : public IJob
+{
+public:
+	CKingLyricsJob(std::shared_ptr<IHttpRequest> pRequest, float DurationSec) :
+		m_pRequest(std::move(pRequest)), m_DurationSec(DurationSec)
+	{
+		Abortable(true);
+	}
+	std::vector<SKingLyricLine> m_vLines;
+
+private:
+	std::shared_ptr<IHttpRequest> m_pRequest;
+	float m_DurationSec;
+
+	void Run() override
+	{
+		if(m_pRequest->State() != EHttpState::DONE || m_pRequest->StatusCode() != 200)
+			return;
+		json_value *pJson = m_pRequest->ResultJson();
+		if(!pJson)
+			return;
+		const char *pSynced = nullptr;
+		if(pJson->type == json_array)
+		{
+			// the result whose length is closest to what plays (if the player tells us)
+			float BestDiff = 1e9f;
+			for(int i = 0; i < json_array_length(pJson); i++)
+			{
+				const json_value &Entry = *json_array_get(pJson, i);
+				const json_value &Synced = Entry["syncedLyrics"];
+				if(Synced.type != json_string || !Synced.u.string.length)
+					continue;
+				const json_value &Duration = Entry["duration"];
+				float Diff = 0.0f;
+				if(m_DurationSec > 0.0f && (Duration.type == json_double || Duration.type == json_integer))
+					Diff = absolute((Duration.type == json_double ? (float)Duration.u.dbl : (float)Duration.u.integer) - m_DurationSec);
+				if(Diff < BestDiff)
+				{
+					BestDiff = Diff;
+					pSynced = Synced.u.string.ptr;
+				}
+			}
+			if(BestDiff > 10.0f)
+				pSynced = nullptr; // a different version of the song, timings would be off
+		}
+		if(pSynced)
+		{
+			const char *p = pSynced;
+			while(*p && State() != IJob::STATE_ABORTED)
+			{
+				const char *pEnd = p;
+				while(*pEnd && *pEnd != '\n')
+					pEnd++;
+				std::string Line(p, pEnd - p);
+				if(!Line.empty() && Line.back() == '\r')
+					Line.pop_back();
+
+				const char *pLine = Line.c_str();
+				std::vector<float> vTimes;
+				float Time;
+				while(KingParseLrcTime(pLine, Time))
+					vTimes.push_back(Time);
+				while(*pLine == ' ')
+					pLine++;
+				std::string Text(pLine);
+				while(!Text.empty() && (Text.back() == ' ' || Text.back() == '\t'))
+					Text.pop_back();
+				for(float T : vTimes)
+					m_vLines.push_back({T, Text});
+				p = *pEnd ? pEnd + 1 : pEnd;
+			}
+			std::stable_sort(m_vLines.begin(), m_vLines.end(), [](const SKingLyricLine &a, const SKingLyricLine &b) { return a.m_Time < b.m_Time; });
+		}
+		json_value_free(pJson);
+	}
+};
+
 
 static constexpr const char *KING_EXE_NAME = "KING.exe";
 
@@ -199,6 +282,17 @@ void CKing::OnShutdown()
 	{
 		m_pLyricsTask->Abort();
 		m_pLyricsTask = nullptr;
+	}
+	if(m_pLyricsJob)
+	{
+		m_pLyricsJob->Abort();
+		m_pLyricsJob = nullptr;
+	}
+	ClearLyricTexts();
+	if(m_HasCoverBlurTexture)
+	{
+		Graphics()->UnloadTexture(&m_CoverBlurTexture);
+		m_HasCoverBlurTexture = false;
 	}
 	for(auto *ppTask : {&m_pLookupStats, &m_pLookupDDNet})
 	{
@@ -697,6 +791,8 @@ void CKing::OnRender()
 	if(m_pDownloadTask && m_pDownloadTask->Done())
 		FinishDownload();
 	if(m_pLyricsTask && m_pLyricsTask->Done())
+		StartLyricsParse();
+	if(m_pLyricsJob && m_pLyricsJob->Done())
 		FinishLyrics();
 	if((m_pLookupStats || m_pLookupDDNet) && (!m_pLookupStats || m_pLookupStats->Done()) && (!m_pLookupDDNet || m_pLookupDDNet->Done()))
 		FinishLookup();
@@ -711,8 +807,6 @@ void CKing::OnRender()
 	UpdateLagMonitor();
 	if(g_Config.m_KgNetHud)
 		RenderNetHud();
-	if(g_Config.m_KgMusicHud && g_Config.m_ClShowhud)
-		RenderLyrics();
 	m_PillRenderedThisFrame = false;
 }
 
@@ -1174,9 +1268,49 @@ void CKing::UpdateCoverTexture()
 		Graphics()->UnloadTexture(&m_CoverTexture);
 		m_HasCoverTexture = false;
 	}
+	if(m_HasCoverBlurTexture)
+	{
+		Graphics()->UnloadTexture(&m_CoverBlurTexture);
+		m_HasCoverBlurTexture = false;
+	}
 	const size_t Bytes = (size_t)CKingMedia::COVER_SIZE * CKingMedia::COVER_SIZE * 4;
 	if(!Have || vPixels.size() < Bytes)
 		return;
+
+	// 8x8 box average of the cover: stretched with linear filtering it becomes a soft
+	// color wash (like a heavy blur) for the lyrics card, at no cost per frame
+	{
+		constexpr int BLUR = 8;
+		constexpr int CELL = CKingMedia::COVER_SIZE / BLUR;
+		CImageInfo Blur;
+		Blur.m_Width = BLUR;
+		Blur.m_Height = BLUR;
+		Blur.m_Format = CImageInfo::FORMAT_RGBA;
+		Blur.Allocate();
+		for(int by = 0; by < BLUR; by++)
+		{
+			for(int bx = 0; bx < BLUR; bx++)
+			{
+				int aSum[3] = {0, 0, 0};
+				for(int y = by * CELL; y < (by + 1) * CELL; y++)
+				{
+					const uint8_t *pRow = vPixels.data() + ((size_t)y * CKingMedia::COVER_SIZE + bx * CELL) * 4;
+					for(int x = 0; x < CELL; x++)
+					{
+						aSum[0] += pRow[x * 4 + 0];
+						aSum[1] += pRow[x * 4 + 1];
+						aSum[2] += pRow[x * 4 + 2];
+					}
+				}
+				uint8_t *pOut = Blur.m_pData + ((size_t)by * BLUR + bx) * 4;
+				for(int c = 0; c < 3; c++)
+					pOut[c] = (uint8_t)(aSum[c] / (CELL * CELL));
+				pOut[3] = 255;
+			}
+		}
+		m_CoverBlurTexture = Graphics()->LoadTextureRaw(Blur, 0, "king_cover_blur");
+		m_HasCoverBlurTexture = m_CoverBlurTexture.IsValid();
+	}
 	CImageInfo Image;
 	Image.m_Width = CKingMedia::COVER_SIZE;
 	Image.m_Height = CKingMedia::COVER_SIZE;
@@ -1227,7 +1361,188 @@ static void KingDrawRoundedImage(IGraphics *pGraphics, float X, float Y, float W
 	pGraphics->QuadsEnd();
 }
 
-float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *pTime, ColorRGBA TimeColor, bool Hud)
+// ***** Lyrics card ***** //
+
+void CKing::ClearLyricTexts()
+{
+	for(SKingLyricText &Text : m_aLyricTexts)
+	{
+		if(Text.m_Index.Valid())
+			TextRender()->DeleteTextContainer(Text.m_Index);
+		Text = SKingLyricText();
+	}
+	for(SKingLyricLayout &Layout : m_aLyricLayouts)
+		Layout = SKingLyricLayout();
+}
+
+void CKing::ResetIslands()
+{
+	for(SKingIsland &Island : m_aIsland)
+	{
+		Island.m_Key = -2;
+		Island.m_PrevKey = -2;
+		Island.m_Shift = 0.0f;
+		Island.m_LastPos = -1.0f;
+	}
+	for(SKingLyricLayout &Layout : m_aLyricLayouts)
+		Layout = SKingLyricLayout();
+}
+
+// A text container for one string at one size, built once and reused every frame
+// (least recently used one is replaced). MaxW > 0 cuts the text with an ellipsis.
+const CKing::SKingLyricText *CKing::LyricText(const std::string &Text, float Size, float MaxW)
+{
+	const int SizeKey = round_to_int(Size * 100.0f);
+	const int WidthKey = MaxW > 0.0f ? round_to_int(MaxW * 10.0f) : 0;
+	const int ScreenW = Graphics()->ScreenWidth();
+	m_LyricUse++;
+	SKingLyricText *pOldest = &m_aLyricTexts[0];
+	for(SKingLyricText &Entry : m_aLyricTexts)
+	{
+		if(Entry.m_Index.Valid() && Entry.m_SizeKey == SizeKey && Entry.m_WidthKey == WidthKey && Entry.m_ScreenW == ScreenW && Entry.m_Text == Text)
+		{
+			Entry.m_LastUse = m_LyricUse;
+			return &Entry;
+		}
+		if(Entry.m_LastUse < pOldest->m_LastUse)
+			pOldest = &Entry;
+	}
+	SKingLyricText &Entry = *pOldest;
+	if(Entry.m_Index.Valid())
+		TextRender()->DeleteTextContainer(Entry.m_Index);
+	Entry.m_Text = Text;
+	Entry.m_SizeKey = SizeKey;
+	Entry.m_WidthKey = WidthKey;
+	Entry.m_ScreenW = ScreenW;
+	Entry.m_LastUse = m_LyricUse;
+	Entry.m_W = 0.0f;
+	CTextCursor Cursor;
+	Cursor.SetPosition(vec2(0.0f, 0.0f));
+	Cursor.m_FontSize = Size;
+	if(MaxW > 0.0f)
+	{
+		Cursor.m_LineWidth = MaxW;
+		Cursor.m_Flags |= TEXTFLAG_ELLIPSIS_AT_END;
+		Cursor.m_MaxLines = 1;
+	}
+	// white: the color is given when drawing (it multiplies)
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+	TextRender()->TextOutlineColor(1.0f, 1.0f, 1.0f, 1.0f);
+	TextRender()->CreateTextContainer(Entry.m_Index, &Cursor, Text.c_str());
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+	if(Entry.m_Index.Valid())
+		Entry.m_W = TextRender()->GetBoundingBoxTextContainer(Entry.m_Index).m_W;
+	return &Entry;
+}
+
+// A lyric line split into at most two rows that fit MaxW (split at the space nearest
+// to the middle). Measured once per line.
+const CKing::SKingLyricLayout &CKing::LyricLayout(int Line, float Size, float MaxW)
+{
+	const int SizeKey = round_to_int(Size * 100.0f);
+	const int WidthKey = round_to_int(MaxW * 10.0f);
+	m_LyricUse++;
+	SKingLyricLayout *pOldest = &m_aLyricLayouts[0];
+	for(SKingLyricLayout &Entry : m_aLyricLayouts)
+	{
+		if(Entry.m_Line == Line && Entry.m_SizeKey == SizeKey && Entry.m_WidthKey == WidthKey)
+		{
+			Entry.m_LastUse = m_LyricUse;
+			return Entry;
+		}
+		if(Entry.m_LastUse < pOldest->m_LastUse)
+			pOldest = &Entry;
+	}
+	SKingLyricLayout &Entry = *pOldest;
+	Entry.m_Line = Line;
+	Entry.m_SizeKey = SizeKey;
+	Entry.m_WidthKey = WidthKey;
+	Entry.m_LastUse = m_LyricUse;
+	Entry.m_aRow[0].clear();
+	Entry.m_aRow[1].clear();
+	Entry.m_Rows = 0;
+	if(Line < 0 || Line >= (int)m_vLyrics.size())
+		return Entry;
+	const std::string &Text = m_vLyrics[Line].m_Text;
+	if(Text.empty())
+		return Entry;
+	if(TextRender()->TextWidth(Size, Text.c_str()) <= MaxW)
+	{
+		Entry.m_aRow[0] = Text;
+		Entry.m_Rows = 1;
+		return Entry;
+	}
+	// best split: both halves fit and the longer one is as short as possible
+	int BestSplit = -1;
+	float BestLonger = 1e9f;
+	for(size_t i = 1; i + 1 < Text.size(); i++)
+	{
+		if(Text[i] != ' ')
+			continue;
+		const std::string A = Text.substr(0, i);
+		const std::string B = Text.substr(i + 1);
+		const float Longer = std::max(TextRender()->TextWidth(Size, A.c_str()), TextRender()->TextWidth(Size, B.c_str()));
+		if(Longer < BestLonger)
+		{
+			BestLonger = Longer;
+			BestSplit = (int)i;
+		}
+	}
+	if(BestSplit < 0)
+	{
+		Entry.m_aRow[0] = Text; // one long word: cut with an ellipsis when drawn
+		Entry.m_Rows = 1;
+		return Entry;
+	}
+	Entry.m_aRow[0] = Text.substr(0, BestSplit);
+	Entry.m_aRow[1] = Text.substr(BestSplit + 1);
+	Entry.m_Rows = 2;
+	return Entry;
+}
+
+// Clip to a rect given in the current screen mapping (nests with the menu's clipping).
+void CKing::LyricClip(float X, float Y, float W, float H)
+{
+	const CScreenRect Screen = Graphics()->GetScreen();
+	const CUIRect *pUi = Ui()->Screen();
+	const float ToUiX = pUi->w / Screen.Width();
+	const float ToUiY = pUi->h / Screen.Height();
+	CUIRect Rect;
+	Rect.x = (X - Screen.m_TopLeft.x) * ToUiX;
+	Rect.y = (Y - Screen.m_TopLeft.y) * ToUiY;
+	Rect.w = std::max(W, 0.0f) * ToUiX;
+	Rect.h = std::max(H, 0.0f) * ToUiY;
+	Ui()->ClipEnable(&Rect);
+}
+
+float CKing::MusicPillHeight(bool Hud, float Unit) const
+{
+	const float Scale = Unit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
+	const SKingIsland &Island = m_aIsland[Hud ? 0 : 1];
+	return (Island.m_Init ? std::max(Island.m_H, 15.0f) : 15.0f) * Scale;
+}
+
+// critically damped spring, framerate independent
+static void KingSpring(float &Value, float &Vel, float Target, float Dt)
+{
+	constexpr float OMEGA = 14.0f; // settles in about 0.3 s
+	while(Dt > 0.0f)
+	{
+		const float Step = std::min(Dt, 1.0f / 240.0f);
+		const float Accel = OMEGA * OMEGA * (Target - Value) - 2.0f * OMEGA * Vel;
+		Vel += Accel * Step;
+		Value += Vel * Step;
+		Dt -= Step;
+	}
+	if(absolute(Target - Value) < 0.01f && absolute(Vel) < 0.05f)
+	{
+		Value = Target;
+		Vel = 0.0f;
+	}
+}
+
+float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *pTime, ColorRGBA TimeColor, bool Hud, float MaxLyricsW)
 {
 	const SKingMediaInfo Info = m_Media.Get();
 	UpdateCoverTexture();
@@ -1244,6 +1559,7 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 	const float BarW = 1.7f * Scale;
 	const float BarGap = 1.1f * Scale;
 	const float VisW = Vis != MUSIC_VIS_OFF ? Columns * BarW + (Columns - 1) * BarGap : 0.0f;
+	const float Dt = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
 
 	// width from a digit template, so the pill does not wobble every second
 	char aTemplate[64];
@@ -1255,15 +1571,136 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 	const float LeftW = Pad + CoverSize + Gap;
 	const float RightW = Vis != MUSIC_VIS_OFF ? Gap + VisW + Pad + 0.6f * Scale : Pad;
 	const float Side = std::max(LeftW, RightW);
-	const float W = TimeW + 2.0f * Side;
-	const float X = CenterX - W / 2.0f;
+	const float BaseW = TimeW + 2.0f * Side;
 	const ColorRGBA Accent = MusicAccent(Info);
 	const float PausedAlpha = Info.m_Playing ? 1.0f : 0.55f;
 
-	// pill
-	Graphics()->DrawRect(X, TopY, W, H, ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f), IGraphics::CORNER_ALL, Soft ? H * 0.32f : 1.2f * Scale);
+	// ---- lyrics: what the card shows now ----
+	const float CurSize = 7.0f * Scale;
+	const float NextSize = 5.4f * Scale;
+	const float RowH = CurSize * 1.28f;
+	const float NextH = NextSize * 1.35f;
+	const float LyricSide = 7.0f * Scale;
+	const float TopPad = 1.0f * Scale;
+	const float MidGap = 0.6f * Scale;
+	const float BottomPad = 3.4f * Scale;
+	float MaxTextW = MaxLyricsW > 0.0f ? MaxLyricsW - 2.0f * LyricSide : Graphics()->GetScreen().Width() * 0.46f;
+	MaxTextW = std::max(MaxTextW, BaseW - 2.0f * LyricSide);
 
-	// cover
+	SKingIsland &Island = m_aIsland[Hud ? 0 : 1];
+	// the media clock is re-read now and then and can step back a little: hold it
+	// instead (a real seek is a bigger jump and goes through), so lines never flicker
+	float Pos = Info.m_PositionSec;
+	if(Island.m_LastPos > Pos && Island.m_LastPos - Pos < 0.4f)
+		Pos = Island.m_LastPos;
+	Island.m_LastPos = Pos;
+	bool Lyrics = false;
+	int Key = -2; // line shown (-1 = dots before the first line)
+	int Next = -1; // next line with text
+	float Progress = 0.0f; // karaoke fill of the line, or of the dots
+	bool Dots = false;
+	if(g_Config.m_KgMusicHud && g_Config.m_KgMusicLyrics && Info.m_Valid && Info.m_HasTimeline && !m_vLyrics.empty() &&
+		m_LyricsTrack == std::string(Info.m_aTitle) + "\n" + Info.m_aArtist)
+	{
+		const float LookAhead = 0.12f; // a line appears a moment before it is sung
+		const auto It = std::upper_bound(m_vLyrics.begin(), m_vLyrics.end(), Pos + LookAhead, [](float T, const SKingLyricLine &L) { return T < L.m_Time; });
+		const int Line = (int)(It - m_vLyrics.begin()) - 1;
+		for(int i = Line + 1; i < (int)m_vLyrics.size(); i++)
+		{
+			if(!m_vLyrics[i].m_Text.empty())
+			{
+				Next = i;
+				break;
+			}
+		}
+		const float Start = Line >= 0 ? m_vLyrics[Line].m_Time : 0.0f;
+		const float End = Line + 1 < (int)m_vLyrics.size() ? m_vLyrics[Line + 1].m_Time : -1.0f;
+		if(Line >= 0 && !m_vLyrics[Line].m_Text.empty())
+		{
+			// sung over an estimated time (lrclib only has line starts)
+			int Chars = 0;
+			for(const char c : m_vLyrics[Line].m_Text)
+				Chars += ((unsigned char)c & 0xC0) != 0x80;
+			float Sing = 0.45f + 0.07f * Chars;
+			if(End > Start)
+				Sing = std::min(Sing, (End - Start) * 0.95f);
+			Sing = std::max(Sing, 0.3f);
+			Progress = std::clamp((Pos - Start) / Sing, 0.0f, 1.0f);
+			Key = Line;
+			// after the last line the card closes again
+			Lyrics = Next >= 0 || Pos < Start + Sing + 5.0f;
+		}
+		else if(Next >= 0)
+		{
+			// instrumental part (or before the first line): breathing dots
+			const float To = m_vLyrics[Next].m_Time;
+			Progress = To > Start ? std::clamp((Pos - Start) / (To - Start), 0.0f, 1.0f) : 0.0f;
+			Dots = true;
+			Key = Line;
+			Lyrics = true;
+		}
+	}
+
+	if(Key != Island.m_Key)
+	{
+		Island.m_PrevKey = Island.m_Key;
+		Island.m_Key = Key;
+		Island.m_Shift = Island.m_PrevKey != -2 && Key != -2 ? 1.0f : 0.0f;
+	}
+	Island.m_Shift = std::max(0.0f, Island.m_Shift - Dt / 0.45f);
+
+	// layout of the current and the next line
+	const SKingLyricLayout *pCur = nullptr;
+	if(Lyrics && !Dots)
+		pCur = &LyricLayout(Key, CurSize, MaxTextW);
+	const SKingLyricText *apCurRow[2] = {nullptr, nullptr};
+	int CurRows = Dots ? 1 : 0;
+	float CurTextW = 0.0f;
+	if(pCur)
+	{
+		CurRows = std::max(pCur->m_Rows, 1);
+		for(int r = 0; r < pCur->m_Rows; r++)
+		{
+			apCurRow[r] = LyricText(pCur->m_aRow[r], CurSize, MaxTextW);
+			CurTextW = std::max(CurTextW, apCurRow[r]->m_W);
+		}
+	}
+	const SKingLyricText *pNext = Lyrics && Next >= 0 ? LyricText(m_vLyrics[Next].m_Text, NextSize, MaxTextW) : nullptr;
+	const float NextTextW = pNext ? pNext->m_W : 0.0f;
+
+	const float LyricsH = Lyrics ? TopPad + CurRows * RowH + (pNext ? MidGap + NextH : 0.0f) + BottomPad : 0.0f;
+	const float TargetW = Lyrics ? std::max(BaseW, std::max(CurTextW, std::max(NextTextW, 5.0f * CurSize)) + 2.0f * LyricSide) : BaseW;
+	const float TargetH = H + LyricsH;
+	if(!Island.m_Init)
+	{
+		Island.m_W = TargetW / Scale;
+		Island.m_H = TargetH / Scale;
+		Island.m_Init = true;
+	}
+	KingSpring(Island.m_W, Island.m_WVel, TargetW / Scale, Dt);
+	KingSpring(Island.m_H, Island.m_HVel, TargetH / Scale, Dt);
+	const float W = std::max(Island.m_W * Scale, BaseW);
+	const float FullH = std::max(Island.m_H * Scale, H);
+	const float X = CenterX - W / 2.0f;
+	const float Open = std::clamp((FullH - H) / (6.0f * Scale), 0.0f, 1.0f); // 0 = plain pill
+	const float Rounding = Soft ? H * 0.32f : 1.2f * Scale;
+
+	// ---- background: blurred cover under a dark gradient, tinted by the accent ----
+	if(Open > 0.0f && m_HasCoverBlurTexture)
+	{
+		Graphics()->WrapClamp();
+		Graphics()->TextureSet(m_CoverBlurTexture);
+		KingDrawRoundedImage(Graphics(), X, TopY, W, FullH, Rounding, ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f * Open * (0.6f + 0.4f * PausedAlpha)));
+		Graphics()->TextureClear();
+		Graphics()->WrapNormal();
+	}
+	{
+		const ColorRGBA Top(0.0f, 0.0f, 0.0f, 0.38f + 0.12f * Open);
+		const ColorRGBA Bottom(Accent.r * 0.12f * Open, Accent.g * 0.12f * Open, Accent.b * 0.12f * Open, 0.38f + 0.2f * Open);
+		Graphics()->DrawRect4(X, TopY, W, FullH, Top, Top, Bottom, Bottom, IGraphics::CORNER_ALL, Rounding);
+	}
+
+	// ---- cover ----
 	const float CoverX = X + Pad;
 	const float CoverY = TopY + Pad;
 	const float CoverRounding = Soft ? CoverSize * 0.22f : 0.6f * Scale;
@@ -1292,20 +1729,19 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	}
 
-	// timer in the middle
+	// ---- timer in the middle ----
 	const STextBoundingBox Box = TextRender()->TextBoundingBox(FontSize, pTime);
 	TextRender()->TextColor(TimeColor);
 	TextRender()->Text(CenterX - Box.m_W / 2.0f, TopY + (H - Box.m_H) / 2.0f, FontSize, pTime, -1.0f);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-	// visualizer on the right
+	// ---- visualizer on the right ----
 	if(Vis != MUSIC_VIS_OFF)
 	{
 		std::array<float, CKingMedia::NUM_BANDS> aBands{};
 		const bool Real = m_Media.VisualizerCapturing();
 		if(Real)
 			m_Media.GetBands(aBands);
-		const float Dt = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
 		const double Time = time_get() / (double)time_freq();
 		const float VisX = X + W - Pad - 0.6f * Scale - VisW;
 		const float MinH = BarW;
@@ -1339,68 +1775,143 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 		}
 	}
 
+	// ---- lyrics card ----
+	if(Open > 0.0f)
+	{
+		const float AreaY = TopY + H;
+		const float AreaH = FullH - H;
+		const float A = Open * Open * (Info.m_Playing ? 1.0f : 0.65f);
+		const float t = 1.0f - Island.m_Shift;
+		const float Ease = 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t);
+		const float ContentY = AreaY + TopPad;
+		const float NextY = ContentY + CurRows * RowH + MidGap;
+		const double Now = time_get() / (double)time_freq();
+		const ColorRGBA Glow = Accent.WithAlpha(0.5f);
+
+		LyricClip(X, AreaY, W, AreaH - 1.6f * Scale);
+
+		// one row, filled up to FillW like karaoke with a soft edge
+		const auto DrawRow = [&](const SKingLyricText *pText, float RowX, float RowY, float FillW, float Alpha) {
+			if(!pText || !pText->m_Index.Valid() || Alpha <= 0.0f)
+				return;
+			const float RowW = pText->m_W;
+			TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, 0.34f * Alpha), ColorRGBA(0.0f, 0.0f, 0.0f, 0.2f * Alpha), RowX, RowY);
+			if(FillW <= 0.0f)
+				return;
+			const float Edge = 5.0f * Scale;
+			const float Bright = std::min(FillW, RowW);
+			LyricClip(RowX - 2.0f * Scale, RowY - 1.0f * Scale, Bright + 2.0f * Scale, RowH + 2.0f * Scale);
+			TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, Alpha), Glow.WithAlpha(Glow.a * Alpha), RowX, RowY);
+			Ui()->ClipDisable();
+			if(FillW < RowW)
+			{
+				// soft edge: three thin slices fading out
+				for(int s = 0; s < 3; s++)
+				{
+					const float SliceX = RowX + Bright + Edge * s / 3.0f;
+					LyricClip(SliceX, RowY - 1.0f * Scale, Edge / 3.0f, RowH + 2.0f * Scale);
+					const float SliceA = Alpha * (0.66f - 0.22f * s);
+					TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, SliceA), Glow.WithAlpha(Glow.a * SliceA * 0.6f), RowX, RowY);
+					Ui()->ClipDisable();
+				}
+			}
+		};
+
+		// a whole line (1-2 rows, centered), Fill 0..1 over all of it
+		const auto DrawLine = [&](const SKingLyricLayout *pLayout, float LineY, float Fill, float Alpha) {
+			if(!pLayout || pLayout->m_Rows <= 0)
+				return;
+			const SKingLyricText *apRow[2] = {nullptr, nullptr};
+			float Total = 0.0f;
+			for(int r = 0; r < pLayout->m_Rows; r++)
+			{
+				apRow[r] = LyricText(pLayout->m_aRow[r], CurSize, MaxTextW);
+				Total += apRow[r]->m_W;
+			}
+			float Filled = Fill * Total;
+			for(int r = 0; r < pLayout->m_Rows; r++)
+			{
+				const float RowW = apRow[r]->m_W;
+				DrawRow(apRow[r], CenterX - RowW / 2.0f, LineY + r * RowH, Filled, Alpha);
+				Filled -= RowW;
+			}
+		};
+
+		// breathing dots that fill up until the next line
+		const auto DrawDots = [&](float DotsY, float Fill, float Alpha) {
+			if(Alpha <= 0.0f)
+				return;
+			const float R = 1.15f * Scale;
+			const float Spacing = 4.4f * Scale;
+			for(int i = 0; i < 3; i++)
+			{
+				const float Lit = std::clamp(Fill * 3.0f - i, 0.0f, 1.0f);
+				const float Breath = 1.0f + 0.18f * std::sin((float)Now * 3.2f - i * 0.7f) * (Info.m_Playing ? 1.0f : 0.0f);
+				const float Rad = R * Breath * (0.85f + 0.3f * Lit);
+				const float Cx = CenterX + (i - 1) * Spacing;
+				const float Cy = DotsY + RowH / 2.0f;
+				Graphics()->DrawRect(Cx - Rad, Cy - Rad, Rad * 2.0f, Rad * 2.0f, ColorRGBA(1.0f, 1.0f, 1.0f, (0.3f + 0.7f * Lit) * Alpha), IGraphics::CORNER_ALL, Rad);
+			}
+		};
+
+		// the line that just ended scrolls up and fades
+		if(Island.m_Shift > 0.0f && Island.m_PrevKey != -2)
+		{
+			const float OldY = ContentY - Ease * RowH * 0.9f;
+			const float OldA = A * (1.0f - Ease);
+			const bool OldDots = Island.m_PrevKey < 0 || Island.m_PrevKey >= (int)m_vLyrics.size() || m_vLyrics[Island.m_PrevKey].m_Text.empty();
+			if(OldDots)
+				DrawDots(OldY, 1.0f, OldA);
+			else
+				DrawLine(&LyricLayout(Island.m_PrevKey, CurSize, MaxTextW), OldY, 1.0f, OldA);
+		}
+
+		// the card is closing: the last line stays and fades with it
+		if(!Lyrics && Island.m_PrevKey >= 0 && Island.m_PrevKey < (int)m_vLyrics.size() && !m_vLyrics[Island.m_PrevKey].m_Text.empty())
+			DrawLine(&LyricLayout(Island.m_PrevKey, CurSize, MaxTextW), ContentY, 1.0f, A);
+
+		// the current line rises from where the next line was
+		if(Lyrics)
+		{
+			const float CurY = ContentY + (1.0f - Ease) * RowH * 0.9f;
+			const float CurA = A * (0.35f + 0.65f * Ease);
+			if(Dots)
+				DrawDots(CurY, Progress, CurA);
+			else
+				DrawLine(pCur, CurY, Progress, CurA);
+
+			// next line: dim, one row
+			if(pNext && pNext->m_Index.Valid())
+			{
+				const float NextA = A * 0.42f * Ease;
+				const float Ny = NextY + (1.0f - Ease) * NextH * 0.8f;
+				TextRender()->RenderTextContainer(pNext->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, NextA), ColorRGBA(0.0f, 0.0f, 0.0f, 0.2f * NextA), CenterX - pNext->m_W / 2.0f, Ny);
+			}
+		}
+		Ui()->ClipDisable();
+
+		// song progress along the bottom edge
+		if(Info.m_DurationSec > 0.0f)
+		{
+			const float BarInset = std::max(LyricSide, Rounding);
+			const float TrackW = W - 2.0f * BarInset;
+			const float TrackY = TopY + FullH - 1.9f * Scale;
+			const float TrackH = 0.5f * Scale;
+			const float Done = std::clamp(Pos / Info.m_DurationSec, 0.0f, 1.0f);
+			Graphics()->DrawRect(X + BarInset, TrackY, TrackW, TrackH, ColorRGBA(1.0f, 1.0f, 1.0f, 0.12f * Open), IGraphics::CORNER_ALL, TrackH / 2.0f);
+			if(Done > 0.0f)
+				Graphics()->DrawRect(X + BarInset, TrackY, TrackW * Done, TrackH, Accent.WithAlpha(0.9f * Open * PausedAlpha), IGraphics::CORNER_ALL, TrackH / 2.0f);
+		}
+	}
+
 	if(Hud)
 	{
 		m_PillRenderedThisFrame = true;
-		m_PillBottom = TopY + H;
+		m_PillBottom = TopY + FullH;
 		m_PillRight = X + W;
-		m_LyricsTop = m_PillBottom;
 		m_PillUnit = Unit;
 	}
-	return H;
-}
-
-void CKing::RenderLyrics()
-{
-	if(!m_PillRenderedThisFrame || !g_Config.m_KgMusicLyrics)
-		return;
-	const SKingMediaInfo Info = m_Media.Get();
-	if(!Info.m_Valid)
-		return;
-
-	const float Height = 300.0f;
-	const float Width = Height * Graphics()->ScreenAspect();
-	Graphics()->MapScreenToSize(Width, Height);
-
-	const float Scale = m_PillUnit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
-	const float Dt = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
-
-	// synced lyrics (opt-in); the song name is not shown, the cover is enough
-	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
-	char aText[512] = "";
-	float Alpha = 0.0f;
-	if(g_Config.m_KgMusicLyrics && Info.m_HasTimeline && Track == m_LyricsTrack && !m_vLyrics.empty())
-	{
-		const float Pos = Info.m_PositionSec + 0.25f; // show a line a moment early, like karaoke
-		int Line = -1;
-		for(int i = 0; i < (int)m_vLyrics.size() && m_vLyrics[i].m_Time <= Pos; i++)
-			Line = i;
-		if(Line != m_CurrentLyric)
-		{
-			m_CurrentLyric = Line;
-			m_LyricAlpha = 0.0f;
-		}
-		if(Line >= 0 && !m_vLyrics[Line].m_Text.empty())
-		{
-			str_copy(aText, m_vLyrics[Line].m_Text.c_str());
-			m_LyricAlpha = std::min(1.0f, m_LyricAlpha + Dt / 0.15f);
-			Alpha = m_LyricAlpha * (Info.m_Playing ? 1.0f : 0.6f);
-		}
-	}
-	if(!aText[0] || Alpha <= 0.0f)
-		return;
-
-	float FontSize = 6.5f * Scale;
-	const float MaxW = Width * 0.6f;
-	const float TextW = TextRender()->TextWidth(FontSize, aText);
-	if(TextW > MaxW)
-		FontSize = std::max(FontSize * 0.7f, FontSize * MaxW / TextW);
-	const float FinalW = TextRender()->TextWidth(FontSize, aText);
-	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.92f * Alpha);
-	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.45f * Alpha);
-	TextRender()->Text(Width / 2.0f - FinalW / 2.0f, m_LyricsTop + 1.5f * Scale, FontSize, aText, -1.0f);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+	return FullH;
 }
 
 // ***** Lyrics (lrclib.net) ***** //
@@ -1451,8 +1962,13 @@ void CKing::UpdateLyrics(const SKingMediaInfo &Info)
 		m_pLyricsTask->Abort();
 		m_pLyricsTask = nullptr;
 	}
+	if(m_pLyricsJob)
+	{
+		m_pLyricsJob->Abort();
+		m_pLyricsJob = nullptr;
+	}
 	m_vLyrics.clear();
-	m_CurrentLyric = -1;
+	ResetIslands();
 	m_LyricsTrack.clear();
 	m_LyricsWanted = Track;
 	m_LyricsAttempt = 0;
@@ -1525,75 +2041,31 @@ static bool KingParseLrcTime(const char *&p, float &Out)
 	return true;
 }
 
-void CKing::FinishLyrics()
+void CKing::StartLyricsParse()
 {
 	std::shared_ptr<IHttpRequest> pTask = m_pLyricsTask;
 	m_pLyricsTask = nullptr;
 	const SKingMediaInfo Info = m_Media.Get();
-	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
-	if(Track != m_LyricsWanted)
+	if(std::string(Info.m_aTitle) + "\n" + Info.m_aArtist != m_LyricsWanted)
 		return; // the song changed meanwhile; UpdateLyrics() starts over
+	m_pLyricsJob = std::make_shared<CKingLyricsJob>(pTask, Info.m_DurationSec);
+	Engine()->AddJob(m_pLyricsJob);
+}
 
-	const char *pSynced = nullptr;
-	json_value *pJson = nullptr;
-	if(pTask->State() == EHttpState::DONE && pTask->StatusCode() == 200)
-		pJson = pTask->ResultJson();
-	if(pJson && pJson->type == json_array)
-	{
-		// the result whose length is closest to what plays (if the player tells us)
-		float BestDiff = 1e9f;
-		for(int i = 0; i < json_array_length(pJson); i++)
-		{
-			const json_value &Entry = *json_array_get(pJson, i);
-			const json_value &Synced = Entry["syncedLyrics"];
-			if(Synced.type != json_string || !Synced.u.string.length)
-				continue;
-			const json_value &Duration = Entry["duration"];
-			float Diff = 0.0f;
-			if(Info.m_DurationSec > 0.0f && (Duration.type == json_double || Duration.type == json_integer))
-				Diff = absolute((Duration.type == json_double ? (float)Duration.u.dbl : (float)Duration.u.integer) - Info.m_DurationSec);
-			if(Diff < BestDiff)
-			{
-				BestDiff = Diff;
-				pSynced = Synced.u.string.ptr;
-			}
-		}
-		if(BestDiff > 10.0f)
-			pSynced = nullptr; // a different version of the song, timings would be off
-	}
-
-	if(pSynced)
-	{
-		const char *p = pSynced;
-		while(*p)
-		{
-			const char *pEnd = p;
-			while(*pEnd && *pEnd != '\n')
-				pEnd++;
-			std::string Line(p, pEnd - p);
-			if(!Line.empty() && Line.back() == '\r')
-				Line.pop_back();
-
-			const char *pLine = Line.c_str();
-			std::vector<float> vTimes;
-			float Time;
-			while(KingParseLrcTime(pLine, Time))
-				vTimes.push_back(Time);
-			while(*pLine == ' ')
-				pLine++;
-			for(float T : vTimes)
-				m_vLyrics.push_back({T, std::string(pLine)});
-			p = *pEnd ? pEnd + 1 : pEnd;
-		}
-		std::stable_sort(m_vLyrics.begin(), m_vLyrics.end(), [](const SLyricLine &a, const SLyricLine &b) { return a.m_Time < b.m_Time; });
-	}
-	if(pJson)
-		json_value_free(pJson);
+void CKing::FinishLyrics()
+{
+	std::shared_ptr<CKingLyricsJob> pJob = m_pLyricsJob;
+	m_pLyricsJob = nullptr;
+	const SKingMediaInfo Info = m_Media.Get();
+	const std::string Track = std::string(Info.m_aTitle) + "\n" + Info.m_aArtist;
+	if(Track != m_LyricsWanted || pJob->State() != IJob::STATE_DONE)
+		return; // the song changed meanwhile; UpdateLyrics() starts over
+	m_vLyrics = std::move(pJob->m_vLines);
+	ResetIslands();
 
 	if(!m_vLyrics.empty() || m_LyricsAttempt >= 1)
 	{
 		m_LyricsTrack = m_LyricsWanted; // done (with or without lyrics)
-		m_CurrentLyric = -1;
 		return;
 	}
 

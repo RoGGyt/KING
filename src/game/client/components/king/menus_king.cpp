@@ -634,12 +634,13 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	{
 		CUIRect Preview;
 		const float Unit = 2.0f;
-		const float PillH = 15.0f * Unit * std::clamp(g_Config.m_KgMusicTextScale, 50, 200) / 100.0f;
+		// the preview grows with the lyrics card (animated height)
+		const float PillH = GameClient()->m_King.MusicPillHeight(false, Unit);
 		RightView.HSplitTop(PillH, &Preview, &RightView);
 		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		const SKingMediaInfo Info = Media.Get();
 		if(g_Config.m_KgMusicHud && Info.m_Valid && (Info.m_aTitle[0] || Info.m_aArtist[0]))
-			GameClient()->m_King.RenderMusicPill(Preview.x + Preview.w / 2.0f, Preview.y, Unit, "12:34", ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false);
+			GameClient()->m_King.RenderMusicPill(Preview.x + Preview.w / 2.0f, Preview.y, Unit, "12:34", ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false, Preview.w);
 		else
 			Ui()->DoLabel(&Preview, g_Config.m_KgMusicHud ? Localize("Play something (Spotify, browser, Yandex Music...) to see it here") : Localize("Music player is off"), 11.0f, TEXTALIGN_MC);
 

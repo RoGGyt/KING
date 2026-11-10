@@ -345,7 +345,7 @@ MACRO_CONFIG_INT(KgMusicVisualizer, kg_music_visualizer, 2, 0, 2, CFGFLAG_CLIENT
 MACRO_CONFIG_INT(KgMusicTextScale, kg_music_text_scale, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player size in percent")
 MACRO_CONFIG_INT(KgMusicColumns, kg_music_columns, 5, 3, 24, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer bars")
 MACRO_CONFIG_INT(KgMusicRounding, kg_music_rounding, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player corners (0 = cube, 1 = soft)")
-MACRO_CONFIG_INT(KgMusicLyrics, kg_music_lyrics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player: show synced song lyrics under the timer (beta, from lrclib.net)")
+MACRO_CONFIG_INT(KgMusicLyrics, kg_music_lyrics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player: show synced song lyrics inside the player (from lrclib.net)")
 MACRO_CONFIG_STR(KgSoundPack, kg_sound_pack, 64, "default", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sound pack from assets/sounds/<name> (default = built-in sounds)")
 MACRO_CONFIG_INT(KgMusicShowPaused, kg_music_show_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep the music player visible while paused")
 MACRO_CONFIG_INT(KgAssetsTile, kg_assets_tile, 110, 60, 240, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Asset catalog: preview tile size")
