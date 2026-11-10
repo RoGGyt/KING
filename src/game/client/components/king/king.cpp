@@ -1602,7 +1602,7 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 	if(g_Config.m_KgMusicHud && g_Config.m_KgMusicLyrics && Info.m_Valid && Info.m_HasTimeline && !m_vLyrics.empty() &&
 		m_LyricsTrack == std::string(Info.m_aTitle) + "\n" + Info.m_aArtist)
 	{
-		const float LookAhead = 0.12f; // a line appears a moment before it is sung
+		const float LookAhead = 0.05f; // a line appears a moment before it is sung
 		const auto It = std::upper_bound(m_vLyrics.begin(), m_vLyrics.end(), Pos + LookAhead, [](float T, const SKingLyricLine &L) { return T < L.m_Time; });
 		const int Line = (int)(It - m_vLyrics.begin()) - 1;
 		for(int i = Line + 1; i < (int)m_vLyrics.size(); i++)
@@ -1621,10 +1621,12 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 			int Chars = 0;
 			for(const char c : m_vLyrics[Line].m_Text)
 				Chars += ((unsigned char)c & 0xC0) != 0x80;
-			float Sing = 0.45f + 0.07f * Chars;
+			// slow enough that it never runs ahead of the singer: most lines are sung
+			// over nearly the whole time until the next line starts
+			float Sing = 1.0f + 0.12f * Chars;
 			if(End > Start)
-				Sing = std::min(Sing, (End - Start) * 0.95f);
-			Sing = std::max(Sing, 0.3f);
+				Sing = std::min(Sing, (End - Start) * 0.92f);
+			Sing = std::max(Sing, 0.4f);
 			Progress = std::clamp((Pos - Start) / Sing, 0.0f, 1.0f);
 			Key = Line;
 			// after the last line the card closes again
@@ -1786,7 +1788,7 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 		const float ContentY = AreaY + TopPad;
 		const float NextY = ContentY + CurRows * RowH + MidGap;
 		const double Now = time_get() / (double)time_freq();
-		const ColorRGBA Glow = Accent.WithAlpha(0.5f);
+		const ColorRGBA NoOutline(0.0f, 0.0f, 0.0f, 0.0f); // clean text, no outline
 
 		LyricClip(X, AreaY, W, AreaH - 1.6f * Scale);
 
@@ -1795,13 +1797,13 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 			if(!pText || !pText->m_Index.Valid() || Alpha <= 0.0f)
 				return;
 			const float RowW = pText->m_W;
-			TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, 0.34f * Alpha), ColorRGBA(0.0f, 0.0f, 0.0f, 0.2f * Alpha), RowX, RowY);
+			TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, 0.34f * Alpha), NoOutline, RowX, RowY);
 			if(FillW <= 0.0f)
 				return;
 			const float Edge = 5.0f * Scale;
 			const float Bright = std::min(FillW, RowW);
 			LyricClip(RowX - 2.0f * Scale, RowY - 1.0f * Scale, Bright + 2.0f * Scale, RowH + 2.0f * Scale);
-			TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, Alpha), Glow.WithAlpha(Glow.a * Alpha), RowX, RowY);
+			TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, Alpha), NoOutline, RowX, RowY);
 			Ui()->ClipDisable();
 			if(FillW < RowW)
 			{
@@ -1811,7 +1813,7 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 					const float SliceX = RowX + Bright + Edge * s / 3.0f;
 					LyricClip(SliceX, RowY - 1.0f * Scale, Edge / 3.0f, RowH + 2.0f * Scale);
 					const float SliceA = Alpha * (0.66f - 0.22f * s);
-					TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, SliceA), Glow.WithAlpha(Glow.a * SliceA * 0.6f), RowX, RowY);
+					TextRender()->RenderTextContainer(pText->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, SliceA), NoOutline, RowX, RowY);
 					Ui()->ClipDisable();
 				}
 			}
@@ -1885,7 +1887,7 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 			{
 				const float NextA = A * 0.42f * Ease;
 				const float Ny = NextY + (1.0f - Ease) * NextH * 0.8f;
-				TextRender()->RenderTextContainer(pNext->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, NextA), ColorRGBA(0.0f, 0.0f, 0.0f, 0.2f * NextA), CenterX - pNext->m_W / 2.0f, Ny);
+				TextRender()->RenderTextContainer(pNext->m_Index, ColorRGBA(1.0f, 1.0f, 1.0f, NextA), NoOutline, CenterX - pNext->m_W / 2.0f, Ny);
 			}
 		}
 		Ui()->ClipDisable();
