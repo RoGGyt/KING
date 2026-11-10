@@ -74,7 +74,6 @@ public:
 
 	// corrections bigger than this are real teleports (tele tiles, rescue, spawn): never smoothed
 	static constexpr float SMOOTH_SNAP_DISTANCE = 64.0f;
-	static constexpr int SMOOTH_HOOKED_MS = 60; // own-tee glide while another player hooks us
 	static constexpr float KING_SMOOTH_MS = 30.0f;
 	// a jump this far is a tele, kill or spawn, not a misprediction
 	static constexpr float TELEPORT_DISTANCE = 400.0f;

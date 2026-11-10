@@ -2787,51 +2787,97 @@ void CGameClient::OnPredict()
 	int LocalTee = g_Config.m_ClDummy ^ m_IsDummySwapping;
 	int DummyTee = LocalTee ^ 1;
 
-	// KING: remember the last prediction of a tick whose input was already final, so a
+	// KING: remember the last prediction of the ticks whose input was already final, so a
 	// change after this repredict can only come from the server (a correction). Used by
 	// the lag monitor always and by correction smoothing when a mode enables it.
 	const int KingLocalId = m_Snap.m_LocalClientId;
+	const int KingGameTick = Client()->GameTick(g_Config.m_ClDummy);
 	const int KingCheckTick = m_KingPrevFinalRegular;
-	bool KingHaveOld = false;
-	vec2 KingOldPos = vec2(0.0f, 0.0f);
-	if(KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy &&
-		KingCheckTick > Client()->GameTick(g_Config.m_ClDummy) && KingCheckTick <= FinalTickRegular && KingCheckTick >= FinalTickRegular - 2 &&
-		m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
+	const bool KingSameTee = KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy;
+	auto KingPredValid = [&](int ClientId, int Tick) {
+		return Tick > KingGameTick && m_aClients[ClientId].m_aPredTick[Tick % 200] == Tick;
+	};
+	bool KingHaveOld = false, KingHaveOld1 = false;
+	vec2 KingOldPos = vec2(0.0f, 0.0f), KingOldPos1 = vec2(0.0f, 0.0f);
+	if(KingSameTee && KingCheckTick <= FinalTickRegular && KingCheckTick >= FinalTickRegular - 2 && KingPredValid(KingLocalId, KingCheckTick))
 	{
 		KingOldPos = m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
 		KingHaveOld = true;
+		if(KingPredValid(KingLocalId, KingCheckTick - 1))
+		{
+			KingOldPos1 = m_aClients[KingLocalId].m_aPredPos[(KingCheckTick - 1) % 200];
+			KingHaveOld1 = true;
+		}
 	}
 
 	// What the player sees is our tee at the exact time it was drawn last frame, between two
-	// predicted ticks (fast input puts it ahead of the tick checked above). While our own
-	// input stays the same, anything that moves that drawn point comes from the server: most
-	// of all a hook by another player, whose future moves we can only guess. That is the
-	// shaking when you get hooked, so smoothing measures the jump right there.
-	const CNetObj_PlayerInput &KingInput = m_Controls.m_aInputData[g_Config.m_ClDummy];
-	const bool KingAimMatters = KingInput.m_Hook || (KingInput.m_Fire & 1);
-	const bool KingInputSame = m_KingPrevInputValid &&
-				   KingInput.m_Direction == m_KingPrevInput.m_Direction && KingInput.m_Jump == m_KingPrevInput.m_Jump &&
-				   KingInput.m_Hook == m_KingPrevInput.m_Hook && KingInput.m_Fire == m_KingPrevInput.m_Fire &&
-				   KingInput.m_WantedWeapon == m_KingPrevInput.m_WantedWeapon &&
-				   (!KingAimMatters || (KingInput.m_TargetX == m_KingPrevInput.m_TargetX && KingInput.m_TargetY == m_KingPrevInput.m_TargetY));
-	m_KingPrevInput = KingInput;
-	m_KingPrevInputValid = true;
+	// predicted ticks (fast input puts it ahead of the ticks checked above). A change of
+	// that drawn point is a server correction only if every input the old prediction used
+	// is the input the new one uses: the keys held right now (they drive the ticks that are
+	// not sent yet) and the inputs sent since. A key pressed in between moves the tee
+	// because WE moved it, and that must never be smoothed: it would delay our own input.
 	const int KingDrawnTick = m_KingDrawnTick;
 	const float KingDrawnIntra = m_KingDrawnIntra;
+	auto KingSameInput = [](const CNetObj_PlayerInput &A, const CNetObj_PlayerInput &B, bool Aim) {
+		return A.m_Direction == B.m_Direction && A.m_Jump == B.m_Jump && A.m_Hook == B.m_Hook && A.m_Fire == B.m_Fire &&
+		       A.m_WantedWeapon == B.m_WantedWeapon && A.m_NextWeapon == B.m_NextWeapon && A.m_PrevWeapon == B.m_PrevWeapon &&
+		       (!Aim || (A.m_TargetX == B.m_TargetX && A.m_TargetY == B.m_TargetY));
+	};
+	bool KingInputSame = true;
+	if(g_Config.m_TcFastInput && FastInputTicks > 0)
+	{
+		const CNetObj_PlayerInput &FastNow = m_Controls.m_aFastInput[LocalTee];
+		// the aim only matters while it can still change what happens: a hook that is about
+		// to be thrown, or a weapon being fired
+		const bool Aim = ((FastNow.m_Fire | m_KingPrevFastInput.m_Fire) & 1) ||
+				 ((FastNow.m_Hook || m_KingPrevFastInput.m_Hook) && KingLocalId >= 0 && m_aClients[KingLocalId].m_RegularPredicted.m_HookState == HOOK_IDLE);
+		KingInputSame = m_KingPrevFastInputValid && KingCheckTick >= FinalTickRegular - 2 && KingSameInput(FastNow, m_KingPrevFastInput, Aim);
+		for(int Tick = KingCheckTick + 1; KingInputSame && Tick <= FinalTickRegular; Tick++)
+		{
+			const CNetObj_PlayerInput *pSent = (const CNetObj_PlayerInput *)Client()->GetInput(Tick, m_IsDummySwapping);
+			KingInputSame = pSent && KingSameInput(*pSent, m_KingPrevFastInput, Aim);
+		}
+		m_KingPrevFastInput = FastNow;
+		m_KingPrevFastInputValid = true;
+	}
+	else
+		m_KingPrevFastInputValid = false;
 	auto KingDrawnValid = [&]() {
-		return KingDrawnTick - 1 > Client()->GameTick(g_Config.m_ClDummy) && KingDrawnTick <= FinalTickSelf &&
-		       m_aClients[KingLocalId].m_aPredTick[(KingDrawnTick - 1) % 200] == KingDrawnTick - 1 &&
-		       m_aClients[KingLocalId].m_aPredTick[KingDrawnTick % 200] == KingDrawnTick;
+		return KingDrawnTick <= FinalTickSelf && KingPredValid(KingLocalId, KingDrawnTick - 1) && KingPredValid(KingLocalId, KingDrawnTick);
 	};
 	auto KingDrawnPos = [&]() {
 		return mix(m_aClients[KingLocalId].m_aPredPos[(KingDrawnTick - 1) % 200], m_aClients[KingLocalId].m_aPredPos[KingDrawnTick % 200], KingDrawnIntra);
 	};
 	bool KingHaveDrawn = false;
 	vec2 KingOldDrawnPos = vec2(0.0f, 0.0f);
-	if(KingInputSame && KingLocalId >= 0 && KingLocalId == m_KingPrevLocalId && g_Config.m_ClDummy == m_KingPrevDummy && KingDrawnValid())
+	if(KingInputSame && KingSameTee && KingDrawnTick > 0 && KingDrawnValid())
 	{
 		KingOldDrawnPos = KingDrawnPos();
 		KingHaveDrawn = true;
+	}
+
+	// other tees: where each one was drawn, before the new snapshot changes its prediction
+	const bool KingOthersNew = g_Config.m_KgSmoothOthers && KingGameTick != m_KingOtherLastGameTick;
+	m_KingOtherLastGameTick = KingGameTick;
+	bool aKingOtherHave[MAX_CLIENTS] = {};
+	vec2 aKingOtherOld[MAX_CLIENTS];
+	auto KingOtherPos = [&](int ClientId) {
+		const SKingOtherSmooth &Other = m_aKingOther[ClientId];
+		return mix(m_aClients[ClientId].m_aPredPos[(Other.m_DrawnTick - 1) % 200], m_aClients[ClientId].m_aPredPos[Other.m_DrawnTick % 200], Other.m_DrawnIntra);
+	};
+	auto KingOtherValid = [&](int ClientId) {
+		const int Tick = m_aKingOther[ClientId].m_DrawnTick;
+		return Tick > 0 && Tick <= FinalTickOthers && KingPredValid(ClientId, Tick - 1) && KingPredValid(ClientId, Tick);
+	};
+	if(KingOthersNew)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(i == KingLocalId || !KingOtherValid(i))
+				continue;
+			aKingOtherOld[i] = KingOtherPos(i);
+			aKingOtherHave[i] = true;
+		}
 	}
 
 	for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= FinalTickSelf; Tick++)
@@ -3037,26 +3083,32 @@ void CGameClient::OnPredict()
 	// KING: detect server corrections of our tee; smooth them if the input mode wants it
 	bool KingHaveErr = false;
 	vec2 KingErr = vec2(0.0f, 0.0f);
-	if(KingHaveOld && m_aClients[KingLocalId].m_aPredTick[KingCheckTick % 200] == KingCheckTick)
+	if(KingHaveOld && KingPredValid(KingLocalId, KingCheckTick))
 	{
 		KingErr = KingOldPos - m_aClients[KingLocalId].m_aPredPos[KingCheckTick % 200];
 		KingHaveErr = true;
 		const float ErrLen = length(KingErr);
 		if(ErrLen > 0.5f)
 			m_King.OnLocalCorrection(ErrLen, KingCheckTick); // lag monitor: real server corrections only
+		// Our input changed, so the drawn point cannot be compared. The ticks above are the
+		// server's part alone; carry their error on to where the tee was drawn (it grows
+		// with the distance into the future).
+		if(!KingHaveDrawn && KingHaveOld1 && KingDrawnTick > KingCheckTick && KingPredValid(KingLocalId, KingCheckTick - 1))
+		{
+			const vec2 Err1 = KingOldPos1 - m_aClients[KingLocalId].m_aPredPos[(KingCheckTick - 1) % 200];
+			const float Ahead = std::clamp((KingDrawnTick - 1 + KingDrawnIntra) - KingCheckTick, 0.0f, 4.0f);
+			vec2 Carried = KingErr + (KingErr - Err1) * Ahead;
+			const float MaxLen = ErrLen * 2.5f + 2.0f;
+			if(length(Carried) > MaxLen)
+				Carried = Carried * (MaxLen / length(Carried));
+			KingErr = Carried;
+		}
 	}
 	if(KingHaveDrawn && KingDrawnValid())
 	{
 		KingErr = KingOldDrawnPos - KingDrawnPos();
 		KingHaveErr = true;
 	}
-	// being hooked by someone else: his moves are guesses, every snapshot fixes them a bit
-	m_KingBeingHooked = false;
-	if(KingLocalId >= 0)
-		for(int i = 0; i < MAX_CLIENTS && !m_KingBeingHooked; i++)
-			if(i != KingLocalId)
-				if(CCharacter *pOther = m_PredictedWorld.GetCharacterById(i))
-					m_KingBeingHooked = pOther->Core()->HookedPlayer() == KingLocalId;
 	if(KingHaveErr)
 	{
 		const float ErrLen = length(KingErr);
@@ -3076,8 +3128,29 @@ void CGameClient::OnPredict()
 				m_KingSmoothStart = m_KingSmoothStart * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
 			m_KingSmoothOffset = m_KingSmoothStart;
 			m_KingSmoothElapsedMs = 0.0f;
-			// while hooked the corrections come every snapshot: a longer glide hides them
-			m_KingSmoothDurMs = m_KingBeingHooked ? std::max(SmoothMs, (float)CKing::SMOOTH_HOOKED_MS) : SmoothMs;
+		}
+	}
+	// other tees: the same for the correction this snapshot made to each of them
+	if(KingOthersNew)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(!aKingOtherHave[i] || !KingOtherValid(i))
+				continue;
+			SKingOtherSmooth &Other = m_aKingOther[i];
+			const vec2 Err = aKingOtherOld[i] - KingOtherPos(i);
+			const float ErrLen = length(Err);
+			if(ErrLen > CKing::SMOOTH_SNAP_DISTANCE)
+				Other.m_Start = Other.m_Offset = vec2(0.0f, 0.0f);
+			else if(ErrLen > 0.25f)
+			{
+				Other.m_Start = Other.m_Offset + Err;
+				const float StartLen = length(Other.m_Start);
+				if(StartLen > CKing::SMOOTH_SNAP_DISTANCE)
+					Other.m_Start = Other.m_Start * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
+				Other.m_Offset = Other.m_Start;
+				Other.m_ElapsedMs = 0.0f;
+			}
 		}
 	}
 	m_KingPrevFinalRegular = FinalTickRegular;
@@ -4319,69 +4392,15 @@ void CGameClient::UpdateSpectatorCursor()
 	m_CursorInfo.m_WorldTarget = m_CursorInfo.m_Position + (m_CursorInfo.m_Target - TargetCameraOffset) * Zoom + TargetCameraOffset;
 }
 
-// Visual only. Watches where another tee is drawn frame by frame; when it suddenly
-// lands somewhere else than its motion says (a server correction of the antiping
-// prediction, or a late snapshot without antiping), the jump is turned into an
-// offset that fades out over KING_SMOOTH_MS. Normal motion, stops at walls and
-// teleports (>= SMOOTH_SNAP_DISTANCE) are left alone.
-vec2 CGameClient::KingSmoothOther(int ClientId, vec2 Pos, bool NewSnapshot)
-{
-	SKingOtherSmooth &State = m_aKingOther[ClientId];
-	const float Dt = Client()->RenderFrameTime() * 1000.0f;
-	if(!State.m_Valid || Dt <= 0.0f || Dt > 100.0f)
-	{
-		State = SKingOtherSmooth();
-		State.m_Valid = Dt > 0.0f && Dt <= 100.0f;
-		State.m_LastPos = Pos;
-		return Pos;
-	}
-
-	const vec2 Moved = Pos - State.m_LastPos;
-	const vec2 Expected = State.m_Velocity * Dt;
-	const vec2 Jump = Moved - Expected;
-	const float JumpLen = length(Jump);
-	// a jump is clearly bigger than what normal motion, a sudden stop or a jump/hook
-	// impulse can do in one frame. Corrections only ever come with new server data, so
-	// only frames with a new snapshot are checked: motion between them is never touched.
-	const float Threshold = std::max({1.5f, length(Expected) * 1.5f, 0.8f * Dt}); // small enough for hook shaking
-	if(length(Moved) >= CKing::SMOOTH_SNAP_DISTANCE)
-	{
-		State.m_Start = State.m_Offset = vec2(0.0f, 0.0f); // teleport, kill, spawn
-		State.m_Velocity = vec2(0.0f, 0.0f);
-	}
-	else if(NewSnapshot && JumpLen > Threshold)
-	{
-		// keep drawing where the tee was heading and glide to the new spot
-		vec2 Start = State.m_Offset - Jump;
-		const float StartLen = length(Start);
-		if(StartLen > CKing::SMOOTH_SNAP_DISTANCE)
-			Start = Start * (CKing::SMOOTH_SNAP_DISTANCE / StartLen);
-		State.m_Start = State.m_Offset = Start;
-		State.m_ElapsedMs = 0.0f;
-	}
-	else
-		State.m_Velocity = mix(State.m_Velocity, Moved / Dt, 0.5f);
-	State.m_LastPos = Pos;
-
-	if(State.m_Start != vec2(0.0f, 0.0f))
-	{
-		State.m_ElapsedMs += Dt;
-		const float T = std::clamp(State.m_ElapsedMs / CKing::KING_SMOOTH_MS, 0.0f, 1.0f);
-		State.m_Offset = State.m_Start * (1.0f - CKing::SmoothEase(T, CKing::SMOOTH_CURVE_SMOOTH));
-		if(T >= 1.0f)
-			State.m_Start = State.m_Offset = vec2(0.0f, 0.0f);
-	}
-	return Pos + State.m_Offset;
-}
-
 void CGameClient::UpdateRenderedCharacters()
 {
-	// KING Smooth/Best: blend the correction offset out over the smoothing time
+	// KING: blend the correction offset of our tee out over the smoothing time
+	const float KingFrameMs = Client()->RenderFrameTime() * 1000.0f;
 	const float KingSmoothMs = m_King.SmoothDurationMs();
 	if(KingSmoothMs > 0.0f && Predict() && m_KingSmoothStart != vec2(0.0f, 0.0f))
 	{
-		m_KingSmoothElapsedMs += Client()->RenderFrameTime() * 1000.0f;
-		const float T = std::clamp(m_KingSmoothElapsedMs / std::max(m_KingSmoothDurMs, KingSmoothMs), 0.0f, 1.0f);
+		m_KingSmoothElapsedMs += KingFrameMs;
+		const float T = std::clamp(m_KingSmoothElapsedMs / KingSmoothMs, 0.0f, 1.0f);
 		m_KingSmoothOffset = m_KingSmoothStart * (1.0f - CKing::SmoothEase(T, m_King.SmoothCurve()));
 		if(T >= 1.0f)
 		{
@@ -4396,13 +4415,26 @@ void CGameClient::UpdateRenderedCharacters()
 			m_KingSmoothStart = vec2(0.0f, 0.0f);
 	}
 
-	// KING: forget other tees that are gone (or everything when the option is off)
-	const int KingGameTick = Client()->GameTick(g_Config.m_ClDummy);
-	const bool KingNewSnapshot = KingGameTick != m_KingOtherLastGameTick;
-	m_KingOtherLastGameTick = KingGameTick;
+	// KING: the same for other tees; gone tees (or the option off, or no prediction as when
+	// spectating: snapshot positions are continuous, there is nothing to smooth) are reset
+	const bool KingOthers = g_Config.m_KgSmoothOthers && Predict();
 	for(int i = 0; i < MAX_CLIENTS; i++)
-		if(!g_Config.m_KgSmoothOthers || !m_Snap.m_aCharacters[i].m_Active)
-			m_aKingOther[i] = SKingOtherSmooth();
+	{
+		SKingOtherSmooth &Other = m_aKingOther[i];
+		if(!KingOthers || !m_Snap.m_aCharacters[i].m_Active)
+		{
+			Other = SKingOtherSmooth();
+			continue;
+		}
+		if(Other.m_Start != vec2(0.0f, 0.0f))
+		{
+			Other.m_ElapsedMs += KingFrameMs;
+			const float T = std::clamp(Other.m_ElapsedMs / CKing::KING_SMOOTH_MS, 0.0f, 1.0f);
+			Other.m_Offset = Other.m_Start * (1.0f - CKing::SmoothEase(T, CKing::SMOOTH_CURVE_SMOOTH));
+			if(T >= 1.0f)
+				Other.m_Start = Other.m_Offset = vec2(0.0f, 0.0f);
+		}
+	}
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -4495,9 +4527,29 @@ void CGameClient::UpdateRenderedCharacters()
 		// KING Smooth: add the fading correction offset to our own tee
 		if(i == m_Snap.m_LocalClientId && m_aClients[i].m_IsPredictedLocal && m_King.SmoothDurationMs() > 0.0f)
 			Pos += m_KingSmoothOffset;
-		// KING: other tees glide over sudden jumps (server corrections, late snapshots)
-		else if(g_Config.m_KgSmoothOthers && i != m_Snap.m_LocalClientId && !m_aClients[i].m_IsPredictedLocal)
-			Pos = KingSmoothOther(i, Pos, KingNewSnapshot);
+		// KING: other tees that are drawn from the plain antiping prediction glide over the
+		// corrections of new snapshots (other ways to draw them smooth by themselves)
+		else if(i != m_Snap.m_LocalClientId)
+		{
+			SKingOtherSmooth &Other = m_aKingOther[i];
+			const bool Plain = KingOthers && m_aClients[i].m_IsPredicted && !m_aClients[i].m_IsPredictedLocal &&
+					   !g_Config.m_ClAntiPingSmooth && !g_Config.m_TcAntiPingImproved && !g_Config.m_TcRemoveAnti &&
+					   !(g_Config.m_TcShowOthersGhosts && g_Config.m_TcSwapGhosts) &&
+					   !(g_Config.m_TcUnpredOthersInFreeze && Client()->m_IsLocalFrozen);
+			if(Plain)
+			{
+				if(g_Config.m_TcFastInput && g_Config.m_TcFastInputOthers)
+					KingFastInputTime(Other.m_DrawnTick, Other.m_DrawnIntra);
+				else
+				{
+					Other.m_DrawnTick = Client()->PredGameTick(g_Config.m_ClDummy);
+					Other.m_DrawnIntra = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+				}
+				Pos += Other.m_Offset;
+			}
+			else
+				Other = SKingOtherSmooth();
+		}
 		m_aClients[i].m_RenderPos = Pos;
 		if(Predict() && i == m_Snap.m_LocalClientId)
 			m_LocalCharacterPos = Pos;
