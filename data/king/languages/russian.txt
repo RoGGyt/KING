@@ -240,8 +240,8 @@ Menus
 Scoreboard (TAB)
 == Таблица игроков (TAB)
 
-Console: kg_ui_scale, kg_scoreboard_scale (50-150)
-== В консоли: kg_ui_scale, kg_scoreboard_scale (50–150)
+Console: kg_ui_scale (50-120), kg_scoreboard_scale (50-150)
+== В консоли: kg_ui_scale (50–120), kg_scoreboard_scale (50–150)
 
 Aspect Ratio
 == Соотношение сторон
@@ -677,3 +677,12 @@ Removed: %s
 
 Hides tabs in the TClient settings only
 == Скрывает вкладки только в настройках TClient
+
+Back to previous
+== Вернуть предыдущее
+
+Back to previous: %s, %s
+== Вернуть предыдущее: %s, %s
+
+Custom: from %.2f to %.2f (width / height)
+== Своё: от %.2f до %.2f (ширина / высота)

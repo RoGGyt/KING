@@ -199,6 +199,9 @@ public:
 	void OnInit() override;
 
 	void RebuildChat();
+	// KING: lines are rebuilt when the font size or width changes from anywhere (menu, console)
+	int m_BuiltFontSize = -1;
+	int m_BuiltWidth = -1;
 	void ClearLines();
 
 	void EnsureCoherentFontSize() const;

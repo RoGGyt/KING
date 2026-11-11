@@ -1285,6 +1285,21 @@ void CChat::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
+	// KING: old lines kept their old size and overlapped the new ones after a size change
+	if(m_BuiltFontSize != g_Config.m_ClChatFontSize || m_BuiltWidth != g_Config.m_ClChatWidth)
+	{
+		if(m_BuiltFontSize != -1)
+		{
+			if(m_BuiltFontSize != g_Config.m_ClChatFontSize)
+				EnsureCoherentWidth();
+			else
+				EnsureCoherentFontSize();
+			RebuildChat();
+		}
+		m_BuiltFontSize = g_Config.m_ClChatFontSize;
+		m_BuiltWidth = g_Config.m_ClChatWidth;
+	}
+
 	// send pending chat messages
 	if(m_PendingChatCounter > 0 && m_LastChatSend + time_freq() < time())
 	{

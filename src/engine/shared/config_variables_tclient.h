@@ -326,7 +326,7 @@ MACRO_CONFIG_INT(KgAspectCustom, kg_aspect_custom, 133, 100, 240, CFGFLAG_CLIENT
 MACRO_CONFIG_INT(KgAspectCustomW, kg_aspect_custom_w, 4, 1, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom aspect ratio: width part (e.g. 4 for 4:3, 1440 for 1440x1080)")
 MACRO_CONFIG_INT(KgAspectCustomH, kg_aspect_custom_h, 3, 1, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom aspect ratio: height part (e.g. 3 for 4:3, 1080 for 1440x1080)")
 MACRO_CONFIG_INT(KgAspectApply, kg_aspect_apply, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "What the aspect ratio stretches in game (0 = full: world, HUD and menus, 1 = only the game world)")
-MACRO_CONFIG_INT(KgUiScale, kg_ui_scale, 100, 50, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of all menus in percent, like the GUI scale in Minecraft (100 = default)")
+MACRO_CONFIG_INT(KgUiScale, kg_ui_scale, 100, 50, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of all menus in percent, like the GUI scale in Minecraft (100 = default)")
 MACRO_CONFIG_INT(KgScoreboardScale, kg_scoreboard_scale, 100, 50, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of the scoreboard (TAB) in percent")
 MACRO_CONFIG_INT(KgBadgeShow, kg_badge_show, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the KING crown left of the names of KING players (in game and in TAB)")
 MACRO_CONFIG_INT(KgBrowserFilterKing, kg_browser_filter_king, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Server browser: only show servers with KING players")

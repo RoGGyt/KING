@@ -466,14 +466,20 @@ float CUi::ScreenScale() const
 {
 	if(m_ScreenScaleOverride > 0.0f)
 		return m_ScreenScaleOverride;
-	return std::clamp(g_Config.m_KgUiScale, 50, 150) / 100.0f;
+	return std::clamp(g_Config.m_KgUiScale, 50, 120) / 100.0f; // above 120% menus no longer fit a 16:9 screen
 }
 
 const CUIRect *CUi::Screen()
 {
 	// KING: a smaller virtual screen makes every menu element bigger (GUI scale)
 	m_Screen.h = 600.0f / ScreenScale();
-	m_Screen.w = Graphics()->ScreenAspect() * m_Screen.h;
+	// a stretched game view stretches the menus too, but never squeezes them narrower
+	// than 5:4: below that the layouts no longer fit and overlap
+	float Aspect = Graphics()->ScreenAspect();
+	const float Native = Graphics()->NativeScreenAspect();
+	if(Aspect != Native)
+		Aspect = std::max(Aspect, std::min(Native, 1.25f));
+	m_Screen.w = Aspect * m_Screen.h;
 
 	// Some buttons (server browser refresh/connect, ...) cache their quads at the
 	// position of their first frame. Stock DDNet only changes the virtual screen on

@@ -748,7 +748,7 @@ float CKing::AspectRatioValue(int Setting)
 	case 5: return 16.0f / 9.0f;
 	case 6:
 		if(g_Config.m_KgAspectCustomW > 0 && g_Config.m_KgAspectCustomH > 0)
-			return std::clamp(g_Config.m_KgAspectCustomW / (float)g_Config.m_KgAspectCustomH, 0.5f, 4.0f);
+			return std::clamp(g_Config.m_KgAspectCustomW / (float)g_Config.m_KgAspectCustomH, ASPECT_MIN, ASPECT_MAX);
 		return 0.0f;
 	}
 	return 0.0f; // native

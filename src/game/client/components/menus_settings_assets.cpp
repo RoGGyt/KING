@@ -363,6 +363,25 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 	CUIRect TabBar, CustomList, QuickSearch, DirectoryButton, ReloadButton;
 
 	MainView.HSplitTop(20.0f, &TabBar, &MainView);
+
+	// KING: arrows to step through the tabs
+	{
+		CUIRect Arrows, PrevArrow, NextArrow;
+		TabBar.VSplitRight(2.0f * TabBar.h * 1.6f + 4.0f, &TabBar, &Arrows);
+		TabBar.VSplitRight(6.0f, &TabBar, nullptr);
+		Arrows.VSplitMid(&PrevArrow, &NextArrow, 4.0f);
+		static CButtonContainer s_PrevTab, s_NextTab;
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+		const bool Prev = DoButton_MenuTab(&s_PrevTab, FontIcon::CHEVRON_LEFT, 0, &PrevArrow, IGraphics::CORNER_ALL, nullptr, nullptr, nullptr, nullptr, 4.0f);
+		const bool Next = DoButton_MenuTab(&s_NextTab, FontIcon::CHEVRON_RIGHT, 0, &NextArrow, IGraphics::CORNER_ALL, nullptr, nullptr, nullptr, nullptr, 4.0f);
+		TextRender()->SetRenderFlags(0);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		if(Prev)
+			s_CurCustomTab = (s_CurCustomTab + NUMBER_OF_ASSETS_TABS - 1) % NUMBER_OF_ASSETS_TABS;
+		if(Next)
+			s_CurCustomTab = (s_CurCustomTab + 1) % NUMBER_OF_ASSETS_TABS;
+	}
 	const float TabWidth = TabBar.w / (float)NUMBER_OF_ASSETS_TABS;
 	static CButtonContainer s_aPageTabs[NUMBER_OF_ASSETS_TABS] = {};
 	const char *apTabNames[NUMBER_OF_ASSETS_TABS] = {

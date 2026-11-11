@@ -239,8 +239,8 @@ Menus
 Scoreboard (TAB)
 == Punktetabelle (TAB)
 
-Console: kg_ui_scale, kg_scoreboard_scale (50-150)
-== Konsole: kg_ui_scale, kg_scoreboard_scale (50-150)
+Console: kg_ui_scale (50-120), kg_scoreboard_scale (50-150)
+== Konsole: kg_ui_scale (50-120), kg_scoreboard_scale (50-150)
 
 Aspect Ratio
 == Seitenverhältnis
@@ -682,3 +682,12 @@ Removed: %s
 
 Hides tabs in the TClient settings only
 == Blendet Tabs nur in den TClient-Einstellungen aus
+
+Back to previous
+== Zurück zur vorherigen
+
+Back to previous: %s, %s
+== Zurück zur vorherigen: %s, %s
+
+Custom: from %.2f to %.2f (width / height)
+== Eigene: von %.2f bis %.2f (Breite / Höhe)

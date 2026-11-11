@@ -106,6 +106,32 @@ struct SKingSections
 	}
 };
 
+// Two columns; a narrow page (big menu size, stretched aspect) puts the right column
+// under the left one instead of squeezing both. Returns true when stacked.
+constexpr float KING_TWO_COLUMNS_MIN = 640.0f;
+bool KingSplitColumns(const CUIRect &MainView, CUIRect &Left, CUIRect &Right)
+{
+	const bool Stacked = MainView.w < KING_TWO_COLUMNS_MIN;
+	if(Stacked)
+	{
+		Left = MainView;
+		Right = MainView;
+	}
+	else
+		MainView.VSplitMid(&Left, &Right, KING_SECTION_GAP); // same gap between the columns as between the sections
+	Left.Margin(KING_MARGIN_SMALL, &Left);
+	Right.Margin(KING_MARGIN_SMALL, &Right);
+	return Stacked;
+}
+// stacked: the right column continues under the left one
+void KingStackRight(bool Stacked, const CUIRect &Left, CUIRect &Right)
+{
+	if(!Stacked)
+		return;
+	Right.y = Left.y + KING_SECTION_GAP + KING_MARGIN;
+	Right.h = std::max(Left.h - KING_SECTION_GAP - KING_MARGIN, 0.0f);
+}
+
 // KING pages line labels up by the ink of their first letter (see CUi::SetInkAlignLeft)
 struct SKingInkAlign
 {
@@ -132,9 +158,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	CUIRect LeftView, RightView, Button;
 	MainView.Margin(KING_MARGIN, &MainView);
-	MainView.VSplitMid(&LeftView, &RightView, KING_SECTION_GAP); // same gap between the columns as between the sections
-	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
-	RightView.Margin(KING_MARGIN_SMALL, &RightView);
+	const bool Stacked = KingSplitColumns(MainView, LeftView, RightView);
 
 	// ***** Input mode ***** //
 	s_Sections.Begin(LeftView);
@@ -350,6 +374,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 
 	s_Sections.End(LeftView);
 
+	KingStackRight(Stacked, LeftView, RightView);
 	// ***** Live network ***** //
 	s_Sections.Begin(RightView);
 	Headline(Ui(), RightView, Localize("Live Network"));
@@ -487,17 +512,15 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 
 	CUIRect LeftView, RightView, Button, Label;
 	MainView.Margin(KING_MARGIN, &MainView);
-	MainView.VSplitMid(&LeftView, &RightView, KING_SECTION_GAP); // same gap between the columns as between the sections
-	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
-	RightView.Margin(KING_MARGIN_SMALL, &RightView);
+	const bool Stacked = KingSplitColumns(MainView, LeftView, RightView);
 
 	// ***** Interface size (like Minecraft's GUI scale) ***** //
 	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, Localize("Interface Size"));
 	{
-		static std::vector<CButtonContainer> s_vMenuScale = {{}, {}, {}, {}, {}, {}};
+		static std::vector<CButtonContainer> s_vMenuScale = {{}, {}, {}, {}, {}};
 		int Value = g_Config.m_KgUiScale;
-		if(DoLine_RadioMenu(LeftView, Localize("Menus"), s_vMenuScale, {"80%", "90%", "100%", "110%", "120%", "130%"}, {80, 90, 100, 110, 120, 130}, Value))
+		if(DoLine_RadioMenu(LeftView, Localize("Menus"), s_vMenuScale, {"80%", "90%", "100%", "110%", "120%"}, {80, 90, 100, 110, 120}, Value))
 			g_Config.m_KgUiScale = Value;
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
@@ -505,9 +528,15 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_KgScoreboardScale, &g_Config.m_KgScoreboardScale, &Button, Localize("Scoreboard (TAB)"), 50, 150, &CUi::ms_LinearScrollbarScale, 0u, "%");
 		LeftView.HSplitTop(KING_LINE, &Button, &LeftView);
 		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_ClChatFontSize, &g_Config.m_ClChatFontSize, &Button, Localize("Chat"), 10, 100);
+		if(Ui()->DoScrollbarOption(&g_Config.m_ClChatFontSize, &g_Config.m_ClChatFontSize, &Button, Localize("Chat"), 10, 100))
+		{
+			GameClient()->m_Chat.EnsureCoherentWidth();
+			GameClient()->m_Chat.RebuildChat();
+			GameClient()->m_Chat.m_BuiltFontSize = g_Config.m_ClChatFontSize;
+			GameClient()->m_Chat.m_BuiltWidth = g_Config.m_ClChatWidth;
+		}
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
-		TextLine(Ui(), LeftView, Localize("Console: kg_ui_scale, kg_scoreboard_scale (50-150)"), 11.0f);
+		TextLine(Ui(), LeftView, Localize("Console: kg_ui_scale (50-120), kg_scoreboard_scale (50-150)"), 11.0f);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 	s_Sections.End(LeftView);
@@ -517,6 +546,25 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	s_Sections.Begin(LeftView);
 	Headline(Ui(), LeftView, Localize("Aspect Ratio"));
 	{
+		// what was set before the last change made here, for "Previous"
+		struct SAspect
+		{
+			int m_Ratio, m_W, m_H, m_Apply;
+			bool operator==(const SAspect &Other) const { return m_Ratio == Other.m_Ratio && m_W == Other.m_W && m_H == Other.m_H && m_Apply == Other.m_Apply; }
+		};
+		const auto Current = []() { return SAspect{g_Config.m_KgAspectRatio, g_Config.m_KgAspectCustomW, g_Config.m_KgAspectCustomH, g_Config.m_KgAspectApply}; };
+		static SAspect s_Prev;
+		static bool s_HasPrev = false;
+		const SAspect Before = Current();
+		static CLineInputNumber s_Width, s_Height;
+		static bool s_Init = false;
+		if(!s_Init)
+		{
+			s_Width.SetInteger(g_Config.m_KgAspectCustomW);
+			s_Height.SetInteger(g_Config.m_KgAspectCustomH);
+			s_Init = true;
+		}
+
 		static CUi::SDropDownState s_PresetState;
 		static CScrollRegion s_PresetScrollRegion;
 		s_PresetState.m_SelectionPopupContext.m_pScrollRegion = &s_PresetScrollRegion; // the popup needs one, or it crashes
@@ -534,14 +582,6 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 
 		if(g_Config.m_KgAspectRatio == 6)
 		{
-			static CLineInputNumber s_Width, s_Height;
-			static bool s_Init = false;
-			if(!s_Init)
-			{
-				s_Width.SetInteger(g_Config.m_KgAspectCustomW);
-				s_Height.SetInteger(g_Config.m_KgAspectCustomH);
-				s_Init = true;
-			}
 			Control = LabeledRow(Ui(), LeftView, Localize("Custom size"));
 			CUIRect WidthBox, Colon, HeightBox;
 			Control.VSplitMid(&WidthBox, &HeightBox, 16.0f);
@@ -561,7 +601,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 			{
 				const int W = s_Width.GetInteger();
 				const int H = s_Height.GetInteger();
-				if(W > 0 && H > 0 && W <= 10000 && H <= 10000 && W / (float)H >= 0.5f && W / (float)H <= 4.0f)
+				if(W > 0 && H > 0 && W <= 10000 && H <= 10000 && W / (float)H >= CKing::ASPECT_MIN - 0.001f && W / (float)H <= CKing::ASPECT_MAX + 0.001f)
 				{
 					g_Config.m_KgAspectCustomW = W;
 					g_Config.m_KgAspectCustomH = H;
@@ -580,7 +620,52 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 			str_format(aNow, sizeof(aNow), Localize("Screen %.2f, the game uses the same"), Screen);
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.6f);
 		TextLine(Ui(), LeftView, aNow, 11.0f);
+		if(g_Config.m_KgAspectRatio == 6)
+		{
+			char aRange[64];
+			str_format(aRange, sizeof(aRange), Localize("Custom: from %.2f to %.2f (width / height)"), CKing::ASPECT_MIN, CKing::ASPECT_MAX);
+			TextLine(Ui(), LeftView, aRange, 11.0f);
+		}
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		// a change made above: remember what it was before
+		const SAspect After = Current();
+		if(!(After == Before))
+		{
+			s_Prev = Before;
+			s_HasPrev = true;
+		}
+
+		// back to the previous setting (pressing again swaps back)
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
+		CUIRect PrevRow;
+		LeftView.HSplitTop(KING_LINE, &PrevRow, &LeftView);
+		static CButtonContainer s_PrevButton;
+		char aPrev[96];
+		if(s_HasPrev)
+		{
+			const char *apNames[] = {Localize("Native"), "4:3", "5:4", "3:2", "16:10", "16:9"};
+			char aName[32];
+			if(s_Prev.m_Ratio == 6)
+				str_format(aName, sizeof(aName), "%d:%d", s_Prev.m_W, s_Prev.m_H);
+			else
+				str_copy(aName, apNames[std::clamp(s_Prev.m_Ratio, 0, 5)]);
+			str_format(aPrev, sizeof(aPrev), Localize("Back to previous: %s, %s"), aName, s_Prev.m_Apply == CKing::ASPECT_APPLY_FULL ? Localize("Full") : Localize("World only"));
+		}
+		else
+			str_copy(aPrev, Localize("Back to previous"));
+		if(DoButton_Menu(&s_PrevButton, aPrev, 0, &PrevRow, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, s_HasPrev ? 0.5f : 0.15f)) && s_HasPrev)
+		{
+			const SAspect Now = Current();
+			g_Config.m_KgAspectRatio = s_Prev.m_Ratio;
+			g_Config.m_KgAspectCustomW = s_Prev.m_W;
+			g_Config.m_KgAspectCustomH = s_Prev.m_H;
+			g_Config.m_KgAspectApply = s_Prev.m_Apply;
+			s_Prev = Now;
+			s_Width.SetInteger(g_Config.m_KgAspectCustomW);
+			s_Height.SetInteger(g_Config.m_KgAspectCustomH);
+		}
+		LeftView.HSplitTop(KING_MARGIN_SMALL, nullptr, &LeftView);
 	}
 	s_Sections.End(LeftView);
 
@@ -596,6 +681,7 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	Ui()->DoScrollbarOption(&g_Config.m_KgAssetsTile, &g_Config.m_KgAssetsTile, &Button, Localize("Asset catalog tile size"), 60, 240, &CUi::ms_LinearScrollbarScale, 0u, "");
 	s_Sections.End(LeftView);
 
+	KingStackRight(Stacked, LeftView, RightView);
 	// ***** Music player ***** //
 	s_Sections.Begin(RightView);
 	{

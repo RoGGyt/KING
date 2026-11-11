@@ -64,6 +64,9 @@ public:
 		ASPECT_APPLY_FULL = 0, // world, HUD and in-game menus
 		ASPECT_APPLY_WORLD, // only the game world
 	};
+	// sane range for a stretched game view (5:4 is 1.25, 21:9 is 2.33)
+	static constexpr float ASPECT_MIN = 1.0f;
+	static constexpr float ASPECT_MAX = 2.4f;
 
 	enum EMusicColor
 	{

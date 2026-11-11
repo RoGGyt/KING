@@ -58,10 +58,13 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Credits")};
 	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
 
+	// KING: the tabs shrink to fit, so every tab (KING too) stays reachable at any menu size
+	const float TabStep = std::min(36.0f, (TabBar.h - 6.0f) / SETTINGS_LENGTH);
+	const float TabGap = TabStep * (10.0f / 36.0f);
 	for(int i = 0; i < SETTINGS_LENGTH; i++)
 	{
-		TabBar.HSplitTop(10.0f, nullptr, &TabBar);
-		TabBar.HSplitTop(26.0f, &Button, &TabBar);
+		TabBar.HSplitTop(TabGap, nullptr, &TabBar);
+		TabBar.HSplitTop(TabStep - TabGap, &Button, &TabBar);
 		if(DoButton_MenuTab(&s_aTabButtons[i], apTabs[i], g_Config.m_UiSettingsPage == i, &Button, IGraphics::CORNER_R, &m_aAnimatorsSettingsTab[i]))
 			g_Config.m_UiSettingsPage = i;
 	}
