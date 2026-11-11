@@ -50,6 +50,7 @@ public:
 		Abortable(true);
 	}
 	std::vector<SKingLyricLine> m_vLines;
+	float m_SongDuration = 0.0f; // length of the song the lyrics are for (from lrclib)
 
 private:
 	std::shared_ptr<IHttpRequest> m_pRequest;
@@ -63,6 +64,7 @@ private:
 		if(!pJson)
 			return;
 		const char *pSynced = nullptr;
+		float SongDuration = 0.0f;
 		if(pJson->type == json_array)
 		{
 			// the result whose length is closest to what plays (if the player tells us)
@@ -74,18 +76,21 @@ private:
 				if(Synced.type != json_string || !Synced.u.string.length)
 					continue;
 				const json_value &Duration = Entry["duration"];
+				const float Length = Duration.type == json_double ? (float)Duration.u.dbl : (Duration.type == json_integer ? (float)Duration.u.integer : 0.0f);
 				float Diff = 0.0f;
-				if(m_DurationSec > 0.0f && (Duration.type == json_double || Duration.type == json_integer))
-					Diff = absolute((Duration.type == json_double ? (float)Duration.u.dbl : (float)Duration.u.integer) - m_DurationSec);
+				if(m_DurationSec > 0.0f && Length > 0.0f)
+					Diff = absolute(Length - m_DurationSec);
 				if(Diff < BestDiff)
 				{
 					BestDiff = Diff;
 					pSynced = Synced.u.string.ptr;
+					SongDuration = Length;
 				}
 			}
 			if(BestDiff > 10.0f)
 				pSynced = nullptr; // a different version of the song, timings would be off
 		}
+		m_SongDuration = pSynced ? SongDuration : 0.0f;
 		if(pSynced)
 		{
 			const char *p = pSynced;
@@ -1599,7 +1604,10 @@ float CKing::RenderMusicPill(float CenterX, float TopY, float Unit, const char *
 	int Next = -1; // next line with text
 	float Progress = 0.0f; // karaoke fill of the line, or of the dots
 	bool Dots = false;
-	if(g_Config.m_KgMusicHud && g_Config.m_KgMusicLyrics && Info.m_Valid && Info.m_HasTimeline && !m_vLyrics.empty() &&
+	// Some players start the next song (length and position) before they update its
+	// title: lyrics for a song of another length belong to the previous song, hide them
+	const bool OtherSong = m_LyricsSongDuration > 0.0f && Info.m_DurationSec > 0.0f && absolute(Info.m_DurationSec - m_LyricsSongDuration) > 10.0f;
+	if(g_Config.m_KgMusicHud && g_Config.m_KgMusicLyrics && Info.m_Valid && Info.m_HasTimeline && !m_vLyrics.empty() && !OtherSong &&
 		m_LyricsTrack == std::string(Info.m_aTitle) + "\n" + Info.m_aArtist)
 	{
 		const float LookAhead = 0.05f; // a line appears a moment before it is sung
@@ -1970,6 +1978,7 @@ void CKing::UpdateLyrics(const SKingMediaInfo &Info)
 		m_pLyricsJob = nullptr;
 	}
 	m_vLyrics.clear();
+	m_LyricsSongDuration = 0.0f;
 	ResetIslands();
 	m_LyricsTrack.clear();
 	m_LyricsWanted = Track;
@@ -2063,6 +2072,7 @@ void CKing::FinishLyrics()
 	if(Track != m_LyricsWanted || pJob->State() != IJob::STATE_DONE)
 		return; // the song changed meanwhile; UpdateLyrics() starts over
 	m_vLyrics = std::move(pJob->m_vLines);
+	m_LyricsSongDuration = pJob->m_SongDuration;
 	ResetIslands();
 
 	if(!m_vLyrics.empty() || m_LyricsAttempt >= 1)

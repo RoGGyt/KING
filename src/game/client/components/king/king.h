@@ -268,6 +268,7 @@ private:
 	// lyrics (lrclib.net, synced lyrics); the reply is parsed on a job thread
 	std::vector<SKingLyricLine> m_vLyrics;
 	std::shared_ptr<class CKingLyricsJob> m_pLyricsJob;
+	float m_LyricsSongDuration = 0.0f; // length of the song m_vLyrics is for (0 = unknown)
 	std::string m_LyricsTrack; // "title\nartist" the lyrics belong to
 	std::string m_LyricsWanted; // track we fetch for
 	std::shared_ptr<IHttpRequest> m_pLyricsTask = nullptr;
