@@ -853,7 +853,11 @@ CLabelResult CUi::DoLabel(const CUIRect *pRect, const char *pText, float Size, i
 	Cursor.m_Flags |= Flags;
 	Cursor.m_vColorSplits = LabelProps.m_vColorSplits;
 	Cursor.m_LineWidth = (float)LabelProps.m_MaxWidth;
+	const unsigned OldRenderFlags = TextRender()->GetRenderFlags();
+	if(m_InkAlignLeft && (Align & TEXTALIGN_MASK_HORIZONTAL) == TEXTALIGN_LEFT)
+		TextRender()->SetRenderFlags(OldRenderFlags | ETextRenderFlags::TEXT_RENDER_FLAG_NO_FIRST_CHARACTER_X_BEARING);
 	TextRender()->TextEx(&Cursor, pText, -1);
+	TextRender()->SetRenderFlags(OldRenderFlags);
 	return CLabelResult{.m_Truncated = Cursor.m_Truncated};
 }
 
@@ -879,7 +883,11 @@ void CUi::DoLabel(CUIElement::SUIElementRect &RectEl, const CUIRect *pRect, cons
 	RectEl.m_TextOutlineColor = TextRender()->GetTextOutlineColor();
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+	const unsigned OldRenderFlags = TextRender()->GetRenderFlags();
+	if(m_InkAlignLeft && !pReadCursor && (Align & TEXTALIGN_MASK_HORIZONTAL) == TEXTALIGN_LEFT)
+		TextRender()->SetRenderFlags(OldRenderFlags | ETextRenderFlags::TEXT_RENDER_FLAG_NO_FIRST_CHARACTER_X_BEARING);
 	TextRender()->CreateTextContainer(RectEl.m_UITextContainer, &Cursor, pText, StrLen);
+	TextRender()->SetRenderFlags(OldRenderFlags);
 	TextRender()->TextColor(RectEl.m_TextColor);
 	TextRender()->TextOutlineColor(RectEl.m_TextOutlineColor);
 	RectEl.m_Cursor = Cursor;

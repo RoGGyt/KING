@@ -327,6 +327,7 @@ public:
 
 class CUi
 {
+	bool m_InkAlignLeft = false; // KING, see SetInkAlignLeft
 public:
 	/**
 	 * These enum values are returned by popup menu functions to specify the behavior.
@@ -631,6 +632,10 @@ public:
 	void DoSmoothScrollLogic(float *pScrollOffset, float *pScrollOffsetChange, float ViewPortSize, float TotalSize, bool SmoothClamp = false, float ScrollSpeed = 10.0f) const;
 	static vec2 CalcAlignedCursorPos(const CUIRect *pRect, vec2 TextSize, int Align, const float *pBiggestCharHeight = nullptr);
 
+	// KING: left aligned labels start at the ink of their first letter (not at its side
+	// bearing), so rows of labels, checkboxes and hints line up to the pixel
+	void SetInkAlignLeft(bool InkAlign) { m_InkAlignLeft = InkAlign; }
+	bool InkAlignLeft() const { return m_InkAlignLeft; }
 	CLabelResult DoLabel(const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps = {}) const;
 	CLabelResult DoLabel_AutoLineSize(const char *pText, float FontSize, int Align, CUIRect *pRect, float LineSize, const SLabelProperties &LabelProps = {}) const;
 

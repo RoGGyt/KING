@@ -676,3 +676,9 @@ Remove a whole weapon:
 
 Removed: %s
 == Entfernt: %s
+
+(%.1f ms ahead)
+== (%.1f ms voraus)
+
+Hides tabs in the TClient settings only
+== Blendet Tabs nur in den TClient-Einstellungen aus

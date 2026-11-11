@@ -311,6 +311,8 @@ int CMenus::DoButton_CheckBox_Common(const void *pId, const char *pText, const c
 	Label.VSplitLeft(5.0f, nullptr, &Label);
 
 	Box.Margin(2.0f, &Box);
+	if(Ui()->InkAlignLeft())
+		Box.x = pRect->x; // flush with the labels above and below
 	if(g_Config.m_KgMenuStyle)
 		Box.Draw(*pBoxText == 'X' ? ColorRGBA(0.91f, 0.70f, 0.29f, 0.9f) : ColorRGBA(1, 1, 1, 0.1f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
 	else

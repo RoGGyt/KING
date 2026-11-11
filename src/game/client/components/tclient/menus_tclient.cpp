@@ -2219,26 +2219,37 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 
 	char aBuf[128 + IO_MAX_PATH_LENGTH];
-	CUIRect TClientConfig, ProfilesFile, WarlistFile, ChatbindsFile;
+	CUIRect TClientConfig, DDNetConfig, ProfilesFile, WarlistFile, ChatbindsFile;
 
+	// KING and TClient settings share settings_tclient.cfg; DDNet's own are in settings_ddnet.cfg
 	LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
-	Button.VSplitMid(&TClientConfig, &ProfilesFile, MarginSmall);
+	Button.VSplitMid(&TClientConfig, &DDNetConfig, MarginSmall);
 
-	static CButtonContainer s_Config, s_Profiles, s_Warlist, s_Chatbinds;
-	if(DoButtonLineSize_Menu(&s_Config, "KING Settings", 0, &TClientConfig, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	static CButtonContainer s_Config, s_DDNetConfig, s_Profiles, s_Warlist, s_Chatbinds;
+	if(DoButtonLineSize_Menu(&s_Config, "KING + TClient Settings", 0, &TClientConfig, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 	{
 		Storage()->GetCompletePath(IStorage::TYPE_SAVE, s_aConfigDomains[ConfigDomain::TCLIENT].m_aConfigPath, aBuf, sizeof(aBuf));
 		Client()->ViewFile(aBuf);
+	}
+	if(DoButtonLineSize_Menu(&s_DDNetConfig, "DDNet Settings", 0, &DDNetConfig, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	{
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, s_aConfigDomains[ConfigDomain::DDNET].m_aConfigPath, aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+	{
+		CUIRect Rest;
+		Button.VSplitLeft((Button.w - 2.0f * MarginSmall) / 3.0f, &ProfilesFile, &Rest);
+		Rest.VSplitLeft(MarginSmall, nullptr, &Rest);
+		Rest.VSplitMid(&WarlistFile, &ChatbindsFile, MarginSmall);
 	}
 	if(DoButtonLineSize_Menu(&s_Profiles, TCLocalize("Profiles"), 0, &ProfilesFile, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 	{
 		Storage()->GetCompletePath(IStorage::TYPE_SAVE, s_aConfigDomains[ConfigDomain::TCLIENTPROFILES].m_aConfigPath, aBuf, sizeof(aBuf));
 		Client()->ViewFile(aBuf);
 	}
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
-	Button.VSplitMid(&WarlistFile, &ChatbindsFile, MarginSmall);
 
 	if(DoButtonLineSize_Menu(&s_Warlist, TCLocalize("War List"), 0, &WarlistFile, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 	{
@@ -2280,6 +2291,10 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
 	Ui()->DoLabel(&Label, TCLocalize("Hide Settings Tabs"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(LineSize, &Label, &RightView);
+	TextRender()->TextColor(ColorRGBA(0.78f, 0.80f, 0.86f, 0.55f));
+	Ui()->DoLabel(&Label, Localize("Hides tabs in the TClient settings only"), FontSize * 0.85f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 	CUIRect LeftSettings, RightSettings;
 

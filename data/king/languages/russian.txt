@@ -671,3 +671,9 @@ Remove a whole weapon:
 
 Removed: %s
 == Удалено: %s
+
+(%.1f ms ahead)
+== (на %.1f мс вперёд)
+
+Hides tabs in the TClient settings only
+== Скрывает вкладки только в настройках TClient

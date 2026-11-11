@@ -74,10 +74,14 @@ struct SKingSections
 	std::vector<CUIRect> m_vBoxes;
 	std::vector<CUIRect> m_vNext;
 	float m_PrevScrollY = 0.0f;
-	void Draw(float ScrollY)
+	void Draw(float ScrollY, CUi *pUi)
 	{
 		const float Shift = ScrollY - m_PrevScrollY; // the page scrolled since last frame
 		m_PrevScrollY = ScrollY;
+		// an open dropdown would stay where it was while the page moves away under it:
+		// close it, like browsers do
+		if(Shift != 0.0f && pUi->IsPopupOpen())
+			pUi->ClosePopupMenus();
 		for(CUIRect Box : m_vBoxes)
 		{
 			Box.y += Shift;
@@ -102,10 +106,20 @@ struct SKingSections
 	}
 };
 
+// KING pages line labels up by the ink of their first letter (see CUi::SetInkAlignLeft)
+struct SKingInkAlign
+{
+	CUi *m_pUi;
+	explicit SKingInkAlign(CUi *pUi) :
+		m_pUi(pUi) { m_pUi->SetInkAlignLeft(true); }
+	~SKingInkAlign() { m_pUi->SetInkAlignLeft(false); }
+};
+
 } // namespace
 
 void CMenus::RenderSettingsKing(CUIRect MainView)
 {
+	const SKingInkAlign InkAlign(Ui());
 	static CScrollRegion s_ScrollRegion;
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 60.0f;
@@ -114,11 +128,11 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 	MainView.VSplitRight(10.0f, &MainView, nullptr); // room for the scrollbar
 
 	static SKingSections s_Sections;
-	s_Sections.Draw(MainView.y);
+	s_Sections.Draw(MainView.y, Ui());
 
 	CUIRect LeftView, RightView, Button;
 	MainView.Margin(KING_MARGIN, &MainView);
-	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 4.0f);
+	MainView.VSplitMid(&LeftView, &RightView, KING_SECTION_GAP); // same gap between the columns as between the sections
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
@@ -172,10 +186,21 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		int Curve = g_Config.m_KgBestInterpolation;
 		if(DoLine_RadioMenu(LeftView, Localize("Interpolation"), s_vCurve, {Localize("Linear"), Localize("Cubic"), Localize("Smooth")}, {0, 1, 2}, Curve))
 			g_Config.m_KgBestInterpolation = Curve;
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBestOthers, Localize("Apply to other tees"), &g_Config.m_KgBestOthers, &LeftView, KING_LINE);
-		char aNow[96];
-		str_format(aNow, sizeof(aNow), Localize("= %.1f ms ahead"), GameClient()->m_King.BestFastMsExact());
-		TextLine(Ui(), LeftView, aNow, 11.0f);
+		{
+			// "Apply to other tees" with the resulting offset after it, dimmed
+			CUIRect Row;
+			LeftView.HSplitTop(KING_LINE, &Row, nullptr);
+			const char *pOthers = Localize("Apply to other tees");
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgBestOthers, pOthers, &g_Config.m_KgBestOthers, &LeftView, KING_LINE);
+			const float LabelSize = (Row.h - 4.0f) * CUi::ms_FontmodHeight;
+			char aNow[96];
+			str_format(aNow, sizeof(aNow), Localize("(%.1f ms ahead)"), GameClient()->m_King.BestFastMsExact());
+			CUIRect Ahead = Row;
+			Ahead.VSplitLeft(Row.h + 5.0f + TextRender()->TextWidth(LabelSize, pOthers) + 6.0f, nullptr, &Ahead);
+			TextRender()->TextColor(KING_TEXT_HINT);
+			Ui()->DoLabel(&Ahead, aNow, LabelSize * 0.85f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
 		break;
 	}
 	case CKing::INPUT_MODE_CLASSIC:
@@ -386,6 +411,7 @@ void CMenus::RenderSettingsKing(CUIRect MainView)
 		default: str_format(aBuf, sizeof(aBuf), Localize("Version %s"), KING_VERSION); break;
 		}
 		TextLine(Ui(), RightView, aBuf);
+		RightView.HSplitTop(KING_MARGIN_SMALL, nullptr, &RightView);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_KgUpdateCheck, Localize("Check for updates on start"), &g_Config.m_KgUpdateCheck, &RightView, KING_LINE);
 
 		CUIRect CheckButton, DownloadButton;
@@ -447,6 +473,7 @@ CUIRect LabeledRow(CUi *pUi, CUIRect &Column, const char *pLabel, float LabelFra
 
 void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 {
+	const SKingInkAlign InkAlign(Ui());
 	// scrolls, so bigger menu sizes still fit
 	static CScrollRegion s_ScrollRegion;
 	CScrollRegionParams ScrollParams;
@@ -456,11 +483,11 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 	MainView.VSplitRight(10.0f, &MainView, nullptr); // room for the scrollbar
 
 	static SKingSections s_Sections;
-	s_Sections.Draw(MainView.y);
+	s_Sections.Draw(MainView.y, Ui());
 
 	CUIRect LeftView, RightView, Button, Label;
 	MainView.Margin(KING_MARGIN, &MainView);
-	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 4.0f);
+	MainView.VSplitMid(&LeftView, &RightView, KING_SECTION_GAP); // same gap between the columns as between the sections
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
@@ -691,12 +718,13 @@ void CMenus::RenderSettingsKingDisplay(CUIRect MainView)
 
 void CMenus::RenderSettingsKingPerformance(CUIRect MainView)
 {
+	const SKingInkAlign InkAlign(Ui());
 	static SKingSections s_Sections;
-	s_Sections.Draw(MainView.y);
+	s_Sections.Draw(MainView.y, Ui());
 
 	CUIRect LeftView, RightView, Button;
 	MainView.Margin(KING_MARGIN, &MainView);
-	MainView.VSplitMid(&LeftView, &RightView, KING_MARGIN * 4.0f);
+	MainView.VSplitMid(&LeftView, &RightView, KING_SECTION_GAP); // same gap between the columns as between the sections
 	LeftView.Margin(KING_MARGIN_SMALL, &LeftView);
 	RightView.Margin(KING_MARGIN_SMALL, &RightView);
 
