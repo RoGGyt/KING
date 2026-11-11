@@ -249,6 +249,7 @@ public:
 		vec2 m_Offset = vec2(0.0f, 0.0f);
 		vec2 m_Start = vec2(0.0f, 0.0f);
 		float m_ElapsedMs = 0.0f;
+		bool m_Shown = false; // the offset was drawn last frame
 	};
 	SKingOtherSmooth m_aKingOther[MAX_CLIENTS];
 	int m_KingOtherLastGameTick = 0;

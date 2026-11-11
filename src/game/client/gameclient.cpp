@@ -2857,7 +2857,9 @@ void CGameClient::OnPredict()
 	}
 
 	// other tees: where each one was drawn, before the new snapshot changes its prediction
-	const bool KingOthersNew = g_Config.m_KgSmoothOthers && KingGameTick != m_KingOtherLastGameTick;
+	// (measured for all of them also when only our own tee is smoothed: tees linked to us
+	// by a hook then glide with us, see UpdateRenderedCharacters)
+	const bool KingOthersNew = (g_Config.m_KgSmoothOthers || m_King.SmoothDurationMs() > 0.0f) && KingGameTick != m_KingOtherLastGameTick;
 	m_KingOtherLastGameTick = KingGameTick;
 	bool aKingOtherHave[MAX_CLIENTS] = {};
 	vec2 aKingOtherOld[MAX_CLIENTS];
@@ -4417,7 +4419,7 @@ void CGameClient::UpdateRenderedCharacters()
 
 	// KING: the same for other tees; gone tees (or the option off, or no prediction as when
 	// spectating: snapshot positions are continuous, there is nothing to smooth) are reset
-	const bool KingOthers = g_Config.m_KgSmoothOthers && Predict();
+	const bool KingOthers = (g_Config.m_KgSmoothOthers || KingSmoothMs > 0.0f) && Predict();
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		SKingOtherSmooth &Other = m_aKingOther[i];
@@ -4545,7 +4547,24 @@ void CGameClient::UpdateRenderedCharacters()
 					Other.m_DrawnTick = Client()->PredGameTick(g_Config.m_ClDummy);
 					Other.m_DrawnIntra = Client()->PredIntraGameTick(g_Config.m_ClDummy);
 				}
-				Pos += Other.m_Offset;
+				// All tees with "smooth others"; otherwise only a tee linked to ours by a hook
+				// (it hooks us or we hook it) while our own corrections are smoothed. A
+				// correction then moves both: if only our tee (and the camera with it) glided,
+				// the other tee and the hook between us would jump on screen instead.
+				bool Show = g_Config.m_KgSmoothOthers != 0;
+				if(!Show && m_Snap.m_LocalClientId >= 0 && m_aClients[m_Snap.m_LocalClientId].m_IsPredictedLocal)
+				{
+					const bool Linked = m_aClients[i].m_Predicted.HookedPlayer() == m_Snap.m_LocalClientId ||
+							    m_aClients[m_Snap.m_LocalClientId].m_Predicted.HookedPlayer() == i;
+					// a glide that started before the link is dropped (it would pop in half way);
+					// one that is being shown finishes after the hook lets go
+					if(Linked && !Other.m_Shown && Other.m_ElapsedMs > KingFrameMs * 1.5f)
+						Other.m_Start = Other.m_Offset = vec2(0.0f, 0.0f);
+					Show = Linked || (Other.m_Shown && Other.m_Start != vec2(0.0f, 0.0f));
+				}
+				Other.m_Shown = Show;
+				if(Show)
+					Pos += Other.m_Offset;
 			}
 			else
 				Other = SKingOtherSmooth();
